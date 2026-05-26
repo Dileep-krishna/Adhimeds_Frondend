@@ -15,11 +15,13 @@ export default function DeliveryReports() {
     ],
   });
 
-  // ✅ SAFE localStorage usage
+  // ✅ FIX: safe localStorage access (no SSR crash)
   useEffect(() => {
-    const storedDistrict = localStorage.getItem("staffDistrict");
-    if (storedDistrict) {
-      setDistrict(storedDistrict);
+    if (typeof window !== "undefined") {
+      const storedDistrict = localStorage.getItem("staffDistrict");
+      if (storedDistrict) {
+        setDistrict(storedDistrict);
+      }
     }
   }, []);
 
