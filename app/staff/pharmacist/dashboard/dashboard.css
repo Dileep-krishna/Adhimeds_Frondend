@@ -1,0 +1,217 @@
+/* ========== PHARMACIST DASHBOARD – PREMIUM STYLES ========== */
+
+/* Fade-in animation for the whole page */
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Card pop animation */
+@keyframes cardPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  80% {
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Page heading */
+h2 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #1e293b, #3b82f6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 1.5rem;
+  animation: fadeSlideUp 0.5s ease-out;
+}
+
+/* Stats row */
+.stats-row {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+/* Stat cards */
+.stat-card {
+  flex: 1;
+  min-width: 200px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 1.5rem;
+  padding: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  animation: cardPop 0.4s ease-out forwards;
+}
+
+.stat-card:nth-child(1) { animation-delay: 0.05s; border-bottom: 3px solid #f59e0b; }
+.stat-card:nth-child(2) { animation-delay: 0.1s; border-bottom: 3px solid #10b981; }
+
+.stat-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 30px -12px rgba(0, 0, 0, 0.15);
+}
+
+.stat-card i {
+  font-size: 2.2rem;
+  padding: 0.8rem;
+  border-radius: 1.2rem;
+  background: #ffffffcc;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+}
+
+.stat-card:nth-child(1) i {
+  color: #f59e0b;
+  background: #fed7aa;
+}
+.stat-card:nth-child(2) i {
+  color: #10b981;
+  background: #d1fae5;
+}
+
+.stat-card div {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-card span {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #0f172a;
+}
+
+.stat-card label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+  letter-spacing: 0.5px;
+  margin-top: 0.2rem;
+}
+
+/* Table wrapper */
+.table-wrapper {
+  background: white;
+  border-radius: 1.2rem;
+  overflow-x: auto;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+  border: 1px solid #eef2ff;
+  transition: all 0.2s;
+}
+
+.table-wrapper:hover {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 600px;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 1rem 1.2rem;
+  background: linear-gradient(90deg, #f8fafc, #fef3c7);
+  color: #1e293b;
+  font-weight: 700;
+  font-size: 0.85rem;
+  border-bottom: 2px solid #fde68a;
+}
+
+.data-table td {
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+  color: #334155;
+  transition: background 0.2s;
+}
+
+.data-table tr:hover td {
+  background: #fffbeb;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  padding: 0.3rem 0.9rem;
+  border-radius: 2rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.badge-warning {
+  background: linear-gradient(135deg, #fff3e0, #fed7aa);
+  color: #ea580c;
+  border: 1px solid #fed7aa;
+}
+
+.badge-success {
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+/* Buttons */
+.btn-sm {
+  padding: 0.3rem 1rem;
+  border-radius: 2rem;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  color: white;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  h2 {
+    font-size: 1.4rem;
+  }
+  .stats-row {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .stat-card {
+    min-width: auto;
+  }
+  .data-table th,
+  .data-table td {
+    padding: 0.7rem;
+    font-size: 0.8rem;
+  }
+  .btn-sm {
+    padding: 0.2rem 0.8rem;
+  }
+}

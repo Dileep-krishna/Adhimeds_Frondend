@@ -1,0 +1,217 @@
+/* ========== GLOBAL RESET & LAYOUT ========== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.super-admin-layout {
+  display: flex;
+  min-height: 100vh;
+  background: #f4f6f9;
+  position: relative;
+}
+
+/* ========== SIDEBAR (DESKTOP) ========== */
+.sidebar {
+  width: 280px;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  color: white;
+  transition: all 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  height: 100vh;
+  z-index: 100;
+  left: 0;
+  top: 0;
+  overflow-y: auto;
+}
+
+/* Closed state (desktop) */
+.sidebar.closed {
+  width: 80px;
+}
+
+.sidebar.closed .logo {
+  font-size: 1.2rem;
+  text-align: center;
+}
+
+.sidebar.closed .toggle-btn {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.sidebar-header {
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logo {
+  font-size: 1.4rem;
+  font-weight: bold;
+  background: linear-gradient(135deg, #60a5fa, #a78bfa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin: 0;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.toggle-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.2s;
+}
+
+.toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Navigation */
+.sidebar-nav {
+  flex: 1;
+  padding: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  color: #cbd5e1;
+  text-decoration: none;
+  transition: all 0.2s;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.nav-item i {
+  font-size: 1.25rem;
+  min-width: 24px;
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+  transform: translateX(5px);
+}
+
+.nav-item.active {
+  background: linear-gradient(90deg, #3b82f6, transparent);
+  color: white;
+  border-left: 3px solid #3b82f6;
+}
+
+/* Footer */
+.sidebar-footer {
+  padding: 1rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: auto;
+}
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: 0.2s;
+}
+
+.logout-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Main content */
+.main-content {
+  flex: 1;
+  margin-left: 280px;
+  transition: margin-left 0.3s;
+  padding: 1rem;
+  width: 100%;
+  min-height: 100vh;
+}
+
+.main-content.expanded {
+  margin-left: 80px;
+}
+
+/* ========== MOBILE MENU BUTTON (hidden on desktop) ========== */
+.mobile-menu-btn {
+  display: none;
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 101;
+  background: #1e293b;
+  border: none;
+  color: white;
+  padding: 0.6rem;
+  border-radius: 0.8rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* ========== RESPONSIVE (TABLETS & MOBILE) ========== */
+@media (max-width: 768px) {
+  .mobile-menu-btn {
+    display: block;
+  }
+
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    width: 280px;
+    box-shadow: none;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: 2px 0 12px rgba(0,0,0,0.3);
+  }
+
+  /* When sidebar is open, prevent body scroll (optional) */
+  body.sidebar-open {
+    overflow: hidden;
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+    padding-top: 4rem;
+  }
+
+  /* Hide toggle button inside sidebar on mobile (redundant) */
+  .sidebar .toggle-btn {
+    display: none;
+  }
+
+  .sidebar-header {
+    justify-content: center;
+    padding: 1rem;
+  }
+
+  .sidebar.closed {
+    width: 280px; /* closed state ignored on mobile – always full width when open */
+  }
+}
