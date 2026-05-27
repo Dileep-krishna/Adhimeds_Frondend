@@ -523,3 +523,46 @@
   background: #059669;
   transform: translateY(-2px);
 }
+
+/* Toast Notification - Swap Alert */
+.toast-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1100;
+  padding: 12px 20px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+  animation: slideInRight 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.toast-notification.success {
+  background: #10b981;
+  color: white;
+  border-left: 4px solid #059669;
+}
+
+.toast-notification.error {
+  background: #ef4444;
+  color: white;
+  border-left: 4px solid #b91c1c;
+}
+
+.toast-notification i {
+  font-size: 1.2rem;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}

@@ -23,7 +23,7 @@ export const getDeliveryBoysAPI = async () => {
 };
 
 // 🔄 Update Status
-export const updateDeliveryBoyAPI = async (id, data) => {
+export const updateDeliveryBoyAPI     = async (id, data) => {
   return await commonAPI(
     "PUT",
     `${SERVERURL}/${id}`, // 👈 different from /status
