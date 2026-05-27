@@ -40,12 +40,14 @@ export default function SuperAdminLayout({ children }) {
   const menuItems = [
     { name: "Dashboard", path: "/super-admin/dashboard", icon: "bi-speedometer2" },
     { name: "Order Management", path: "/super-admin/orders", icon: "bi-cart-check" },
-    { name: "Vendor Management", path: "/super-admin/vendors", icon: "bi-shop" },
+    { name: "Store Management", path: "/super-admin/vendors", icon: "bi-shop" },
     { name: "Delivery Boys", path: "/super-admin/delivery-boys", icon: "bi-truck" },
     { name: "Staff Management", path: "/super-admin/staff", icon: "bi-people" },
     { name: "Notifications", path: "/super-admin/notifications", icon: "bi-bell" },
     { name: "Reports", path: "/super-admin/reports", icon: "bi-file-text" },
     { name: "Settings", path: "/super-admin/settings", icon: "bi-gear" },
+    { name: "Category Management", path: "/super-admin/category-managment", icon: "bi-tags" },
+    { name: "Product Management", path: "/super-admin/product-managment", icon: "bi-box-seam" },
   ];
 
   return (
