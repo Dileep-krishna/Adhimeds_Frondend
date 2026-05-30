@@ -1,0 +1,132 @@
+/* product-management.css */
+
+/* Sidebar container */
+.product-sidebar {
+  width: 280px;
+  background-color: #fff;
+  border-right: 1px solid #e9ecef;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
+  transition: transform 0.3s ease;
+}
+
+/* Sidebar headers */
+.sidebar-header {
+  padding: 1.5rem 1.25rem;
+  border-bottom: 1px solid #e9ecef;
+}
+.sidebar-header h5 {
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+.sidebar-header p {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+/* Section title */
+.sidebar-section-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #6c757d;
+  padding: 0.75rem 1.25rem 0.25rem;
+  margin-top: 0.5rem;
+}
+
+/* Sidebar navigation items */
+.sidebar-nav .nav-link {
+  padding: 0.5rem 1.25rem;
+  color: #4a5568;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  transition: all 0.2s;
+}
+.sidebar-nav .nav-link i {
+  font-size: 1.1rem;
+  width: 1.25rem;
+  color: #6c757d;
+}
+.sidebar-nav .nav-link:hover {
+  background-color: #f8f9fa;
+  color: #0d6efd;
+}
+.sidebar-nav .nav-link.active {
+  background-color: #e7f1ff;
+  color: #0d6efd;
+  font-weight: 500;
+}
+.sidebar-nav .nav-link.active i {
+  color: #0d6efd;
+}
+
+/* Main content */
+.product-main {
+  flex: 1;
+  background-color: #f8f9fa;
+  min-height: 100vh;
+  padding: 1.5rem;
+}
+
+/* Mobile toggle button */
+.mobile-toggle {
+  display: none;
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1050;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .mobile-toggle {
+    display: block;
+  }
+  .product-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1040;
+    transform: translateX(-100%);
+  }
+  .product-sidebar.show {
+    transform: translateX(0);
+  }
+  .product-main {
+    padding: 1rem;
+  }
+}
+
+/* Cards and tables */
+.card-custom {
+  border-radius: 1rem;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.02);
+}
+
+.badge-status {
+  padding: 0.25rem 0.75rem;
+  border-radius: 2rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.badge-active {
+  background: #d1fae5;
+  color: #0b5e2e;
+}
+.badge-inactive {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.table-custom th {
+  background: #f8f9fa;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e9ecef;
+}
