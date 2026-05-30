@@ -1,0 +1,152 @@
+/* sizechart.css - Green Medical Theme */
+
+.container {
+  background: #e8f5e9;
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+.btn-purple {
+  background-color: #2e7d32;
+  color: white;
+  border: none;
+  border-radius: 2rem;
+  padding: 0.4rem 1rem;
+  font-weight: 500;
+  transition: 0.2s;
+}
+.btn-purple:hover {
+  background-color: #1b5e20;
+  transform: scale(1.02);
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+}
+.btn-icon.edit { color: #2e7d32; }
+.btn-icon.delete { color: #d32f2f; }
+
+.card {
+  border: none;
+  border-radius: 1rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  background: white;
+}
+
+.table thead th {
+  background: #c8e6c9;
+  color: #1b5e20;
+  padding: 0.75rem;
+  border-bottom: none;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1050;
+}
+
+.modal-container {
+  background: white;
+  border-radius: 1rem;
+  width: 90%;
+  max-width: 900px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+
+.modal-lg {
+  max-width: 800px;
+}
+
+.modal-header {
+  background: #2e7d32;
+  color: white;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 1rem 1rem 0 0;
+}
+
+.close-modal {
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  color: white;
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #1b5e20;
+  display: block;
+  margin-bottom: 0.3rem;
+}
+
+.form-control, .form-select {
+  border-radius: 0.5rem;
+  border: 1px solid #ced4da;
+  width: 100%;
+  padding: 0.5rem;
+}
+
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: 0.3rem;
+}
+
+.image-previews img {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 0.3rem;
+  border: 1px solid #ddd;
+}
+
+.modal-footer {
+  padding: 1rem 1.5rem;
+  background: #f8f9fa;
+  border-top: 1px solid #dee2e6;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.8rem;
+  border-radius: 0 0 1rem 1rem;
+}
+
+.btn-cancel {
+  background: #e0e0e0;
+  border: none;
+  padding: 0.4rem 1rem;
+  border-radius: 2rem;
+}
+
+.btn-save {
+  background: #2e7d32;
+  color: white;
+  border: none;
+  padding: 0.4rem 1rem;
+  border-radius: 2rem;
+}

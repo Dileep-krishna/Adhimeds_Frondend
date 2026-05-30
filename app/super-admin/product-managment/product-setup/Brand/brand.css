@@ -1,0 +1,57 @@
+.card {
+  border-radius: 12px;
+}
+
+.table td, .table th {
+  vertical-align: middle;
+}
+
+.btn-primary {
+  border-radius: 8px;
+}
+
+input.form-control {
+  border-radius: 8px;
+}
+
+.table tbody tr:hover {
+  background-color: #f8f9fa;
+  transition: 0.2s;
+}
+.tab-btn {
+  padding: 6px 14px;
+  border: none;
+  background: #e9ecef;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.tab-btn.active {
+  background: #0d6efd;
+  color: white;
+}
+
+.table tbody tr:hover {
+  background-color: #f1f3f5;
+  transition: 0.2s;
+}
+
+.btn {
+  border-radius: 6px;
+}
+/* dark background overlay */
+.modal-bg {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* smoother modal */
+.modal-content {
+  border-radius: 10px;
+}
+
+/* spacing fix */
+.modal-body label {
+  font-weight: 500;
+  margin-bottom: 5px;
+}

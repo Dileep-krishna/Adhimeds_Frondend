@@ -27,7 +27,7 @@ export default function AddProductPage() {
     flashDiscount: '',
     flashDiscountType: 'percent',
     refundable: false,
-    refundNote: 'This is a demo refund note for Active eCommerce CMS, developed by Activ...',
+    refundNote: 'This product is eligible for return within 7 days of delivery.',
     // Files
     thumbnail: null,
     galleryImages: [],
@@ -42,10 +42,10 @@ export default function AddProductPage() {
     flatRate: false,
     quantityMultiply: false,
     shippingDays: '',
-    shippingNote: 'This is a demo shipping note for Active eCommerce CMS, developed by Activ...',
+    shippingNote: 'This product is shipped within 2-3 business days.',
     // COD
     codAvailable: false,
-    codNote: 'This is a demo delivery note...',
+    codNote: 'Cash on delivery available for orders within India.',
     // Price & Stock
     colors: [],
     attributes: [],
@@ -59,13 +59,60 @@ export default function AddProductPage() {
     externalLinkText: '',
     hsnCode: '',
     gstRate: 0,
-    hideStock: 'none', // 'none', 'show_quantity', 'text_only'
+    hideStock: 'none',
     lowStockWarning: 0,
     quantity: 1,
     frequentlyBought: [],
   });
 
-  // Helper for handling form fields
+  // Medical categories list
+  const medicalCategories = [
+    'Medicine (Prescription)',
+    'Medicine (OTC)',
+    'Medical Equipment',
+    'Supplements & Vitamins',
+    'Ayurveda & Herbal',
+    'Diagnostics & Monitoring',
+    'Personal Care',
+    'First Aid',
+    'Mobility Aids',
+  ];
+
+  const medicalBrands = [
+    'Cipla',
+    'Sun Pharma',
+    'Pfizer',
+    'Omron',
+    'Dr. Trust',
+    'Dabur',
+    'Himalaya',
+    'Philips Healthcare',
+    'Abbott',
+    'GSK',
+  ];
+
+  const medicalUnits = [
+    'Tablet',
+    'Capsule',
+    'ml',
+    'mg',
+    'g',
+    'Patch',
+    'Spray',
+    'Strip',
+    'Bottle',
+    'Inhaler',
+    'Vial',
+  ];
+
+  const medicalAttributes = [
+    { name: 'Dosage Form', values: ['Tablet', 'Capsule', 'Liquid', 'Injection', 'Cream', 'Ointment'] },
+    { name: 'Strength', values: ['100mg', '250mg', '500mg', '1g', '10mg/ml'] },
+    { name: 'Pack Size', values: ['10 tablets', '20 tablets', '50 tablets', '30ml', '100ml'] },
+    { name: 'Active Ingredient', values: ['Paracetamol', 'Ibuprofen', 'Amoxicillin', 'Cetirizine'] },
+    { name: 'Prescription Required', values: ['Yes', 'No'] },
+  ];
+
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -87,7 +134,7 @@ export default function AddProductPage() {
     }));
   };
 
-  // Gallery images
+  // Gallery
   const handleGalleryChange = (e) => {
     const files = Array.from(e.target.files);
     setFormData(prev => ({
@@ -123,15 +170,15 @@ export default function AddProductPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log('Form Data:', formData);
-    alert('Product submitted (demo)');
-    // Here you would send data to your API
+    console.log('Medical Product Data:', formData);
+    alert('Product submitted (demo). Connect to API.');
+    // API call would go here
   };
 
   return (
     <div className="container-fluid py-4" style={{ maxWidth: '1400px' }}>
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2 className="fw-bold mb-0">Add New Product</h2>
+        <h2 className="fw-bold mb-0">Add New Medical Product</h2>
         <button type="submit" form="productForm" className="btn btn-primary px-4">
           Save Product
         </button>
@@ -145,20 +192,20 @@ export default function AddProductPage() {
             <div className="row g-3">
               <div className="col-md-6">
                 <label className="form-label">Product Name *</label>
-                <input type="text" className="form-control" required value={formData.productName} onChange={e => handleChange('productName', e.target.value)} />
+                <input type="text" className="form-control" required placeholder="e.g., Paracetamol 500mg Tablets" value={formData.productName} onChange={e => handleChange('productName', e.target.value)} />
               </div>
               <div className="col-md-6">
                 <label className="form-label">Select Main Category *</label>
                 <select className="form-select" required value={formData.mainCategory} onChange={e => handleChange('mainCategory', e.target.value)}>
                   <option value="">Select Main Category</option>
-                  <option>Electronics</option><option>Clothing</option><option>Home & Garden</option>
+                  {medicalCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
               </div>
               <div className="col-md-6">
-                <label className="form-label">Brand</label>
+                <label className="form-label">Brand / Manufacturer</label>
                 <select className="form-select" value={formData.brand} onChange={e => handleChange('brand', e.target.value)}>
                   <option value="">Select Brand</option>
-                  <option>Nike</option><option>Apple</option><option>Samsung</option>
+                  {medicalBrands.map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
               </div>
             </div>
@@ -173,17 +220,20 @@ export default function AddProductPage() {
               <div className="col-md-6">
                 <label className="form-label">Related Categories *</label>
                 <select className="form-select" multiple size="3">
-                  <option>Category 1</option><option>Category 2</option>
+                  {medicalCategories.map(cat => <option key={cat}>{cat}</option>)}
                 </select>
                 <small className="text-muted">Hold Ctrl/Cmd to select multiple</small>
               </div>
               <div className="col-md-3">
                 <label className="form-label">Unit *</label>
-                <input type="text" className="form-control" placeholder="e.g., KG, Pc" value={formData.unit} onChange={e => handleChange('unit', e.target.value)} />
+                <select className="form-select" value={formData.unit} onChange={e => handleChange('unit', e.target.value)}>
+                  <option value="">Select Unit</option>
+                  {medicalUnits.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
               </div>
               <div className="col-md-3">
-                <label className="form-label">Weight (In Kg)</label>
-                <input type="number" step="0.01" className="form-control" value={formData.weight} onChange={e => handleChange('weight', e.target.value)} />
+                <label className="form-label">Weight (In Kg) / Volume</label>
+                <input type="number" step="0.01" className="form-control" placeholder="e.g., 0.5" value={formData.weight} onChange={e => handleChange('weight', e.target.value)} />
               </div>
               <div className="col-md-6">
                 <label className="form-label">Minimum Purchase Qty *</label>
@@ -208,13 +258,13 @@ export default function AddProductPage() {
                   {formData.tags.map(tag => (
                     <span key={tag} className="tag">{tag} <i className="bi bi-x-circle" onClick={() => removeTag(tag)}></i></span>
                   ))}
-                  <input type="text" className="tag-input" placeholder="Type and hit enter to add a tag"
+                  <input type="text" className="tag-input" placeholder="Type and hit enter to add a tag (e.g., fever, pain relief)"
                     value={formData.tagInput}
                     onChange={e => handleChange('tagInput', e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())}
                   />
                 </div>
-                <small className="text-muted">This is used for search. Input those words by which customer can find this product.</small>
+                <small className="text-muted">These keywords help customers find the product via search.</small>
               </div>
             </div>
           </div>
@@ -228,12 +278,12 @@ export default function AddProductPage() {
               <div className="col-md-4">
                 <div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.published} onChange={e => handleChange('published', e.target.checked)} /><label className="form-check-label">Published</label></div>
                 <div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.featured} onChange={e => handleChange('featured', e.target.checked)} /><label className="form-check-label">Featured</label></div>
-                <div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.todaysDeal} onChange={e => handleChange('todaysDeal', e.target.checked)} /><label className="form-check-label">Todays Deal</label></div>
+                <div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.todaysDeal} onChange={e => handleChange('todaysDeal', e.target.checked)} /><label className="form-check-label">Today's Deal</label></div>
               </div>
               <div className="col-md-8">
                 <label className="form-label">Flash Sale</label>
                 <div className="row g-2">
-                  <div className="col-4"><select className="form-select" value={formData.flashSaleTitle} onChange={e => handleChange('flashSaleTitle', e.target.value)}><option>Choose Flash Title</option></select></div>
+                  <div className="col-4"><select className="form-select" value={formData.flashSaleTitle} onChange={e => handleChange('flashSaleTitle', e.target.value)}><option>Choose Flash Title</option><option>Summer Health Offer</option><option>Monsoon Immunity Boost</option></select></div>
                   <div className="col-4"><input type="number" className="form-control" placeholder="Discount" value={formData.flashDiscount} onChange={e => handleChange('flashDiscount', e.target.value)} /></div>
                   <div className="col-4"><select className="form-select" value={formData.flashDiscountType} onChange={e => handleChange('flashDiscountType', e.target.value)}><option value="percent">Percent</option><option value="fixed">Fixed</option></select></div>
                 </div>
@@ -242,11 +292,11 @@ export default function AddProductPage() {
             <hr className="my-3" />
             <div className="row">
               <div className="col-md-6">
-                <div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.refundable} onChange={e => handleChange('refundable', e.target.value)} /><label className="form-check-label">Refundable</label></div>
-                <div className="form-check"><input className="form-check-input" type="checkbox" /><label>Show notes in refund section in product description page</label></div>
+                <div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.refundable} onChange={e => handleChange('refundable', e.target.checked)} /><label className="form-check-label">Refundable</label></div>
+                <div className="form-check"><input className="form-check-input" type="checkbox" /><label>Show refund notes on product page</label></div>
               </div>
               <div className="col-md-6">
-                <label className="form-label">Note (Add from preset)</label>
+                <label className="form-label">Refund Note</label>
                 <textarea rows="2" className="form-control" value={formData.refundNote} onChange={e => handleChange('refundNote', e.target.value)}></textarea>
               </div>
             </div>
@@ -282,7 +332,7 @@ export default function AddProductPage() {
         <div className="form-section">
           <div className="form-section-header">Product Description</div>
           <div className="form-section-body">
-            <textarea className="form-control" rows="6" placeholder="Full product description..." value={formData.description} onChange={e => handleChange('description', e.target.value)}></textarea>
+            <textarea className="form-control" rows="6" placeholder="Include usage instructions, ingredients, precautions, etc." value={formData.description} onChange={e => handleChange('description', e.target.value)}></textarea>
           </div>
         </div>
 
@@ -290,8 +340,8 @@ export default function AddProductPage() {
         <div className="form-section">
           <div className="form-section-header">SEO Meta Tags</div>
           <div className="form-section-body">
-            <div className="mb-3"><label className="form-label">Meta Title</label><input type="text" className="form-control" value={formData.metaTitle} onChange={e => handleChange('metaTitle', e.target.value)} /></div>
-            <div className="mb-3"><label className="form-label">Description</label><textarea rows="2" className="form-control" value={formData.metaDescription} onChange={e => handleChange('metaDescription', e.target.value)}></textarea></div>
+            <div className="mb-3"><label className="form-label">Meta Title</label><input type="text" className="form-control" placeholder="e.g., Buy Paracetamol 500mg Online" value={formData.metaTitle} onChange={e => handleChange('metaTitle', e.target.value)} /></div>
+            <div className="mb-3"><label className="form-label">Meta Description</label><textarea rows="2" className="form-control" placeholder="Brief description for search engines" value={formData.metaDescription} onChange={e => handleChange('metaDescription', e.target.value)}></textarea></div>
             <div><label className="form-label">Meta Image</label><input type="file" className="form-control" onChange={e => handleChange('metaImage', e.target.files[0])} /></div>
           </div>
         </div>
@@ -308,11 +358,11 @@ export default function AddProductPage() {
               </div>
               <div className="col-md-4">
                 <label>Estimated Shipping Time</label>
-                <input type="text" className="form-control" placeholder="7-15 days" value={formData.shippingDays} onChange={e => handleChange('shippingDays', e.target.value)} />
-                <div className="form-check mt-2"><input type="checkbox" /><label>Show estimated shipping time in product description page</label></div>
+                <input type="text" className="form-control" placeholder="e.g., 3-5 days" value={formData.shippingDays} onChange={e => handleChange('shippingDays', e.target.value)} />
+                <div className="form-check mt-2"><input type="checkbox" /><label>Show on product page</label></div>
               </div>
               <div className="col-md-4">
-                <label>Notes (Add from Preset)</label>
+                <label>Shipping Notes</label>
                 <textarea rows="3" className="form-control" value={formData.shippingNote} onChange={e => handleChange('shippingNote', e.target.value)}></textarea>
               </div>
             </div>
@@ -326,10 +376,10 @@ export default function AddProductPage() {
             <div className="row g-3">
               <div className="col-md-6">
                 <div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.codAvailable} onChange={e => handleChange('codAvailable', e.target.checked)} /><label>Cash on delivery available</label></div>
-                <div className="form-check"><input type="checkbox" /><label>Show notes in cash on delivery section</label></div>
+                <div className="form-check"><input type="checkbox" /><label>Show notes in COD section</label></div>
               </div>
               <div className="col-md-6">
-                <label>Notes (Add from Preset)</label>
+                <label>COD Notes</label>
                 <textarea rows="3" className="form-control" value={formData.codNote} onChange={e => handleChange('codNote', e.target.value)}></textarea>
               </div>
             </div>
@@ -343,20 +393,23 @@ export default function AddProductPage() {
             <div className="row g-3">
               <div className="col-md-6">
                 <label>Colors</label>
-                <select className="form-select" multiple size="3"><option>Red</option><option>Blue</option><option>Green</option></select>
+                <select className="form-select" multiple size="3"><option>Not applicable</option><option>White (for devices)</option><option>Black</option></select>
+                <small className="text-muted">Most medical products don't have color variations</small>
               </div>
               <div className="col-md-6">
                 <label>Attributes</label>
-                <select className="form-select" multiple size="3"><option>Size</option><option>Material</option></select>
+                <select className="form-select" multiple size="3">
+                  {medicalAttributes.map(attr => <option key={attr.name}>{attr.name}</option>)}
+                </select>
               </div>
-              <div className="col-md-3"><label>Unit price *</label><input type="number" className="form-control" value={formData.unitPrice} onChange={e => handleChange('unitPrice', e.target.value)} /></div>
+              <div className="col-md-3"><label>Unit price * (₹)</label><input type="number" className="form-control" value={formData.unitPrice} onChange={e => handleChange('unitPrice', e.target.value)} /></div>
               <div className="col-md-3"><label>Discount Date Range</label><input type="date" className="form-control" placeholder="Start" /> to <input type="date" className="form-control mt-1" placeholder="End" /></div>
-              <div className="col-md-3"><label>Discount</label><input type="number" className="form-control" value={formData.discount} onChange={e => handleChange('discount', e.target.value)} /></div>
+              <div className="col-md-3"><label>Discount (%)</label><input type="number" className="form-control" value={formData.discount} onChange={e => handleChange('discount', e.target.value)} /></div>
               <div className="col-md-3"><label>Discount Type</label><select className="form-select" value={formData.discountType} onChange={e => handleChange('discountType', e.target.value)}><option>Percent</option><option>Fixed</option></select></div>
               <div className="col-md-3"><label>Stock</label><input type="number" className="form-control" value={formData.stock} onChange={e => handleChange('stock', e.target.value)} /></div>
               <div className="col-md-3"><label>SKU</label><div className="input-group"><input type="text" className="form-control" value={formData.sku} onChange={e => handleChange('sku', e.target.value)} /><button type="button" className="btn btn-outline-secondary">Generate</button></div></div>
-              <div className="col-md-3"><label>Product External Link</label><input type="url" className="form-control" placeholder="External link" value={formData.externalLink} onChange={e => handleChange('externalLink', e.target.value)} /></div>
-              <div className="col-md-3"><label>Link Button Text</label><input type="text" className="form-control" placeholder="External link button text" value={formData.externalLinkText} onChange={e => handleChange('externalLinkText', e.target.value)} /></div>
+              <div className="col-md-3"><label>Product External Link (e.g., FDA info)</label><input type="url" className="form-control" placeholder="External link" value={formData.externalLink} onChange={e => handleChange('externalLink', e.target.value)} /></div>
+              <div className="col-md-3"><label>Link Button Text</label><input type="text" className="form-control" placeholder="e.g., More Info" value={formData.externalLinkText} onChange={e => handleChange('externalLinkText', e.target.value)} /></div>
             </div>
             <hr />
             <div className="row g-3">
@@ -373,15 +426,15 @@ export default function AddProductPage() {
                 </select>
               </div>
               <div className="col-md-4"><label>Low Stock Quantity Warning</label><input type="number" className="form-control" value={formData.lowStockWarning} onChange={e => handleChange('lowStockWarning', e.target.value)} /></div>
-              <div className="col-md-4"><label>Quantity</label><input type="number" className="form-control" value={formData.quantity} onChange={e => handleChange('quantity', e.target.value)} /></div>
+              <div className="col-md-4"><label>Quantity (default in cart)</label><input type="number" className="form-control" value={formData.quantity} onChange={e => handleChange('quantity', e.target.value)} /></div>
             </div>
             <hr />
             <div className="mt-3">
-              <label>Frequently Bought</label>
+              <label>Frequently Bought Together</label>
               {formData.frequentlyBought.map((item, idx) => (
                 <div key={idx} className="row g-2 mb-2 align-items-end">
-                  <div className="col-5"><select className="form-select" value={item.product} onChange={e => updateFrequentlyBought(idx, 'product', e.target.value)}><option>Select Product</option></select></div>
-                  <div className="col-5"><select className="form-select" value={item.category} onChange={e => updateFrequentlyBought(idx, 'category', e.target.value)}><option>Select Category</option></select></div>
+                  <div className="col-5"><select className="form-select" value={item.product} onChange={e => updateFrequentlyBought(idx, 'product', e.target.value)}><option>Select Product</option><option>Paracetamol 500mg</option><option>Vitamin C Tablets</option></select></div>
+                  <div className="col-5"><select className="form-select" value={item.category} onChange={e => updateFrequentlyBought(idx, 'category', e.target.value)}><option>Select Category</option><option>Medicine</option><option>Supplements</option></select></div>
                   <div className="col-2"><button type="button" className="btn btn-sm btn-danger" onClick={() => removeFrequentlyBought(idx)}>Remove</button></div>
                 </div>
               ))}

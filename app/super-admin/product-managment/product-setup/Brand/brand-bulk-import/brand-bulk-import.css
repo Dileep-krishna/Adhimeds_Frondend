@@ -1,0 +1,93 @@
+/* brand-bulk-import.css */
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.page-header {
+  margin-bottom: 1.5rem;
+}
+
+.page-header h4 {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.main-card {
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  border: none;
+}
+
+.steps-section {
+  background-color: #f8f9fa;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.steps-section ol {
+  margin-bottom: 0;
+  padding-left: 1.2rem;
+}
+
+.steps-section li {
+  margin-bottom: 0.5rem;
+}
+
+.download-buttons {
+  margin-bottom: 1.5rem;
+}
+
+.btn-outline-primary, .btn-outline-secondary {
+  border-radius: 30px;
+  padding: 0.4rem 1rem;
+}
+
+.upload-section {
+  background-color: #fff;
+  border: 1px dashed #ced4da;
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  margin: 1rem 0;
+}
+
+.file-upload-box {
+  margin-top: 1rem;
+}
+
+.file-label {
+  display: inline-block;
+  background-color: #e9ecef;
+  padding: 0.5rem 1.2rem;
+  border-radius: 30px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.file-label:hover {
+  background-color: #dee2e6;
+}
+
+.file-label i {
+  margin-right: 8px;
+}
+
+.btn-primary {
+  background-color: #0d6efd;
+  border-radius: 30px;
+  padding: 0.5rem 2rem;
+}
+
+.footer-note {
+  margin-top: 1.5rem;
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+hr {
+  margin: 1.5rem 0;
+}

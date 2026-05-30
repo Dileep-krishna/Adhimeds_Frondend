@@ -1,16 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';   // ✅ for navigation
 import './staff.css';
 
 export default function StaffManagement() {
-  const [staff, setStaff] = useState([
-    { id: 1, name: 'Rahul Sharma', role: 'Pharmacist', district: 'Ernakulam', email: 'rahul@pharmacy.com', phone: '+91 98765 43210', status: 'active', joinDate: '2023-01-15' },
-    { id: 2, name: 'Priya Patel', role: 'Store Manager', district: 'Thiruvananthapuram', email: 'priya@store.com', phone: '+91 87654 32109', status: 'active', joinDate: '2023-03-20' },
-    { id: 3, name: 'Ahmed Khan', role: 'Delivery Coordinator', district: 'Kozhikode', email: 'ahmed@delivery.com', phone: '+91 76543 21098', status: 'inactive', joinDate: '2023-06-10' },
-    { id: 4, name: 'Sneha Nair', role: 'Customer Support', district: 'Kochi', email: 'sneha@support.com', phone: '+91 65432 10987', status: 'active', joinDate: '2024-01-05' },
-    { id: 5, name: 'Vikram Singh', role: 'Accountant', district: 'Kollam', email: 'vikram@accounts.com', phone: '+91 54321 09876', status: 'pending', joinDate: '2024-02-18' },
-  ]);
+  const router = useRouter();
+
+  // ✅ No fake data – start empty
+  const [staff, setStaff] = useState([]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -57,7 +55,7 @@ export default function StaffManagement() {
     if (editingStaff) {
       setStaff(staff.map(s => s.id === editingStaff.id ? { ...s, ...formData } : s));
     } else {
-      const newId = Math.max(0, ...staff.map(s => s.id)) + 1;
+      const newId = staff.length > 0 ? Math.max(...staff.map(s => s.id)) + 1 : 1;
       setStaff([...staff, { id: newId, ...formData }]);
     }
     setShowModal(false);
@@ -75,18 +73,23 @@ export default function StaffManagement() {
 
   return (
     <div className="staff-page">
-      {/* Hero Header */}
+      {/* Hero Header with two buttons */}
       <div className="hero-section staff-hero">
         <div>
           <h1 className="hero-title"><i className="bi bi-people-fill"></i> Staff Management</h1>
           <p className="hero-subtitle">Manage your team members, roles, and assignments.</p>
         </div>
-        <button className="btn-glow" onClick={() => openModal()}>
-          <i className="bi bi-person-plus"></i> Add Staff Member
-        </button>
+        <div className="hero-buttons">
+          <button className="btn-glow roles-perms" onClick={() => router.push('/super-admin/staff/role-permission')}>
+            <i className="bi bi-shield-lock-fill"></i> Roles & Permissions
+          </button>
+          <button className="btn-glow" onClick={() => openModal()}>
+            <i className="bi bi-person-plus"></i> Add Staff Member
+          </button>
+        </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards (dynamic counts) */}
       <div className="staff-stats">
         <div className="stat-card"><i className="bi bi-person-badge"></i><div><span className="stat-number">{staff.length}</span><span>Total Staff</span></div></div>
         <div className="stat-card"><i className="bi bi-check-circle-fill"></i><div><span className="stat-number">{staff.filter(s => s.status === 'active').length}</span><span>Active</span></div></div>
@@ -101,7 +104,7 @@ export default function StaffManagement() {
         <div className="filter-group"><label><i className="bi bi-flag"></i> Status</label><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}><option value="all">All</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="pending">Pending</option></select></div>
       </div>
 
-      {/* Staff Grid (Responsive Cards) */}
+      {/* Staff Grid */}
       <div className="staff-grid">
         {filteredStaff.map(member => (
           <div className="staff-card" key={member.id}>
@@ -127,10 +130,15 @@ export default function StaffManagement() {
             </div>
           </div>
         ))}
-        {filteredStaff.length === 0 && (<div className="empty-state"><i className="bi bi-person-x"></i><p>No staff members found</p></div>)}
+        {filteredStaff.length === 0 && (
+          <div className="empty-state">
+            <i className="bi bi-person-x"></i>
+            <p>No staff members found. Click "Add Staff Member" to get started.</p>
+          </div>
+        )}
       </div>
 
-      {/* Add/Edit Modal */}
+      {/* Add/Edit Modal (unchanged) */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>

@@ -1,0 +1,221 @@
+/* product-reviews.css – Green Medical Theme */
+
+.reviews-container {
+  padding: 1.5rem;
+  background: #e8f5e9;
+  min-height: 100vh;
+}
+.header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+.page-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #1b5e20;
+  margin: 0;
+}
+.btn-add {
+  background: #2e7d32;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 2rem;
+  font-weight: 600;
+  transition: 0.2s;
+}
+.btn-add:hover {
+  background: #1b5e20;
+  transform: scale(1.02);
+}
+.med-table {
+  width: 100%;
+  background: white;
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+}
+.med-table th {
+  background: #c8e6c9;
+  color: #1b5e20;
+  padding: 0.8rem;
+  font-weight: 600;
+}
+.med-table td {
+  padding: 0.8rem;
+  border-bottom: 1px solid #e0e0e0;
+  vertical-align: middle;
+}
+.med-table tr:hover {
+  background: #f1f8e9;
+}
+.btn-view {
+  background: #2e7d32;
+  color: white;
+  border: none;
+  padding: 0.25rem 0.8rem;
+  border-radius: 2rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.stars {
+  color: #f5b042;
+  font-size: 0.9rem;
+}
+/* Modal (same as previous) */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+}
+.modal-container {
+  background: white;
+  border-radius: 1rem;
+  width: 90%;
+  max-width: 650px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.modal-header {
+  background: #2e7d32;
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 1rem 1rem 0 0;
+  display: flex;
+  justify-content: space-between;
+}
+.close-modal {
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  color: white;
+  cursor: pointer;
+}
+.modal-body {
+  padding: 1.5rem;
+}
+.form-group {
+  margin-bottom: 1rem;
+}
+.form-group label {
+  font-weight: 600;
+  color: #1b5e20;
+  display: block;
+  margin-bottom: 0.3rem;
+}
+.form-control, .form-select {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #ced4da;
+}
+.star-selector {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #ccc;
+}
+.star-icon {
+  cursor: pointer;
+  transition: 0.1s;
+}
+.star-icon.bi-star-fill {
+  color: #f5b042;
+}
+.preview-img {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 0.3rem;
+  border: 1px solid #ddd;
+}
+.modal-footer {
+  padding: 1rem 1.5rem;
+  background: #f8f9fa;
+  border-top: 1px solid #dee2e6;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.8rem;
+}
+.btn-cancel, .btn-save {
+  border: none;
+  padding: 0.4rem 1rem;
+  border-radius: 2rem;
+}
+.btn-cancel { background: #e0e0e0; }
+.btn-save { background: #2e7d32; color: white; }
+
+/* Side Modal (slide-in) */
+.side-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.5);
+  z-index: 1040;
+}
+.side-modal {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 450px;
+  height: 100%;
+  background: white;
+  box-shadow: -2px 0 12px rgba(0,0,0,0.2);
+  z-index: 1050;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.side-modal-header {
+  background: #2e7d32;
+  color: white;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.side-modal-body {
+  padding: 1.5rem;
+  flex: 1;
+}
+.product-info {
+  background: #f1f8e9;
+  padding: 1rem;
+  border-radius: 0.8rem;
+  margin-bottom: 1.5rem;
+}
+.reviews-list {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.review-card {
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 0.8rem;
+  margin-bottom: 0.8rem;
+}
+.review-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.badge-custom {
+  background: #ffc107;
+  color: #333;
+  padding: 0.2rem 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.7rem;
+}
+.review-comment {
+  margin-top: 0.5rem;
+  color: #444;
+}
