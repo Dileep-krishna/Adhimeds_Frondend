@@ -1,10 +1,15 @@
 'use client';
-import { useState, useMemo } from 'react';
+
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import toast, { Toaster } from 'react-hot-toast';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './all-products.css';
+import { getProductsAPI, updateProductAPI, deleteProductAPI } from '../../../services/productService';
+import SERVERURL from '../../../services/serverURL';
+
 
 export default function AllProductsPage() {
   const pathname = usePathname();
@@ -18,42 +23,124 @@ export default function AllProductsPage() {
     { id: 'add-digital', label: 'Add New Digital Products', icon: 'bi-cloud-download-fill', path: '/super-admin/product-managment/add-digital-product' },
   ];
 
-  const [products, setProducts] = useState([
-    { id: 1, name: 'Paracetamol 500mg', brand: 'Cipla', category: 'Medicine', rating: 5, price: 49, discount: 0, published: true, featured: false, todayDeal: false },
-    { id: 2, name: 'Amoxicillin 250mg', brand: 'GSK', category: 'Antibiotic', rating: 4, price: 120, discount: 5, published: true, featured: false, todayDeal: false },
-    { id: 3, name: 'BP Monitor (Upper Arm)', brand: 'Omron', category: 'Equipment', rating: 5, price: 2499, discount: 10, published: true, featured: true, todayDeal: false },
-    { id: 4, name: 'Vitamin D3 2000IU', brand: 'Sun Pharma', category: 'Supplements', rating: 4, price: 299, discount: 0, published: true, featured: false, todayDeal: true },
-    { id: 5, name: 'Digital Thermometer', brand: 'Dr. Trust', category: 'Equipment', rating: 4, price: 399, discount: 5, published: true, featured: false, todayDeal: false },
-    { id: 6, name: 'Ayurvedic Immunity Kit', brand: 'Dabur', category: 'Ayurveda', rating: 5, price: 899, discount: 15, published: true, featured: true, todayDeal: false },
-    { id: 7, name: 'Nebulizer Machine', brand: 'Philips', category: 'Equipment', rating: 5, price: 3599, discount: 8, published: false, featured: false, todayDeal: false },
-  ]);
-
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOption, setFilterOption] = useState('');
   const [sortOption, setSortOption] = useState('');
 
+  // Fetch products from API
+  const fetchProducts = async () => {
+    setLoading(true);
+    try {
+      const response = await getProductsAPI();
+      if (response.success) {
+        setProducts(response.data);
+      } else {
+        toast.error(response.message || 'Failed to load products');
+      }
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      toast.error('Server error while loading products');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  // Helper to get image URL
+  const getImageUrl = (filename) => {
+    if (!filename) return null;
+    return `${SERVERURL}/imgUploads/${filename}`;
+  };
+
+  // Filter and sort products
   const filteredProducts = useMemo(() => {
     let result = [...products];
-    if (searchTerm) result = result.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    if (filterOption === 'published') result = result.filter(p => p.published);
-    if (filterOption === 'featured') result = result.filter(p => p.featured);
-    if (filterOption === 'todayDeal') result = result.filter(p => p.todayDeal);
+    if (searchTerm) {
+      result = result.filter(p => p.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                  p.brand?.toLowerCase().includes(searchTerm.toLowerCase()));
+    }
+    if (filterOption === 'published') result = result.filter(p => p.published === true);
+    if (filterOption === 'featured') result = result.filter(p => p.featured === true);
+    if (filterOption === 'todayDeal') result = result.filter(p => p.todaysDeal === true);
     if (filterOption === 'discount') result = result.filter(p => p.discount > 0);
-    if (sortOption === 'price-asc') result.sort((a,b) => a.price - b.price);
-    if (sortOption === 'price-desc') result.sort((a,b) => b.price - a.price);
-    if (sortOption === 'rating-desc') result.sort((a,b) => b.rating - a.rating);
-    if (sortOption === 'name-asc') result.sort((a,b) => a.name.localeCompare(b.name));
+    if (sortOption === 'price-asc') result.sort((a, b) => (a.unitPrice || 0) - (b.unitPrice || 0));
+    if (sortOption === 'price-desc') result.sort((a, b) => (b.unitPrice || 0) - (a.unitPrice || 0));
+    if (sortOption === 'rating-desc') result.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    if (sortOption === 'name-asc') result.sort((a, b) => (a.productName || '').localeCompare(b.productName || ''));
     return result;
   }, [products, searchTerm, filterOption, sortOption]);
 
-  const togglePublished = (id) => setProducts(products.map(p => p.id === id ? { ...p, published: !p.published } : p));
-  const toggleFeatured = (id) => setProducts(products.map(p => p.id === id ? { ...p, featured: !p.featured } : p));
-  const toggleTodayDeal = (id) => setProducts(products.map(p => p.id === id ? { ...p, todayDeal: !p.todayDeal } : p));
-  const handleDelete = (id) => { if (window.confirm('Delete this product permanently?')) setProducts(products.filter(p => p.id !== id)); };
+  // Toggle functions (call update API)
+  const togglePublished = async (id, currentStatus) => {
+    try {
+      const response = await updateProductAPI(id, { published: !currentStatus });
+      if (response.success) {
+        toast.success(`Product ${!currentStatus ? 'published' : 'unpublished'}`);
+        fetchProducts();
+      } else {
+        toast.error(response.message || 'Update failed');
+      }
+    } catch (error) {
+      toast.error('Server error');
+    }
+  };
+
+  const toggleFeatured = async (id, currentStatus) => {
+    try {
+      const response = await updateProductAPI(id, { featured: !currentStatus });
+      if (response.success) {
+        toast.success(`Product ${!currentStatus ? 'featured' : 'unfeatured'}`);
+        fetchProducts();
+      } else {
+        toast.error(response.message || 'Update failed');
+      }
+    } catch (error) {
+      toast.error('Server error');
+    }
+  };
+
+  const toggleTodayDeal = async (id, currentStatus) => {
+    try {
+      const response = await updateProductAPI(id, { todaysDeal: !currentStatus });
+      if (response.success) {
+        toast.success(`Product ${!currentStatus ? 'added to' : 'removed from'} Today\'s Deal`);
+        fetchProducts();
+      } else {
+        toast.error(response.message || 'Update failed');
+      }
+    } catch (error) {
+      toast.error('Server error');
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this product permanently?')) return;
+    try {
+      const response = await deleteProductAPI(id);
+      if (response.success) {
+        toast.success('Product deleted successfully');
+        fetchProducts();
+      } else {
+        toast.error(response.message || 'Delete failed');
+      }
+    } catch (error) {
+      toast.error('Server error');
+    }
+  };
+
   const handleAddNew = () => router.push('/super-admin/product-managment/add-product');
+const handleEdit = (id) => {
+  router.push(`/super-admin/product-managment/edit-product/${id}`);
+};
 
   return (
     <div className="all-products-container">
+      <Toaster position="top-right" />
       <div className="top-nav">
         <div className="nav-scroll">
           {navItems.map(item => (
@@ -101,30 +188,66 @@ export default function AllProductsPage() {
       </div>
 
       <div className="table-responsive">
-        <table className="med-table">
-          <thead>...</thead>
-          <tbody>
-            {filteredProducts.map(product => (
-              <tr key={product.id}>
-                <td><div className="fw-bold">{product.name}</div><small>{product.brand}</small></td>
-                <td>{product.brand}</td>
-                <td>{product.category}</td>
-                <td><div>{'⭐'.repeat(product.rating)}</div><small>{product.rating} out of 5</small></td>
-                <td>₹{product.price}</td>
-                <td>{product.discount > 0 ? `${product.discount}%` : '—'}</td>
-                <td><i className="bi bi-info-circle text-secondary"></i></td>
-                <td><input type="checkbox" checked={product.published} onChange={() => togglePublished(product.id)} /></td>
-                <td><input type="checkbox" checked={product.featured} onChange={() => toggleFeatured(product.id)} /></td>
-                <td><input type="checkbox" checked={product.todayDeal} onChange={() => toggleTodayDeal(product.id)} /></td>
-                <td>
-                  <button className="btn-icon edit" onClick={() => alert(`Edit ${product.name}`)}><i className="bi bi-pencil"></i></button>
-                  <button className="btn-icon delete" onClick={() => handleDelete(product.id)}><i className="bi bi-trash"></i></button>
-                </td>
+        {loading ? (
+          <div className="text-center py-5">Loading products...</div>
+        ) : (
+          <table className="med-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Brand</th>
+                <th>Category</th>
+                <th>Rating</th>
+                <th>Price (₹)</th>
+                <th>Discount</th>
+                <th>Info</th>
+                <th>Published</th>
+                <th>Featured</th>
+                <th>Today's Deal</th>
+                <th>Actions</th>
               </tr>
-            ))}
-            {filteredProducts.length === 0 && <tr><td colSpan="11" className="text-center py-4">No products found.</td></tr>}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredProducts.map(product => (
+                <tr key={product._id}>
+                  <td>
+                    <div className="d-flex align-items-center gap-2">
+                      {product.thumbnail && (
+                        <img src={getImageUrl(product.thumbnail)} alt={product.productName} width="40" height="40" style={{ objectFit: 'cover', borderRadius: '8px' }} />
+                      )}
+                      <div>
+                        <div className="fw-bold">{product.productName}</div>
+                        <small>{product.brand}</small>
+                      </div>
+                    </div>
+                  </td>
+                  <td>{product.brand}</td>
+                  <td>{product.mainCategory}</td>
+                  <td>{product.rating ? `${'⭐'.repeat(product.rating)} ${product.rating}/5` : '—'}</td>
+                  <td>₹{product.unitPrice}</td>
+                  <td>{product.discount > 0 ? `${product.discount}%` : '—'}</td>
+                  <td><i className="bi bi-info-circle text-secondary"></i></td>
+                  <td>
+                    <input type="checkbox" checked={product.published || false} onChange={() => togglePublished(product._id, product.published)} />
+                  </td>
+                  <td>
+                    <input type="checkbox" checked={product.featured || false} onChange={() => toggleFeatured(product._id, product.featured)} />
+                  </td>
+                  <td>
+                    <input type="checkbox" checked={product.todaysDeal || false} onChange={() => toggleTodayDeal(product._id, product.todaysDeal)} />
+                  </td>
+                  <td>
+                    <button className="btn-icon edit" onClick={() => handleEdit(product._id)}><i className="bi bi-pencil"></i></button>
+                    <button className="btn-icon delete" onClick={() => handleDelete(product._id)}><i className="bi bi-trash"></i></button>
+                  </td>
+                </tr>
+              ))}
+              {filteredProducts.length === 0 && (
+                <tr><td colSpan="11" className="text-center py-4">No products found.</td></tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
