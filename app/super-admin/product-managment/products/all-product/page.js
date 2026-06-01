@@ -7,8 +7,10 @@ import toast, { Toaster } from 'react-hot-toast';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './all-products.css';
-import { getProductsAPI, updateProductAPI, deleteProductAPI } from '../../../services/productService';
-import SERVERURL from '../../../services/serverURL';
+import { deleteProductAPI, getProductsAPI, updateProductAPI } from '../../../../services/productService';
+import SERVERURL from '../../../../services/serverURL';
+
+
 
 
 export default function AllProductsPage() {
@@ -21,6 +23,7 @@ export default function AllProductsPage() {
     { id: 'seller', label: 'Seller Products', icon: 'bi-people-fill', path: '/super-admin/product-managment/all-seller-product' },
     { id: 'add-physical', label: 'Add New Physical Products', icon: 'bi-plus-circle-fill', path: '/super-admin/product-managment/add-product' },
     { id: 'add-digital', label: 'Add New Digital Products', icon: 'bi-cloud-download-fill', path: '/super-admin/product-managment/add-digital-product' },
+    { id: 'digital', label: ' Digital Products', icon: 'bi-cloud-download-fill', path: '/super-admin/product-managment/digital-product' },
   ];
 
   const [products, setProducts] = useState([]);

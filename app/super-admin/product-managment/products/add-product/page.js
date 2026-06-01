@@ -5,7 +5,8 @@ import toast, { Toaster } from 'react-hot-toast';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './add-product.css';
-import { createProductAPI } from '../../../services/productService';
+import { createProductAPI } from '../../../../services/productService';
+
 
 export default function AddProductPage() {
   const [formData, setFormData] = useState({

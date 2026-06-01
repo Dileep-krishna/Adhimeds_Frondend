@@ -15,7 +15,7 @@ export default function ProductManagementPage() {
     alert('Export Bulk Product - Generate CSV/Excel');
   };
   const handleAddProduct = () => {
-    router.push('/super-admin/product-managment/add-product');
+    router.push('/super-admin/product-managment/products/add-product');
   };
 
   // Complete menu structure matching the screenshot
@@ -23,17 +23,17 @@ export default function ProductManagementPage() {
     {
       title: 'PRODUCTS',
       items: [
-        { id: 'all-products', label: 'All products', icon: 'bi-grid-3x3-gap-fill', desc: 'View, search and manage your entire product line.', path: '/super-admin/product-managment/all-product' },
+        { id: 'all-products', label: 'All products', icon: 'bi-grid-3x3-gap-fill', desc: 'View, search and manage your entire product line.', path: '/super-admin/product-managment/products/all-product' },
         { id: 'inhouse', label: 'Inhouse Products', icon: 'bi-house-door-fill', desc: 'Manage products of your own.', path: '/super-admin/product-managment/inhouse-product' },
         { id: 'seller', label: 'Seller Products', icon: 'bi-people-fill', desc: 'Oversee items listed by your sellers.', path: '/super-admin/product-managment/all-seller-product' },
-        { id: 'add-physical', label: 'Add New Physical Products', icon: 'bi-plus-circle-fill', desc: 'Create listings for physical products that require shipping.', path: '/super-admin/product-managment/add-product' },
-        { id: 'add-digital', label: 'Add New Digital Products', icon: 'bi-cloud-download-fill', desc: 'Create downloadable products for instant delivery.', path: '/super-admin/product-managment/add-digital-product' },
+        { id: 'add-physical', label: 'Add New Physical Products', icon: 'bi-plus-circle-fill', desc: 'Create listings for physical products that require shipping.', path: '/super-admin/product-managment/products/add-product' },
+
       ],
     },
     {
       title: 'PRODUCT SETUP',
       items: [
-        { id: 'category', label: 'Category', icon: 'bi-folder-tree', desc: 'Organize your products into hierarchical groups.', path: '/super-admin/category-managment' },
+        { id: 'category', label: 'Category', icon: 'bi-folder-tree', desc: 'Organize your products into hierarchical groups.', path: '/super-admin/product-managment/product-setup/category' },
         { id: 'brand', label: 'Brand', icon: 'bi-tag-fill', desc: 'Define and manage manufacturer or brand names.', path: '/super-admin/product-managment/product-setup/Brand' },
 
         { id: 'attributes', label: 'Attributes', icon: 'bi-sliders2', desc: 'Define custom product properties.', path: '/super-admin/product-managment/product-setup/Attribute' },

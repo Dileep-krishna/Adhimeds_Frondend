@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
-import SERVERURL from "../../services/serverURL";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./categories.css";
+import SERVERURL from "../../../../services/serverURL";
 
 export default function CategoriesPage() {
   const [showModal, setShowModal] = useState(false);
@@ -14,12 +14,10 @@ export default function CategoriesPage() {
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [categories, setCategories] = useState([]);
-  const [typeFilter, setTypeFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
   const [formData, setFormData] = useState({
     name: "",
-    type: "physical",
     parent: "",
     order: 0,
     metaTitle: "",
@@ -35,7 +33,6 @@ export default function CategoriesPage() {
 
   const BASE_URL = `${SERVERURL}/category`;
 
-  // ✅ Helper to get correct image URL (your backend serves /imgUploads)
   const getImageUrl = (filename) => {
     if (!filename) return null;
     return `${SERVERURL}/imgUploads/${filename}`;
@@ -101,7 +98,6 @@ export default function CategoriesPage() {
     try {
       const data = new FormData();
       data.append("name", formData.name);
-      data.append("type", formData.type);
       data.append("order", Number(formData.order));
       data.append("metaTitle", formData.metaTitle);
       data.append("metaDescription", formData.metaDescription);
@@ -124,7 +120,6 @@ export default function CategoriesPage() {
     try {
       const data = new FormData();
       data.append("name", formData.name);
-      data.append("type", formData.type);
       data.append("order", Number(formData.order));
       data.append("metaTitle", formData.metaTitle);
       data.append("metaDescription", formData.metaDescription);
@@ -157,7 +152,6 @@ export default function CategoriesPage() {
   const resetModal = () => {
     setFormData({
       name: "",
-      type: "physical",
       parent: "",
       order: 0,
       metaTitle: "",
@@ -186,13 +180,11 @@ export default function CategoriesPage() {
     setSelectedCategory(cat);
     setFormData({
       name: cat.name,
-      type: cat.type,
       parent: getParentId(cat),
       order: cat.order,
       metaTitle: cat.metaTitle || "",
       metaDescription: cat.metaDescription || "",
     });
-    // ✅ Use getImageUrl for previews
     if (cat.banner) setBannerPreview(getImageUrl(cat.banner));
     if (cat.icon) setIconPreview(getImageUrl(cat.icon));
     if (cat.coverImage) setCoverPreview(getImageUrl(cat.coverImage));
@@ -205,47 +197,20 @@ export default function CategoriesPage() {
   };
 
   const filteredCategories = categories.filter(cat => {
-    if (typeFilter !== "all" && cat.type !== typeFilter) return false;
     if (searchTerm && !cat.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
   });
 
-  const physicalCount = categories.filter(cat => cat.type === "physical").length;
-  const digitalCount = categories.filter(cat => cat.type === "digital").length;
-
   return (
     <div className="categories-container">
-      {/* Stats Cards */}
-      <div className="stats-row">
-        <div className="stat-card physical">
-          <div className="stat-icon">🏥</div>
-          <div className="stat-info">
-            <h3>{physicalCount}</h3>
-            <p>Physical Categories</p>
-          </div>
-        </div>
-        <div className="stat-card digital">
-          <div className="stat-icon">💻</div>
-          <div className="stat-info">
-            <h3>{digitalCount}</h3>
-            <p>Digital Categories</p>
-          </div>
-        </div>
-      </div>
-
       <div className="header-actions">
-        <h4 className="page-title">🌿 Medical Categories</h4>
+        <h4 className="page-title">📂 Category Management</h4>
         <button className="btn-add" onClick={openAddModal}>+ Add Category</button>
       </div>
 
-      {/* Filter Bar */}
+      {/* Filter Bar (search only) */}
       <div className="filter-bar">
-        <div className="filter-buttons">
-          <button className={`filter-btn ${typeFilter === "all" ? "active" : ""}`} onClick={() => setTypeFilter("all")}>All</button>
-          <button className={`filter-btn ${typeFilter === "physical" ? "active" : ""}`} onClick={() => setTypeFilter("physical")}>Physical</button>
-          <button className={`filter-btn ${typeFilter === "digital" ? "active" : ""}`} onClick={() => setTypeFilter("digital")}>Digital</button>
-        </div>
-        <input type="text" className="search-input" placeholder="Search by name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        <input type="text" className="search-input" placeholder="🔍 Search by name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
       </div>
 
       {loading ? (
@@ -266,7 +231,6 @@ export default function CategoriesPage() {
             <tbody>
               {filteredCategories.map(cat => (
                 <tr key={cat._id}>
-                  {/* ICON COLUMN */}
                   <td>
                     {cat.icon ? (
                       <img src={getImageUrl(cat.icon)} className="rounded-circle" width="40" height="40" style={{ objectFit: "cover" }} alt="icon" />
@@ -276,12 +240,9 @@ export default function CategoriesPage() {
                       </div>
                     )}
                   </td>
-                  {/* NAME COLUMN with icon beside name */}
                   <td>
                     <div className="d-flex align-items-center gap-2">
-                      {cat.icon && (
-                        <img src={getImageUrl(cat.icon)} width="24" height="24" className="rounded-circle" alt="icon" />
-                      )}
+                      {cat.icon && <img src={getImageUrl(cat.icon)} width="24" height="24" className="rounded-circle" alt="icon" />}
                       <span className="fw-semibold">{cat.name}</span>
                     </div>
                   </td>
@@ -290,12 +251,8 @@ export default function CategoriesPage() {
                   <td>{cat.metaTitle?.substring(0, 30) || "-"}</td>
                   <td className="actions-cell">
                     <button className="btn-view" onClick={() => openView(cat)}>View</button>
-                    <button className="btn-icon edit" onClick={() => openEditModal(cat)} title="Edit">
-                      <i className="bi bi-pencil"></i>
-                    </button>
-                    <button className="btn-icon delete" onClick={() => handleDelete(cat._id)} title="Delete">
-                      <i className="bi bi-trash"></i>
-                    </button>
+                    <button className="btn-icon edit" onClick={() => openEditModal(cat)} title="Edit"><i className="bi bi-pencil"></i></button>
+                    <button className="btn-icon delete" onClick={() => handleDelete(cat._id)} title="Delete"><i className="bi bi-trash"></i></button>
                   </td>
                 </tr>
               ))}
@@ -321,15 +278,6 @@ export default function CategoriesPage() {
                 <input name="name" value={formData.name} onChange={handleChange} required />
               </div>
               <div className="form-group">
-                <label>Type</label>
-                <div className="type-toggle">
-                  <button className={`type-btn ${formData.type === "physical" ? "active" : ""}`}
-                    onClick={() => setFormData({ ...formData, type: "physical" })}>Physical</button>
-                  <button className={`type-btn ${formData.type === "digital" ? "active" : ""}`}
-                    onClick={() => setFormData({ ...formData, type: "digital" })}>Digital</button>
-                </div>
-              </div>
-              <div className="form-group">
                 <label>Parent Category</label>
                 <select name="parent" value={formData.parent} onChange={handleChange}>
                   <option value="">No Parent</option>
@@ -341,24 +289,24 @@ export default function CategoriesPage() {
               <div className="form-group">
                 <label>Ordering Number</label>
                 <input type="number" name="order" value={formData.order} onChange={handleChange} />
-                <small>Higher number has high priority</small>
+                <small>Higher number = higher priority</small>
               </div>
               <div className="form-group">
                 <label>Banner</label>
                 <input type="file" accept="image/*" onChange={handleFileChange(setBannerFile, setBannerPreview)} />
-                <small>Min 150x150px</small>
+                <small>Recommended size: 150x150px</small>
                 {bannerPreview && <img src={bannerPreview} className="preview-img" alt="banner" />}
               </div>
               <div className="form-group">
                 <label>Icon</label>
                 <input type="file" accept="image/*" onChange={handleFileChange(setIconFile, setIconPreview)} />
-                <small>Min 16x16px</small>
+                <small>Recommended size: 16x16px</small>
                 {iconPreview && <img src={iconPreview} className="preview-icon" alt="icon" />}
               </div>
               <div className="form-group">
                 <label>Cover Image</label>
                 <input type="file" accept="image/*" onChange={handleFileChange(setCoverFile, setCoverPreview)} />
-                <small>Min 260x260px</small>
+                <small>Recommended size: 260x260px</small>
                 {coverPreview && <img src={coverPreview} className="preview-img" alt="cover" />}
               </div>
               <div className="form-group">
@@ -378,7 +326,7 @@ export default function CategoriesPage() {
         </div>
       )}
 
-      {/* SIDE MODAL with Bootstrap + Framer Motion */}
+      {/* ATTRACTIVE SIDE VIEW DRAWER */}
       <AnimatePresence>
         {showView && selectedCategory && (
           <>
@@ -394,39 +342,44 @@ export default function CategoriesPage() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "tween", duration: 0.3, ease: "easeOut" }}
-              className="view-sidebar bootstrap-themed"
+              className="view-sidebar"
             >
               <div className="sidebar-header">
                 <h4>{selectedCategory.name}</h4>
-                <button className="btn-close btn-close-white" onClick={() => setShowView(false)}></button>
+                <button className="btn-close" onClick={() => setShowView(false)}>✕</button>
               </div>
               <div className="sidebar-body">
-                <ul className="list-group list-group-flush">
-                  <li className="list-group-item"><strong>Type:</strong> {selectedCategory.type}</li>
-                  <li className="list-group-item"><strong>Parent:</strong> {getParentName(selectedCategory)}</li>
-                  <li className="list-group-item"><strong>Order:</strong> {selectedCategory.order}</li>
-                  <li className="list-group-item"><strong>Meta Title:</strong> {selectedCategory.metaTitle || "-"}</li>
-                  <li className="list-group-item"><strong>Meta Description:</strong> {selectedCategory.metaDescription || "-"}</li>
+                <ul className="list-group">
+                  <li className="list-group-item"><strong>Parent Category</strong> <span>{getParentName(selectedCategory)}</span></li>
+                  <li className="list-group-item"><strong>Order Priority</strong> <span>{selectedCategory.order}</span></li>
+                  <li className="list-group-item"><strong>Meta Title</strong> <span>{selectedCategory.metaTitle || "—"}</span></li>
+                  <li className="list-group-item"><strong>Meta Description</strong> <span>{selectedCategory.metaDescription || "—"}</span></li>
                 </ul>
 
-                <div className="image-section mt-4">
-                  <div className="mb-3">
-                    <label className="form-label fw-bold">Banner</label>
+                <div className="image-section">
+                  <div className="image-card">
+                    <div className="image-label">🏞️ Banner Image</div>
                     {selectedCategory.banner ? (
-                      <img src={getImageUrl(selectedCategory.banner)} className="img-fluid rounded shadow-sm" alt="banner" />
-                    ) : <div className="alert alert-light">No banner</div>}
+                      <img src={getImageUrl(selectedCategory.banner)} alt="banner" />
+                    ) : (
+                      <div className="placeholder-icon">No banner uploaded</div>
+                    )}
                   </div>
-                  <div className="mb-3">
-                    <label className="form-label fw-bold">Icon</label>
+                  <div className="image-card">
+                    <div className="image-label">🔘 Icon</div>
                     {selectedCategory.icon ? (
-                      <img src={getImageUrl(selectedCategory.icon)} className="rounded-circle shadow-sm" width="64" height="64" alt="icon" />
-                    ) : <div className="alert alert-light">No icon</div>}
+                      <img src={getImageUrl(selectedCategory.icon)} alt="icon" style={{ width: "80px", height: "80px", margin: "0 auto", display: "block" }} />
+                    ) : (
+                      <div className="placeholder-icon">No icon uploaded</div>
+                    )}
                   </div>
-                  <div className="mb-3">
-                    <label className="form-label fw-bold">Cover Image</label>
+                  <div className="image-card">
+                    <div className="image-label">📷 Cover Image</div>
                     {selectedCategory.coverImage ? (
-                      <img src={getImageUrl(selectedCategory.coverImage)} className="img-fluid rounded shadow-sm" alt="cover" />
-                    ) : <div className="alert alert-light">No cover image</div>}
+                      <img src={getImageUrl(selectedCategory.coverImage)} alt="cover" />
+                    ) : (
+                      <div className="placeholder-icon">No cover image uploaded</div>
+                    )}
                   </div>
                 </div>
               </div>
