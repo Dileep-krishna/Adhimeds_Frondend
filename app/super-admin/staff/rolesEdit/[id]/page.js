@@ -4,14 +4,11 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import './roles-permissions.css';
-import {
-  createRole,
-  updateRole,
-  getRoleById,
-  getRolePermissions,
-  setRolePermissions,
-} from '../../../services/permissionService';
+
+import './roles-custom.css';
+import { getRoleById, getRolePermissions, setRolePermissions } from '../../../../services/permissionService';
+
+
 
 export default function RolesPermissionsPage() {
   const router = useRouter();

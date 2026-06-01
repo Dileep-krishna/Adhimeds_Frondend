@@ -41,7 +41,7 @@ export default function SuperAdminLayout({ children }) {
 
     { name: "Delivery Boys", path: "/super-admin/delivery-boys", icon: "bi-truck" },
     { name: "Notifications", path: "/super-admin/notifications", icon: "bi-bell" },
-    { name: "Category Management", path: "/super-admin/category-managment", icon: "bi-tags" },
+    // { name: "Category Management", path: "/super-admin/category-managment", icon: "bi-tags" },
     { name: "Reports", path: "/super-admin/reports", icon: "bi-file-text" },
     { name: "Settings", path: "/super-admin/settings", icon: "bi-gear" },
 
@@ -89,7 +89,7 @@ export default function SuperAdminLayout({ children }) {
 
   const staffMenu = [
     { name: "All Staff", path: "/super-admin/staff" },
-    { name: "Roles & Permissions", path: "/super-admin/staff/role-permission" },
+    { name: "Roles & Permission", path: "/super-admin/staff/permissions" },
   ];
 
   const storeMenu = [

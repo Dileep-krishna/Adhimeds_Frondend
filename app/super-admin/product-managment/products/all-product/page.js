@@ -10,9 +10,6 @@ import './all-products.css';
 import { deleteProductAPI, getProductsAPI, updateProductAPI } from '../../../../services/productService';
 import SERVERURL from '../../../../services/serverURL';
 
-
-
-
 export default function AllProductsPage() {
   const pathname = usePathname();
   const router = useRouter();
@@ -21,9 +18,6 @@ export default function AllProductsPage() {
     { id: 'all-products', label: 'All products', icon: 'bi-grid-3x3-gap-fill', path: '/super-admin/product-managment/all-products' },
     { id: 'inhouse', label: 'Inhouse Products', icon: 'bi-house-door-fill', path: '/super-admin/product-managment/inhouse-product' },
     { id: 'seller', label: 'Seller Products', icon: 'bi-people-fill', path: '/super-admin/product-managment/all-seller-product' },
-    { id: 'add-physical', label: 'Add New Physical Products', icon: 'bi-plus-circle-fill', path: '/super-admin/product-managment/add-product' },
-    { id: 'add-digital', label: 'Add New Digital Products', icon: 'bi-cloud-download-fill', path: '/super-admin/product-managment/add-digital-product' },
-    { id: 'digital', label: ' Digital Products', icon: 'bi-cloud-download-fill', path: '/super-admin/product-managment/digital-product' },
   ];
 
   const [products, setProducts] = useState([]);
@@ -31,8 +25,8 @@ export default function AllProductsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOption, setFilterOption] = useState('');
   const [sortOption, setSortOption] = useState('');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // Fetch products from API
   const fetchProducts = async () => {
     setLoading(true);
     try {
@@ -54,13 +48,11 @@ export default function AllProductsPage() {
     fetchProducts();
   }, []);
 
-  // Helper to get image URL
   const getImageUrl = (filename) => {
     if (!filename) return null;
     return `${SERVERURL}/imgUploads/${filename}`;
   };
 
-  // Filter and sort products
   const filteredProducts = useMemo(() => {
     let result = [...products];
     if (searchTerm) {
@@ -78,7 +70,6 @@ export default function AllProductsPage() {
     return result;
   }, [products, searchTerm, filterOption, sortOption]);
 
-  // Toggle functions (call update API)
   const togglePublished = async (id, currentStatus) => {
     try {
       const response = await updateProductAPI(id, { published: !currentStatus });
@@ -111,7 +102,7 @@ export default function AllProductsPage() {
     try {
       const response = await updateProductAPI(id, { todaysDeal: !currentStatus });
       if (response.success) {
-        toast.success(`Product ${!currentStatus ? 'added to' : 'removed from'} Today\'s Deal`);
+        toast.success(`Product ${!currentStatus ? 'added to' : 'removed from'} Today's Deal`);
         fetchProducts();
       } else {
         toast.error(response.message || 'Update failed');
@@ -136,10 +127,12 @@ export default function AllProductsPage() {
     }
   };
 
-  const handleAddNew = () => router.push('/super-admin/product-managment/add-product');
-const handleEdit = (id) => {
-  router.push(`/super-admin/product-managment/edit-product/${id}`);
-};
+  const handleEdit = (id) => {
+    router.push(`/super-admin/product-managment/products/edit-product/${id}`);
+  };
+
+  const toggleDropdown = () => setDropdownOpen(!dropdownOpen);
+  const closeDropdown = () => setDropdownOpen(false);
 
   return (
     <div className="all-products-container">
@@ -156,9 +149,35 @@ const handleEdit = (id) => {
 
       <div className="header-actions">
         <h4 className="page-title">All Products</h4>
-        <button className="btn-add" onClick={handleAddNew}>
-          <i className="bi bi-plus-circle me-1"></i> Add New Product
-        </button>
+        <div className="transparent-dropdown">
+          <button className="transparent-add-btn" onClick={toggleDropdown}>
+            <i className="bi bi-plus-circle"></i> Add New
+          </button>
+          {dropdownOpen && (
+            <ul className="transparent-dropdown-menu">
+              <li>
+                <Link href="/super-admin/product-managment/products/add-product" className="dropdown-item" onClick={closeDropdown}>
+                  <i className="bi bi-box-seam me-2"></i> New Product
+                </Link>
+              </li>
+              <li>
+                <Link href="/super-admin/product-managment/product-setup/category" className="dropdown-item" onClick={closeDropdown}>
+                  <i className="bi bi-tags me-2"></i> New Category
+                </Link>
+              </li>
+              <li>
+                <Link href="/super-admin/product-managment/draft-products" className="dropdown-item" onClick={closeDropdown}>
+                  <i className="bi bi-file-earmark-text me-2"></i> Draft
+                </Link>
+              </li>
+              <li>
+                <Link href="/super-admin/product-managment/product-setup/Brand" className="dropdown-item" onClick={closeDropdown}>
+                  <i className="bi bi-building me-2"></i> New Brand
+                </Link>
+              </li>
+            </ul>
+          )}
+        </div>
       </div>
 
       <div className="filter-bar">
@@ -231,13 +250,22 @@ const handleEdit = (id) => {
                   <td>{product.discount > 0 ? `${product.discount}%` : '—'}</td>
                   <td><i className="bi bi-info-circle text-secondary"></i></td>
                   <td>
-                    <input type="checkbox" checked={product.published || false} onChange={() => togglePublished(product._id, product.published)} />
+                    <label className="switch">
+                      <input type="checkbox" checked={product.published || false} onChange={() => togglePublished(product._id, product.published)} />
+                      <span className="slider round"></span>
+                    </label>
                   </td>
                   <td>
-                    <input type="checkbox" checked={product.featured || false} onChange={() => toggleFeatured(product._id, product.featured)} />
+                    <label className="switch">
+                      <input type="checkbox" checked={product.featured || false} onChange={() => toggleFeatured(product._id, product.featured)} />
+                      <span className="slider round"></span>
+                    </label>
                   </td>
                   <td>
-                    <input type="checkbox" checked={product.todaysDeal || false} onChange={() => toggleTodayDeal(product._id, product.todaysDeal)} />
+                    <label className="switch">
+                      <input type="checkbox" checked={product.todaysDeal || false} onChange={() => toggleTodayDeal(product._id, product.todaysDeal)} />
+                      <span className="slider round"></span>
+                    </label>
                   </td>
                   <td>
                     <button className="btn-icon edit" onClick={() => handleEdit(product._id)}><i className="bi bi-pencil"></i></button>
