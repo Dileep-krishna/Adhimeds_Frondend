@@ -24,8 +24,18 @@ export default function SuperAdminLayout({ children }) {
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
-  const toggleDropdown = (key) => {
-    setOpenDropdowns((prev) => ({ ...prev, [key]: !prev[key] }));
+  // const toggleDropdown = (key) => {
+  //   setOpenDropdowns((prev) => ({ ...prev, [key]: !prev[key] }));
+  // };
+  const toggleMainDropdown = () => {
+    setOpenDropdowns((prev) => ({
+      main: !prev.main,
+      staffMain: false,
+      storeMain: false,
+      Products: false,
+      "Product Setup": false,
+      "Product Operation": false,
+    }));
   };
 
   const closeAllDropdowns = () => {
@@ -135,38 +145,38 @@ export default function SuperAdminLayout({ children }) {
             <div className="dropdown-header-wrapper">
 
               {/* ✅ MAIN PRODUCT BUTTON */}
-       <button
-  className="dropdown-main-link"
-  onClick={() => {
-    setOpenDropdowns((prev) => {
-      const isOpen = prev.main;
+              <button
+                className="dropdown-main-link"
+                onClick={() => {
+                  setOpenDropdowns((prev) => {
+                    const isOpen = prev.main;
 
-      if (isOpen) {
-        return {
-          main: false,
-          Products: false,
-          "Product Setup": false,
-          "Product Operation": false,
-        };
-      }
+                    if (isOpen) {
+                      return {
+                        main: false,
+                        Products: false,
+                        "Product Setup": false,
+                        "Product Operation": false,
+                      };
+                    }
 
-      return {
-        main: true,
-        Products: false,
-        "Product Setup": false,
-        "Product Operation": false,
-      };
-    });
-  }}
->
-  <i className="bi bi-box"></i>
-  <span>Product Management</span>
-</button>
+                    return {
+                      main: true,
+                      Products: false,
+                      "Product Setup": false,
+                      "Product Operation": false,
+                    };
+                  });
+                }}
+              >
+                <i className="bi bi-box"></i>
+                <span>Product Management</span>
+              </button>
 
               {/* chevron toggle */}
               <button
                 className="chevron-toggle"
-                onClick={() => toggleDropdown("main")}
+                onClick={toggleMainDropdown}
               >
                 <i className={`bi bi-chevron-${openDropdowns.main ? "up" : "down"}`}></i>
               </button>
@@ -181,27 +191,17 @@ export default function SuperAdminLayout({ children }) {
                   <div
                     className="dropdown-item"
                     onClick={() => {
-                      // navigate if path exists
                       if (menu.path) {
                         router.push(menu.path);
                       }
 
-                      setOpenDropdowns((prev) => {
-                        if (prev[menu.name]) {
-                          return {
-                            ...prev,
-                            [menu.name]: false,
-                          };
-                        }
-
-                        return {
-                          ...prev,
-                          Products: false,
-                          "Product Setup": false,
-                          "Product Operation": false,
-                          [menu.name]: true,
-                        };
-                      });
+                      setOpenDropdowns(() => ({
+                        main: true, // keep parent open
+                        Products: false,
+                        "Product Setup": false,
+                        "Product Operation": false,
+                        [menu.name]: true, // ✅ ONLY ONE OPEN
+                      }));
                     }}
                   >
                     <span>

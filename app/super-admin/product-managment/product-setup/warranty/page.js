@@ -1,33 +1,70 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
-import "./warranty.css";
+import "react-toastify/dist/ReactToastify.css";
+import { toast, ToastContainer } from "react-toastify";
 
-// Mock initial warranty data (replace with API call later)
-const initialWarranties = [
-  { id: 1, text: "1 Year", logo: null },
-  { id: 2, text: "2 Year", logo: null },
-  { id: 3, text: "3 Year", logo: null },
-  { id: 4, text: "5 Year", logo: null },
-];
+import "./warranty.css";
+import { createWarrantyAPI, deleteWarrantyAPI, getWarrantiesAPI, updateWarrantyAPI } from "../../../../services/warrentyAPI";
+import SERVERURL from "../../../../services/serverURL";
 
 export default function WarrantyPage() {
-  const [warranties, setWarranties] = useState(initialWarranties);
+  const [warranties, setWarranties] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [currentWarranty, setCurrentWarranty] = useState(null);
   const [warrantyText, setWarrantyText] = useState("");
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
-  const [dimensionError, setDimensionError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const previewUrlRef = useRef(null);
 
-  // Reset form
+  const getLogoUrl = (logo) => {
+    if (!logo) return null;
+    if (logo.startsWith("data:")) return logo;
+    if (logo.startsWith("http")) return logo;
+    return `${SERVERURL}/${logo}`;
+  };
+
+  const fetchWarranties = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await getWarrantiesAPI();
+      if (response.success) {
+        setWarranties(response.data);
+      } else {
+        toast.error(response.message || "Failed to load warranties");
+      }
+    } catch (err) {
+      console.error("Fetch warranties error:", err);
+      toast.error("Network error while fetching warranties");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWarranties();
+  }, [fetchWarranties]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+    };
+  }, []);
+
   const resetForm = () => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
     setWarrantyText("");
     setLogoFile(null);
     setLogoPreview(null);
-    setDimensionError("");
     setIsEditMode(false);
     setCurrentWarranty(null);
   };
@@ -38,12 +75,13 @@ export default function WarrantyPage() {
   };
 
   const openEditModal = (warranty) => {
+    resetForm();
     setIsEditMode(true);
     setCurrentWarranty(warranty);
     setWarrantyText(warranty.text);
-    setLogoPreview(warranty.logo || null);
+    const logoUrl = getLogoUrl(warranty.logo);
+    setLogoPreview(logoUrl);
     setLogoFile(null);
-    setDimensionError("");
     setShowModal(true);
   };
 
@@ -52,89 +90,87 @@ export default function WarrantyPage() {
     resetForm();
   };
 
-  // Validate image dimensions (40x40)
-  const validateImageDimensions = (file) => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        if (img.width === 40 && img.height === 40) {
-          resolve(true);
-        } else {
-          reject(`Image must be exactly 40x40px. Current: ${img.width}x${img.height}`);
-        }
-      };
-      img.onerror = () => reject("Invalid image file");
-      img.src = url;
-    });
-  };
-
-  const handleLogoChange = async (e) => {
+  // ✅ No dimension validation – accept any image size
+  const handleLogoChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    try {
-      await validateImageDimensions(file);
-      setLogoFile(file);
-      const previewUrl = URL.createObjectURL(file);
-      setLogoPreview(previewUrl);
-      setDimensionError("");
-    } catch (err) {
-      setDimensionError(err);
-      setLogoFile(null);
-      setLogoPreview(null);
+
+    // Revoke previous preview URL if any
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
     }
+
+    setLogoFile(file);
+    const previewUrl = URL.createObjectURL(file);
+    previewUrlRef.current = previewUrl;
+    setLogoPreview(previewUrl);
   };
 
-  // Save warranty (add or update)
-  const saveWarranty = () => {
+  const saveWarranty = async () => {
     if (!warrantyText.trim()) {
-      alert("Please enter warranty text");
+      toast.warn("Please enter warranty text");
       return;
     }
 
-    let logoBase64 = null;
-    if (logoFile) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const newWarranty = {
-          id: isEditMode ? currentWarranty.id : Date.now(),
-          text: warrantyText.trim(),
-          logo: reader.result,
-        };
-        if (isEditMode) {
-          setWarranties(warranties.map(w => w.id === currentWarranty.id ? newWarranty : w));
-        } else {
-          setWarranties([...warranties, newWarranty]);
-        }
-        closeModal();
-      };
-      reader.readAsDataURL(logoFile);
-    } else {
-      // No new logo uploaded – keep existing logo if editing
-      const newWarranty = {
-        id: isEditMode ? currentWarranty.id : Date.now(),
-        text: warrantyText.trim(),
-        logo: isEditMode ? currentWarranty.logo : null,
-      };
+    setIsSaving(true);
+    try {
+      let response;
+      const payloadText = warrantyText.trim();
+
       if (isEditMode) {
-        setWarranties(warranties.map(w => w.id === currentWarranty.id ? newWarranty : w));
+        if (logoFile) {
+          const formData = new FormData();
+          formData.append("text", payloadText);
+          formData.append("logo", logoFile);
+          response = await updateWarrantyAPI(currentWarranty._id, formData);
+        } else {
+          response = await updateWarrantyAPI(currentWarranty._id, { text: payloadText });
+        }
       } else {
-        setWarranties([...warranties, newWarranty]);
+        if (logoFile) {
+          const formData = new FormData();
+          formData.append("text", payloadText);
+          formData.append("logo", logoFile);
+          response = await createWarrantyAPI(formData);
+        } else {
+          response = await createWarrantyAPI({ text: payloadText, logo: null });
+        }
       }
-      closeModal();
+
+      if (response.success) {
+        toast.success(isEditMode ? "Warranty updated" : "Warranty created");
+        await fetchWarranties();
+        closeModal();
+      } else {
+        toast.error(response.message || "Operation failed");
+      }
+    } catch (err) {
+      console.error("Save warranty error:", err);
+      toast.error("Something went wrong while saving");
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // Delete warranty
-  const deleteWarranty = (id) => {
-    if (window.confirm("Delete this warranty permanently?")) {
-      setWarranties(warranties.filter(w => w.id !== id));
+  const deleteWarranty = async (id) => {
+    if (!window.confirm("Delete this warranty permanently?")) return;
+    try {
+      const response = await deleteWarrantyAPI(id);
+      if (response.success) {
+        toast.success("Warranty deleted");
+        fetchWarranties();
+      } else {
+        toast.error(response.message || "Delete failed");
+      }
+    } catch (err) {
+      console.error("Delete error:", err);
+      toast.error("Network error while deleting");
     }
   };
 
   return (
     <div className="warranty-container">
+      <ToastContainer position="top-right" autoClose={3000} />
       <div className="header-actions">
         <h4 className="page-title">All Warranties</h4>
         <button className="btn-add" onClick={openAddModal}>
@@ -143,43 +179,54 @@ export default function WarrantyPage() {
       </div>
 
       <div className="table-responsive">
-        <table className="med-table">
-          <thead>
-            <tr>
-              <th>Warranty Text</th>
-              <th>Logo (40x40)</th>
-              <th>Options</th>
-            </tr>
-          </thead>
-          <tbody>
-            {warranties.map(w => (
-              <tr key={w.id}>
-                <td><strong>{w.text}</strong></td>
-                <td>
-                  {w.logo ? (
-                    <img src={w.logo} alt="logo" className="warranty-logo" />
-                  ) : (
-                    <span className="text-muted">No logo</span>
-                  )}
-                </td>
-                <td>
-                  <button className="btn-icon edit" onClick={() => openEditModal(w)}>
-                    <i className="bi bi-pencil"></i>
-                  </button>
-                  <button className="btn-icon delete" onClick={() => deleteWarranty(w.id)}>
-                    <i className="bi bi-trash"></i>
-                  </button>
-                </td>
+        {loading ? (
+          <div className="text-center py-4">Loading warranties...</div>
+        ) : (
+          <table className="med-table">
+            <thead>
+              <tr>
+                <th>Warranty Text</th>
+                <th>Logo</th>
+                <th>Options</th>
               </tr>
-            ))}
-            {warranties.length === 0 && (
-              <tr><td colSpan="3" className="text-center">No warranties added yet.</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {warranties.map((w) => (
+                <tr key={w._id}>
+                  <td><strong>{w.text}</strong></td>
+                  <td>
+                    {w.logo ? (
+                      <img
+                        src={getLogoUrl(w.logo)}
+                        alt="logo"
+                        className="warranty-logo"
+                        onError={(e) => {
+                          console.error(`Failed to load logo: ${getLogoUrl(w.logo)}`);
+                          e.target.style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <span className="text-muted">No logo</span>
+                    )}
+                  </td>
+                  <td>
+                    <button className="btn-icon edit" onClick={() => openEditModal(w)}>
+                      <i className="bi bi-pencil"></i>
+                    </button>
+                    <button className="btn-icon delete" onClick={() => deleteWarranty(w._id)}>
+                      <i className="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {warranties.length === 0 && !loading && (
+                <tr><td colSpan="3" className="text-center">No warranties added yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
 
-      {/* Add/Edit Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>
@@ -199,15 +246,14 @@ export default function WarrantyPage() {
                 />
               </div>
               <div className="form-group">
-                <label>Logo (40x40px)</label>
+                <label>Logo (any size)</label>
                 <input
                   type="file"
                   className="form-control"
                   accept="image/*"
                   onChange={handleLogoChange}
                 />
-                <small className="text-muted">Minimum dimensions required: 40px width X 40px height.</small>
-                {dimensionError && <div className="text-danger small mt-1">{dimensionError}</div>}
+                <small className="text-muted">Upload an image (any dimensions).</small>
                 {logoPreview && (
                   <div className="mt-2">
                     <img src={logoPreview} alt="preview" className="logo-preview" />
@@ -217,8 +263,8 @@ export default function WarrantyPage() {
             </div>
             <div className="modal-footer">
               <button className="btn-cancel" onClick={closeModal}>Cancel</button>
-              <button className="btn-save" onClick={saveWarranty}>
-                {isEditMode ? "Update" : "Save"}
+              <button className="btn-save" onClick={saveWarranty} disabled={isSaving}>
+                {isSaving ? "Saving..." : (isEditMode ? "Update" : "Save")}
               </button>
             </div>
           </div>
