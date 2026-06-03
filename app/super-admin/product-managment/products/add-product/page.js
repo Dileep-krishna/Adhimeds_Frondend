@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -10,7 +10,8 @@ import { createProductAPI, deleteProductAPI } from '../../../../services/product
 import { getAllBrands } from '../../../../services/brandAPI';
 import { getCategoriesAPI } from '../../../../services/categoryAPI';
 import { getWarrantiesAPI } from '../../../../services/warrentyAPI';
-
+import { getColorsAPI } from '../../../../services/colorAPI';
+import { getAttributesAPI } from '../../../../services/attributeAPI';
 
 export default function AddProductPage() {
   const router = useRouter();
@@ -19,46 +20,62 @@ export default function AddProductPage() {
   const [brands, setBrands] = useState([]);
   const [categories, setCategories] = useState([]);
   const [warranties, setWarranties] = useState([]);
+  const [colorOptions, setColorOptions] = useState([]);
+  const [attributeOptions, setAttributeOptions] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  // Helper to extract array from API response (handles { data: [...] } or { success: true, data: [...] })
+  // For attributes, store selected values per attribute
+  const [selectedAttributeValues, setSelectedAttributeValues] = useState({});
+
   const extractDataArray = (response) => {
     if (Array.isArray(response)) return response;
     if (response?.data && Array.isArray(response.data)) return response.data;
     if (response?.success && Array.isArray(response.data)) return response.data;
     return [];
   };
-useEffect(() => {
-  const fetchDropdownData = async () => {
-    try {
-      const [brandRes, catRes, warrantyRes] = await Promise.all([
-        getAllBrands(),
-        getCategoriesAPI(),
-        getWarrantiesAPI(),
-      ]);
 
-      setBrands(extractDataArray(brandRes));
-      setCategories(extractDataArray(catRes));
+  useEffect(() => {
+    const fetchDropdownData = async () => {
+      try {
+        const [brandRes, catRes, warrantyRes, colorRes, attrRes] = await Promise.all([
+          getAllBrands(),
+          getCategoriesAPI(),
+          getWarrantiesAPI(),
+          getColorsAPI(),
+          getAttributesAPI(),
+        ]);
 
-      // ✅ Warranty: map 'text' to 'name' so the select works
-      const rawWarranties = extractDataArray(warrantyRes);
-      const mappedWarranties = rawWarranties.map(w => ({
-        ...w,
-        name: w.text || w.name || 'Unnamed',  // use 'text' as the display name
-      }));
-      setWarranties(mappedWarranties);
+        setBrands(extractDataArray(brandRes));
+        setCategories(extractDataArray(catRes));
 
-    } catch (error) {
-      console.error('Error loading dropdown data:', error);
-      toast.error('Failed to load brands/categories/warranties');
-    } finally {
-      setLoadingData(false);
-    }
-  };
-  fetchDropdownData();
-}, []);
+        const rawWarranties = extractDataArray(warrantyRes);
+        const mappedWarranties = rawWarranties.map(w => ({
+          ...w,
+          name: w.text || w.name || 'Unnamed',
+        }));
+        setWarranties(mappedWarranties);
 
-  // ========== FORM STATE (unchanged) ==========
+        setColorOptions(extractDataArray(colorRes));
+        const attributes = extractDataArray(attrRes);
+        setAttributeOptions(attributes);
+
+        // Initialize selected values for each attribute as an empty array
+        const initialSelections = {};
+        attributes.forEach(attr => {
+          initialSelections[attr._id] = [];
+        });
+        setSelectedAttributeValues(initialSelections);
+      } catch (error) {
+        console.error('Error loading dropdown data:', error);
+        toast.error('Failed to load data');
+      } finally {
+        setLoadingData(false);
+      }
+    };
+    fetchDropdownData();
+  }, []);
+
+  // ========== FORM STATE ==========
   const [formData, setFormData] = useState({
     productName: '', mainCategory: '', brand: '',
     relatedCategories: [], unit: '', weight: '', minPurchaseQty: 1,
@@ -80,7 +97,6 @@ useEffect(() => {
     videoFile: null, videoThumbnail: null, pdfSpec: null,
     unitPrice: 0, stock: 0, sku: '',
     colorsEnabled: false, colorInput: '',
-    attributes: [{ name: '', values: '' }],
     variants: [],
     hideStockState: 'none',
     lowStockWarning: 0,
@@ -92,18 +108,23 @@ useEffect(() => {
   const [deleting, setDeleting] = useState(false);
   const [generatingVariants, setGeneratingVariants] = useState(false);
 
-  // ========== HELPER FUNCTIONS (unchanged) ==========
+  // ========== COMPUTE VARIANTS ==========
   const computeVariants = () => {
+    // Colors selected as comma-separated string
     const colors = formData.colorsEnabled
       ? formData.colorInput.split(',').map(c => c.trim()).filter(c => c)
       : [];
+
+    // Attribute value lists: for each attribute that has selected values, push the array of selected values
     const attrLists = [];
-    formData.attributes.forEach(attr => {
-      if (attr.name.trim() && attr.values.trim()) {
-        const values = attr.values.split(',').map(v => v.trim()).filter(v => v);
-        if (values.length) attrLists.push(values);
+    Object.keys(selectedAttributeValues).forEach(attrId => {
+      const selectedVals = selectedAttributeValues[attrId];
+      if (selectedVals && selectedVals.length) {
+        attrLists.push(selectedVals);
       }
     });
+
+    // Cartesian product of attribute value lists
     let combinations = [[]];
     for (const list of attrLists) {
       const newCombos = [];
@@ -136,6 +157,38 @@ useEffect(() => {
 
   const handleChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
 
+  // Colors multi‑select (with swatch)
+  const handleColorSelect = (e) => {
+    const selected = Array.from(e.target.selectedOptions, opt => opt.value);
+    setFormData(prev => ({ ...prev, colorInput: selected.join(',') }));
+  };
+
+  // Attribute value change handler
+  const handleAttributeValueChange = (attrId, selectedValues) => {
+    setSelectedAttributeValues(prev => ({
+      ...prev,
+      [attrId]: selectedValues
+    }));
+  };
+
+  const generateVariants = () => {
+    if (!formData.colorsEnabled && Object.keys(selectedAttributeValues).every(id => selectedAttributeValues[id].length === 0)) {
+      toast.error('Enable color variation or select at least one attribute value');
+      return;
+    }
+    setGeneratingVariants(true);
+    const newVariants = computeVariants();
+    setFormData(prev => ({ ...prev, variants: newVariants }));
+    setGeneratingVariants(false);
+  };
+
+  const updateVariant = (idx, field, value) => {
+    const updated = [...formData.variants];
+    updated[idx][field] = value;
+    setFormData(prev => ({ ...prev, variants: updated }));
+  };
+
+  // ========== FREQUENTLY BOUGHT ==========
   const addFrequentlyBought = () => {
     setFormData(prev => ({ ...prev, frequentlyBought: [...prev.frequentlyBought, { product: '', category: '' }] }));
   };
@@ -149,11 +202,13 @@ useEffect(() => {
     setFormData(prev => ({ ...prev, frequentlyBought: updated }));
   };
 
+  // ========== RELATED CATEGORIES ==========
   const handleRelatedCategoriesChange = (e) => {
     const selected = Array.from(e.target.selectedOptions, opt => opt.value);
     setFormData(prev => ({ ...prev, relatedCategories: selected }));
   };
 
+  // ========== TAGS ==========
   const addTag = () => {
     if (formData.tagInput.trim() && !formData.tags.includes(formData.tagInput.trim())) {
       setFormData(prev => ({ ...prev, tags: [...prev.tags, prev.tagInput.trim()], tagInput: '' }));
@@ -161,6 +216,7 @@ useEffect(() => {
   };
   const removeTag = (tag) => setFormData(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
 
+  // ========== SEO TAGS ==========
   const addSeoTag = () => {
     if (formData.seoTagInput.trim() && !formData.seoTags.includes(formData.seoTagInput.trim())) {
       setFormData(prev => ({ ...prev, seoTags: [...prev.seoTags, prev.seoTagInput.trim()], seoTagInput: '' }));
@@ -177,6 +233,7 @@ useEffect(() => {
     handleChange('sku', sku);
   };
 
+  // ========== FILES ==========
   const handleGalleryChange = (e) => {
     const files = Array.from(e.target.files);
     setFormData(prev => ({ ...prev, galleryImages: [...prev.galleryImages, ...files] }));
@@ -198,32 +255,35 @@ useEffect(() => {
     setFormData(prev => ({ ...prev, youtubeUrls: updated }));
   };
 
-  const addAttribute = () => {
-    setFormData(prev => ({ ...prev, attributes: [...prev.attributes, { name: '', values: '' }] }));
+  // ========== SAVE PRODUCT ==========
+  // Convert selectedAttributeValues into the format expected by backend (an array of { name, values })
+  const buildAttributesPayload = () => {
+    const payload = [];
+    attributeOptions.forEach(attr => {
+      const selectedVals = selectedAttributeValues[attr._id] || [];
+      if (selectedVals.length) {
+        payload.push({
+          name: attr.name,
+          values: selectedVals
+        });
+      }
+    });
+    return payload;
   };
-  const removeAttribute = (idx) => {
-    const updated = formData.attributes.filter((_, i) => i !== idx);
-    setFormData(prev => ({ ...prev, attributes: updated }));
-  };
-  const updateAttribute = (idx, field, value) => {
-    const updated = [...formData.attributes];
-    updated[idx][field] = value;
-    setFormData(prev => ({ ...prev, attributes: updated }));
-  };
+  const handleAttributeSelect = (e) => {
+  const value = e.target.value;
 
-  const generateVariants = () => {
-    if (!formData.colorsEnabled) return;
-    setGeneratingVariants(true);
-    const newVariants = computeVariants();
-    setFormData(prev => ({ ...prev, variants: newVariants }));
-    setGeneratingVariants(false);
-  };
+  setFormData(prev => {
+    const exists = prev.selectedAttributes.includes(value);
 
-  const updateVariant = (idx, field, value) => {
-    const updated = [...formData.variants];
-    updated[idx][field] = value;
-    setFormData(prev => ({ ...prev, variants: updated }));
-  };
+    return {
+      ...prev,
+      selectedAttributes: exists
+        ? prev.selectedAttributes.filter(v => v !== value)
+        : [...prev.selectedAttributes, value]
+    };
+  });
+};
 
   const saveProduct = async (status) => {
     if (!formData.productName || !formData.mainCategory || !formData.brand) {
@@ -233,14 +293,14 @@ useEffect(() => {
     setSaving(true);
     try {
       const payload = new FormData();
+      // Copy all formData except 'attributes' (we'll add from selectedAttributeValues)
       Object.keys(formData).forEach(key => {
-        if (['galleryImages', 'youtubeUrls', 'relatedCategories', 'tags', 'seoTags', 'attributes', 'variants', 'frequentlyBought'].includes(key)) {
+        if (['galleryImages', 'youtubeUrls', 'relatedCategories', 'tags', 'seoTags', 'variants', 'frequentlyBought'].includes(key)) {
           if (key === 'relatedCategories') formData[key].forEach(val => payload.append(`${key}[]`, val));
           else if (key === 'tags') formData[key].forEach(val => payload.append(`${key}[]`, val));
           else if (key === 'seoTags') formData[key].forEach(val => payload.append(`${key}[]`, val));
           else if (key === 'youtubeUrls') formData[key].forEach(val => payload.append(`${key}[]`, val));
           else if (key === 'galleryImages') formData[key].forEach(file => payload.append(`${key}[]`, file));
-          else if (key === 'attributes') payload.append(key, JSON.stringify(formData[key]));
           else if (key === 'variants') payload.append(key, JSON.stringify(formData[key]));
           else if (key === 'frequentlyBought') payload.append(key, JSON.stringify(formData[key]));
         } else if (key === 'thumbnail' && formData.thumbnail) payload.append('thumbnail', formData.thumbnail);
@@ -250,6 +310,9 @@ useEffect(() => {
         else if (key === 'metaImage' && formData.metaImage) payload.append('metaImage', formData.metaImage);
         else if (typeof formData[key] !== 'object') payload.append(key, formData[key]);
       });
+      // Add attributes payload
+      const attributesArray = buildAttributesPayload();
+      payload.append('attributes', JSON.stringify(attributesArray));
       payload.append('published', status === 'publish' ? true : status === 'unpublish' ? false : false);
       const response = await createProductAPI(payload);
       if (response.success) {
@@ -289,6 +352,7 @@ useEffect(() => {
       setDeleting(false);
     }
   };
+  
 
   if (loadingData) {
     return (
@@ -296,7 +360,7 @@ useEffect(() => {
         <div className="spinner-border text-success" role="status">
           <span className="visually-hidden">Loading...</span>
         </div>
-        <p className="mt-2">Loading brands, categories & warranties...</p>
+        <p className="mt-2">Loading data...</p>
       </div>
     );
   }
@@ -392,9 +456,7 @@ useEffect(() => {
                 {formData.youtubeUrls.map((url, idx) => (
                   <div key={idx} className="input-group mb-2">
                     <input type="url" className="form-control" placeholder="Paste url" value={url} onChange={e => updateYouTubeUrl(idx, e.target.value)} />
-                    {formData.youtubeUrls.length > 1 && (
-                      <button type="button" className="btn btn-outline-danger" onClick={() => removeYouTubeUrl(idx)}><i className="bi bi-trash"></i></button>
-                    )}
+                    {formData.youtubeUrls.length > 1 && <button type="button" className="btn btn-outline-danger" onClick={() => removeYouTubeUrl(idx)}><i className="bi bi-trash"></i></button>}
                   </div>
                 ))}
                 <button type="button" className="btn btn-sm btn-outline-secondary" onClick={addYouTubeUrl}>+ Add Another</button>
@@ -437,40 +499,67 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* Variation Configuration */}
+          {/* ========== COLOR SELECTION CARD ========== */}
           <div className="form-card">
-            <div className="card-header">Product Variation Configuration</div>
+            <div className="card-header">Colors</div>
             <div className="card-body">
               <div className="toggle-item">
-                <label className="toggle-switch"><input type="checkbox" checked={formData.colorsEnabled} onChange={e => { handleChange('colorsEnabled', e.target.checked); if (!e.target.checked) setFormData(prev => ({ ...prev, variants: [] })); }} /><span className="toggle-slider"></span></label>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={formData.colorsEnabled} onChange={e => {
+                    handleChange('colorsEnabled', e.target.checked);
+                    if (!e.target.checked) setFormData(prev => ({ ...prev, variants: [] }));
+                  }} />
+                  <span className="toggle-slider"></span>
+                </label>
                 <span className="toggle-label">Enable Color Variation</span>
               </div>
+
               {formData.colorsEnabled && (
-                <div className="mb-3"><label className="form-label">Colors (comma separated)</label><input type="text" className="form-control" placeholder="e.g., Red, Blue, Green" value={formData.colorInput} onChange={e => handleChange('colorInput', e.target.value)} /></div>
+                <div className="mt-2">
+                  <label className="form-label">Select Colors *</label>
+                  <select multiple className="form-select" value={formData.colorInput.split(',')} onChange={handleColorSelect} style={{ minHeight: '100px' }}>
+                    {colorOptions.map(color => (
+                      <option key={color._id} value={color.name}>
+                        <span style={{ display: 'inline-block', width: '16px', height: '16px', backgroundColor: color.code, marginRight: '8px', borderRadius: '2px' }}></span>
+                        {color.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               )}
-              <div className="mb-3">
-                <label className="form-label fw-bold">Attributes</label>
-                {formData.attributes.map((attr, idx) => (
-                  <div key={idx} className="row g-2 mb-2">
-                    <div className="col-5"><input type="text" className="form-control" placeholder="Attribute name" value={attr.name} onChange={e => updateAttribute(idx, 'name', e.target.value)} /></div>
-                    <div className="col-5"><input type="text" className="form-control" placeholder="Values (comma separated)" value={attr.values} onChange={e => updateAttribute(idx, 'values', e.target.value)} /></div>
-                    <div className="col-2">{formData.attributes.length > 1 && <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => removeAttribute(idx)}><i className="bi bi-trash"></i></button>}</div>
-                  </div>
-                ))}
-                <button type="button" className="btn btn-sm btn-outline-primary" onClick={addAttribute}>+ Add Attribute</button>
-              </div>
-              <button type="button" className="btn btn-primary mt-2" onClick={generateVariants} disabled={!formData.colorsEnabled || generatingVariants}>{generatingVariants ? 'Generating...' : 'Generate Variants'}</button>
             </div>
           </div>
 
-          {/* Variants Table */}
-          {formData.colorsEnabled && formData.variants.length > 0 && (
+          {/* ========== ATTRIBUTES CARD – always displays all attributes ========== */}
+        <div className="mb-3">
+  <label className="form-label">Attribute</label>
+  <select className="form-select" value={formData.selectedAttribute} onChange={e => handleChange('selectedAttribute', e.target.value)}>
+    <option value="">Select Attribute</option>
+    {attributeOptions.map(attr => (
+      <option key={attr._id} value={attr.name}>{attr.name}</option>
+    ))}
+  </select>
+</div>
+
+          {/* Generate Variants Button & Variants Table */}
+          <div className="form-card">
+            <div className="card-header">Generate Variants</div>
+            <div className="card-body">
+              <button type="button" className="btn btn-primary w-100" onClick={generateVariants} disabled={generatingVariants}>
+                {generatingVariants ? 'Generating...' : 'Generate Variants'}
+              </button>
+            </div>
+          </div>
+
+          {formData.variants.length > 0 && (
             <div className="form-card">
               <div className="card-header">Product Variants</div>
               <div className="card-body">
                 <div className="table-responsive">
                   <table className="table table-bordered align-middle">
-                    <thead><tr><th>Variant</th><th>Price (₹)</th><th>SKU</th><th>Quantity</th><th>Photo</th></tr></thead>
+                    <thead>
+                      <tr><th>Variant</th><th>Price (₹)</th><th>SKU</th><th>Quantity</th><th>Photo</th></tr>
+                    </thead>
                     <tbody>
                       {formData.variants.map((variant, idx) => (
                         <tr key={idx}>
@@ -489,9 +578,8 @@ useEffect(() => {
           )}
         </div>
 
-        {/* RIGHT COLUMN */}
+        {/* RIGHT COLUMN (unchanged) */}
         <div className="col-md-6">
-          {/* Product Settings */}
           <div className="form-card">
             <div className="card-header">Product Settings</div>
             <div className="card-body">
@@ -501,43 +589,38 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* Flash Sale */}
           <div className="form-card">
             <div className="card-header">Flash Sale</div>
             <div className="card-body">
-              <div className="mb-3"><label className="form-label">Choose Flash Title</label><select className="form-select" value={formData.flashTitle} onChange={e => handleChange('flashTitle', e.target.value)}><option value="">Select Flash Title</option><option value="Flash Sale">Flash Sale</option><option value="Flash Deal">Flash Deal</option><option value="Electronic">Electronic</option><option value="Winter Sale">Winter Sale</option></select></div>
-              <div className="row g-2"><div className="col-6"><label className="form-label">Discount</label><input type="number" className="form-control" value={formData.discount} onChange={e => handleChange('discount', e.target.value)} /></div><div className="col-6"><label className="form-label">Discount Type</label><select className="form-select" value={formData.discountType} onChange={e => handleChange('discountType', e.target.value)}><option value="percent">Percent</option><option value="fixed">Fixed</option></select></div><div className="col-6"><label className="form-label">Start Date</label><input type="date" className="form-control" value={formData.discountStartDate} onChange={e => handleChange('discountStartDate', e.target.value)} /></div><div className="col-6"><label className="form-label">End Date</label><input type="date" className="form-control" value={formData.discountEndDate} onChange={e => handleChange('discountEndDate', e.target.value)} /></div></div>
+              <div className="mb-3"><label className="form-label">Choose Flash Title</label><select className="form-select" value={formData.flashTitle} onChange={e => handleChange('flashTitle', e.target.value)}><option value="">Select Flash Title</option><option>Flash Sale</option><option>Flash Deal</option><option>Electronic</option><option>Winter Sale</option></select></div>
+              <div className="row g-2">
+                <div className="col-6"><label className="form-label">Discount</label><input type="number" className="form-control" value={formData.discount} onChange={e => handleChange('discount', e.target.value)} /></div>
+                <div className="col-6"><label className="form-label">Discount Type</label><select className="form-select" value={formData.discountType} onChange={e => handleChange('discountType', e.target.value)}><option value="percent">Percent</option><option value="fixed">Fixed</option></select></div>
+                <div className="col-6"><label className="form-label">Start Date</label><input type="date" className="form-control" value={formData.discountStartDate} onChange={e => handleChange('discountStartDate', e.target.value)} /></div>
+                <div className="col-6"><label className="form-label">End Date</label><input type="date" className="form-control" value={formData.discountEndDate} onChange={e => handleChange('discountEndDate', e.target.value)} /></div>
+              </div>
             </div>
           </div>
 
-          {/* Refund */}
           <div className="form-card">
             <div className="card-header">Refund</div>
             <div className="card-body">
               <div className="toggle-item"><label className="toggle-switch"><input type="checkbox" checked={formData.refundable} onChange={e => handleChange('refundable', e.target.checked)} /><span className="toggle-slider"></span></label><span className="toggle-label">Refundable</span></div>
-              <div className="text-muted mb-2" style={{ fontSize: '0.8rem' }}>Show notes in refund section in product description page</div>
-              <div className="mt-2"><label className="form-label">Note (Add from preset)</label><div className="preset-note-box"><p className="mb-0">{formData.refundNote}</p></div><button type="button" className="btn btn-sm btn-outline-primary mt-2" onClick={() => router.push('/super-admin/product-managment/refund-presets')}>+ Add New Preset</button></div>
+              <div className="text-muted mb-2" style={{ fontSize: '0.8rem' }}>Show notes in refund section</div>
+              <div><label className="form-label">Note (Add from preset)</label><div className="preset-note-box"><p className="mb-0">{formData.refundNote}</p></div><button type="button" className="btn btn-sm btn-outline-primary mt-2" onClick={() => router.push('/super-admin/product-managment/refund-presets')}>+ Add New Preset</button></div>
             </div>
           </div>
 
-          {/* Warranty */}
           <div className="form-card">
             <div className="card-header">Warranty</div>
             <div className="card-body">
               <div className="toggle-item"><label className="toggle-switch"><input type="checkbox" checked={formData.warrantyEnabled} onChange={e => handleChange('warrantyEnabled', e.target.checked)} /><span className="toggle-slider"></span></label><span className="toggle-label">Enable warranty</span></div>
-              <div className="mt-2">
-                <label className="form-label">Select Warranty</label>
-                <select className="form-select" value={formData.warrantyType} onChange={e => handleChange('warrantyType', e.target.value)}>
-                  <option value="">Select Warranty</option>
-                  {warranties.map(w => <option key={w._id} value={w.name}>{w.name}</option>)}
-                </select>
-              </div>
-              <div className="text-muted mb-2" style={{ fontSize: '0.8rem' }}>Show notes in warranty section</div>
-              <div className="mt-2"><label className="form-label">Notes (Add from Preset)</label><div className="preset-note-box"><p className="mb-0">{formData.warrantyNote}</p></div><button type="button" className="btn btn-sm btn-outline-primary mt-2" onClick={() => router.push('/super-admin/product-managment/warranty-presets')}>+ Add New Notes</button></div>
+              <div className="mt-2"><label className="form-label">Select Warranty</label><select className="form-select" value={formData.warrantyType} onChange={e => handleChange('warrantyType', e.target.value)}><option value="">Select Warranty</option>{warranties.map(w => <option key={w._id} value={w.name}>{w.name}</option>)}</select></div>
+              <div className="text-muted mb-2 mt-2">Show notes in warranty section</div>
+              <div><label className="form-label">Notes (Add from Preset)</label><div className="preset-note-box"><p className="mb-0">{formData.warrantyNote}</p></div><button type="button" className="btn btn-sm btn-outline-primary mt-2" onClick={() => router.push('/super-admin/product-managment/warranty-presets')}>+ Add New Notes</button></div>
             </div>
           </div>
 
-          {/* Shipping */}
           <div className="form-card">
             <div className="card-header">Shipping</div>
             <div className="card-body">
@@ -551,21 +634,19 @@ useEffect(() => {
                 <div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.showShippingTime} onChange={e => handleChange('showShippingTime', e.target.checked)} /><label className="form-check-label">Show estimated shipping time in product description page</label></div>
                 <div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.showShippingNote} onChange={e => handleChange('showShippingNote', e.target.checked)} /><label className="form-check-label">Show notes in shipping time section</label></div>
               </div>
-              <div className="mt-2"><label className="form-label">Notes (Add from Preset)</label><div className="preset-note-box"><p className="mb-0">{formData.shippingNote}</p></div><button type="button" className="btn btn-sm btn-outline-primary mt-2" onClick={() => router.push('/super-admin/product-managment/shipping-presets')}>+ Add New Notes</button></div>
+              <div><label className="form-label">Notes (Add from Preset)</label><div className="preset-note-box"><p className="mb-0">{formData.shippingNote}</p></div><button type="button" className="btn btn-sm btn-outline-primary mt-2" onClick={() => router.push('/super-admin/product-managment/shipping-presets')}>+ Add New Notes</button></div>
             </div>
           </div>
 
-          {/* Cash on Delivery */}
           <div className="form-card">
             <div className="card-header">Cash on Delivery</div>
             <div className="card-body">
               <div className="toggle-item"><label className="toggle-switch"><input type="checkbox" checked={formData.codAvailable} onChange={e => handleChange('codAvailable', e.target.checked)} /><span className="toggle-slider"></span></label><span className="toggle-label">Cash on delivery available</span></div>
-              <div className="text-muted mb-2" style={{ fontSize: '0.8rem' }}>Show notes in cash on delivery section</div>
-              <div className="mt-2"><label className="form-label">Notes (Add from Preset)</label><div className="preset-note-box"><p className="mb-0">{formData.codNote}</p></div><button type="button" className="btn btn-sm btn-outline-primary mt-2" onClick={() => router.push('/super-admin/product-managment/cod-presets')}>+ Add New Preset</button></div>
+              <div className="text-muted mb-2">Show notes in cash on delivery section</div>
+              <div><label className="form-label">Notes (Add from Preset)</label><div className="preset-note-box"><p className="mb-0">{formData.codNote}</p></div><button type="button" className="btn btn-sm btn-outline-primary mt-2" onClick={() => router.push('/super-admin/product-managment/cod-presets')}>+ Add New Preset</button></div>
             </div>
           </div>
 
-          {/* HSN & GST */}
           <div className="form-card">
             <div className="card-header">HSN & GST</div>
             <div className="card-body">
@@ -574,20 +655,18 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* Stock & Order Display Settings */}
           <div className="form-card">
             <div className="card-header">Stock & Order Display Settings</div>
             <div className="card-body">
               <div className="mb-3"><label className="form-label fw-bold">Hide Stock Visibility State</label>
-                <div className="form-check"><input className="form-check-input" type="radio" name="hideStockState" value="none" checked={formData.hideStockState === 'none'} onChange={e => handleChange('hideStockState', e.target.value)} /><label className="form-check-label">Show Stock Quantity</label></div>
-                <div className="form-check"><input className="form-check-input" type="radio" name="hideStockState" value="text_only" checked={formData.hideStockState === 'text_only'} onChange={e => handleChange('hideStockState', e.target.value)} /><label className="form-check-label">Show Stock With Text Only</label></div>
+                <div className="form-check"><input className="form-check-input" type="radio" name="hideStockState" value="none" checked={formData.hideStockState === 'none'} onChange={e => handleChange('hideStockState', e.target.value)} /><label>Show Stock Quantity</label></div>
+                <div className="form-check"><input className="form-check-input" type="radio" name="hideStockState" value="text_only" checked={formData.hideStockState === 'text_only'} onChange={e => handleChange('hideStockState', e.target.value)} /><label>Show Stock With Text Only</label></div>
               </div>
               <div className="mb-3"><label className="form-label">Low Stock Quantity Warning</label><input type="number" className="form-control" value={formData.lowStockWarning} onChange={e => handleChange('lowStockWarning', parseInt(e.target.value))} /></div>
               <div className="mb-3"><label className="form-label">Quantity (default in cart)</label><input type="number" className="form-control" value={formData.defaultQuantity} onChange={e => handleChange('defaultQuantity', parseInt(e.target.value))} /></div>
             </div>
           </div>
 
-          {/* Frequently Bought */}
           <div className="form-card">
             <div className="card-header">Frequently Bought</div>
             <div className="card-body">
