@@ -7,15 +7,58 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './add-product.css';
 import { createProductAPI, deleteProductAPI } from '../../../../services/productService';
+import { getAllBrands } from '../../../../services/brandAPI';
+import { getCategoriesAPI } from '../../../../services/categoryAPI';
+import { getWarrantiesAPI } from '../../../../services/warrentyAPI';
+
 
 export default function AddProductPage() {
   const router = useRouter();
-  const medicalCategories = [
-    'Medicine (Prescription)', 'Medicine (OTC)', 'Medical Equipment',
-    'Supplements & Vitamins', 'Ayurveda & Herbal', 'Diagnostics & Monitoring',
-    'Personal Care', 'First Aid', 'Mobility Aids',
-  ];
 
+  // ========== DYNAMIC DROPDOWN DATA ==========
+  const [brands, setBrands] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [warranties, setWarranties] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  // Helper to extract array from API response (handles { data: [...] } or { success: true, data: [...] })
+  const extractDataArray = (response) => {
+    if (Array.isArray(response)) return response;
+    if (response?.data && Array.isArray(response.data)) return response.data;
+    if (response?.success && Array.isArray(response.data)) return response.data;
+    return [];
+  };
+useEffect(() => {
+  const fetchDropdownData = async () => {
+    try {
+      const [brandRes, catRes, warrantyRes] = await Promise.all([
+        getAllBrands(),
+        getCategoriesAPI(),
+        getWarrantiesAPI(),
+      ]);
+
+      setBrands(extractDataArray(brandRes));
+      setCategories(extractDataArray(catRes));
+
+      // ✅ Warranty: map 'text' to 'name' so the select works
+      const rawWarranties = extractDataArray(warrantyRes);
+      const mappedWarranties = rawWarranties.map(w => ({
+        ...w,
+        name: w.text || w.name || 'Unnamed',  // use 'text' as the display name
+      }));
+      setWarranties(mappedWarranties);
+
+    } catch (error) {
+      console.error('Error loading dropdown data:', error);
+      toast.error('Failed to load brands/categories/warranties');
+    } finally {
+      setLoadingData(false);
+    }
+  };
+  fetchDropdownData();
+}, []);
+
+  // ========== FORM STATE (unchanged) ==========
   const [formData, setFormData] = useState({
     productName: '', mainCategory: '', brand: '',
     relatedCategories: [], unit: '', weight: '', minPurchaseQty: 1,
@@ -49,6 +92,7 @@ export default function AddProductPage() {
   const [deleting, setDeleting] = useState(false);
   const [generatingVariants, setGeneratingVariants] = useState(false);
 
+  // ========== HELPER FUNCTIONS (unchanged) ==========
   const computeVariants = () => {
     const colors = formData.colorsEnabled
       ? formData.colorInput.split(',').map(c => c.trim()).filter(c => c)
@@ -246,6 +290,17 @@ export default function AddProductPage() {
     }
   };
 
+  if (loadingData) {
+    return (
+      <div className="add-product-page text-center py-5">
+        <div className="spinner-border text-success" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+        <p className="mt-2">Loading brands, categories & warranties...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="add-product-page">
       <Toaster position="top-right" />
@@ -264,41 +319,47 @@ export default function AddProductPage() {
           <div className="form-card auto-height-card">
             <div className="card-header">Product Basic Information</div>
             <div className="card-body">
-              <div className="mb-3"><label className="form-label">Product Name *</label><input type="text" className="form-control" value={formData.productName} onChange={e => handleChange('productName', e.target.value)} /></div>
-              <div className="mb-3"><label className="form-label">Select Main Category *</label><select className="form-select" value={formData.mainCategory} onChange={e => handleChange('mainCategory', e.target.value)}><option value="">Select Main Category</option>{medicalCategories.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-              <div className="mb-3"><label className="form-label">Brand / Manufacturer *</label><input type="text" className="form-control" value={formData.brand} onChange={e => handleChange('brand', e.target.value)} /></div>
+              <div className="mb-3">
+                <label className="form-label">Product Name *</label>
+                <input type="text" className="form-control" value={formData.productName} onChange={e => handleChange('productName', e.target.value)} />
+              </div>
+              <div className="mb-3">
+                <label className="form-label">Select Main Category *</label>
+                <select className="form-select" value={formData.mainCategory} onChange={e => handleChange('mainCategory', e.target.value)}>
+                  <option value="">Select Main Category</option>
+                  {categories.map(cat => (
+                    <option key={cat._id} value={cat.name}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="mb-3">
+                <label className="form-label">Brand / Manufacturer *</label>
+                <select className="form-select" value={formData.brand} onChange={e => handleChange('brand', e.target.value)}>
+                  <option value="">Select Brand</option>
+                  {brands.map(b => (
+                    <option key={b._id} value={b.name}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
-          {/* Product Configuration (merged) */}
+          {/* Product Configuration */}
           <div className="form-card">
             <div className="card-header">Product Configuration</div>
             <div className="card-body">
-              {/* Related Categories */}
               <div className="mb-3">
                 <label className="form-label">Related Categories *</label>
                 <select className="form-select" multiple size="4" value={formData.relatedCategories} onChange={handleRelatedCategoriesChange}>
-                  {medicalCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                  {categories.map(cat => <option key={cat._id} value={cat.name}>{cat.name}</option>)}
                 </select>
                 <small className="text-muted">Hold Ctrl/Cmd to select multiple</small>
               </div>
-              {/* Unit & Weight row */}
               <div className="row g-2 mb-3">
-                <div className="col-6">
-                  <label className="form-label">Unit *</label>
-                  <input type="text" className="form-control" placeholder="e.g., Tablet, Bottle" value={formData.unit} onChange={e => handleChange('unit', e.target.value)} />
-                </div>
-                <div className="col-6">
-                  <label className="form-label">Weight (In Kg)</label>
-                  <input type="number" step="0.01" className="form-control" value={formData.weight} onChange={e => handleChange('weight', e.target.value)} />
-                </div>
+                <div className="col-6"><label className="form-label">Unit *</label><input type="text" className="form-control" placeholder="e.g., Tablet, Bottle" value={formData.unit} onChange={e => handleChange('unit', e.target.value)} /></div>
+                <div className="col-6"><label className="form-label">Weight (In Kg)</label><input type="number" step="0.01" className="form-control" value={formData.weight} onChange={e => handleChange('weight', e.target.value)} /></div>
               </div>
-              {/* Minimum Purchase Qty */}
-              <div className="mb-3">
-                <label className="form-label">Minimum Purchase Qty *</label>
-                <input type="number" min="1" className="form-control" value={formData.minPurchaseQty} onChange={e => handleChange('minPurchaseQty', e.target.value)} />
-              </div>
-              {/* Barcode */}
+              <div className="mb-3"><label className="form-label">Minimum Purchase Qty *</label><input type="number" min="1" className="form-control" value={formData.minPurchaseQty} onChange={e => handleChange('minPurchaseQty', e.target.value)} /></div>
               <div className="mb-3">
                 <label className="form-label">Barcode</label>
                 <div className="input-group">
@@ -306,23 +367,13 @@ export default function AddProductPage() {
                   <button type="button" className="btn btn-outline-secondary" onClick={generateBarcode}>Generate</button>
                 </div>
               </div>
-              {/* Tags – clearly visible */}
               <div className="mb-3">
                 <label className="form-label">Tags *</label>
                 <div className="tag-input-container">
                   {formData.tags.map(tag => (
-                    <span key={tag} className="tag">
-                      {tag} <i className="bi bi-x-circle" onClick={() => removeTag(tag)}></i>
-                    </span>
+                    <span key={tag} className="tag">{tag} <i className="bi bi-x-circle" onClick={() => removeTag(tag)}></i></span>
                   ))}
-                  <input
-                    type="text"
-                    className="tag-input"
-                    placeholder="Type and hit enter to add a tag"
-                    value={formData.tagInput}
-                    onChange={e => handleChange('tagInput', e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                  />
+                  <input type="text" className="tag-input" placeholder="Type and hit enter to add a tag" value={formData.tagInput} onChange={e => handleChange('tagInput', e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())} />
                 </div>
                 <small className="text-muted">These keywords help customers find the product via search.</small>
               </div>
@@ -348,17 +399,9 @@ export default function AddProductPage() {
                 ))}
                 <button type="button" className="btn btn-sm btn-outline-secondary" onClick={addYouTubeUrl}>+ Add Another</button>
               </div>
-              <div className="mb-3"><label className="form-label">Video file</label>
-                <input type="file" className="form-control" accept="video/*" onChange={e => handleChange('videoFile', e.target.files[0])} />
-                <small className="text-muted">Under 30s for better performance</small>
-              </div>
-              <div className="mb-3"><label className="form-label">Video Thumbnail</label>
-                <input type="file" className="form-control" accept="image/*" onChange={e => handleChange('videoThumbnail', e.target.files[0])} />
-                <small className="text-muted">Upload if you want to set video thumb manually</small>
-              </div>
-              <div className="mb-3"><label className="form-label">PDF Specification</label>
-                <input type="file" className="form-control" accept=".pdf" onChange={e => handleChange('pdfSpec', e.target.files[0])} />
-              </div>
+              <div className="mb-3"><label className="form-label">Video file</label><input type="file" className="form-control" accept="video/*" onChange={e => handleChange('videoFile', e.target.files[0])} /><small className="text-muted">Under 30s for better performance</small></div>
+              <div className="mb-3"><label className="form-label">Video Thumbnail</label><input type="file" className="form-control" accept="image/*" onChange={e => handleChange('videoThumbnail', e.target.files[0])} /><small className="text-muted">Upload if you want to set video thumb manually</small></div>
+              <div className="mb-3"><label className="form-label">PDF Specification</label><input type="file" className="form-control" accept=".pdf" onChange={e => handleChange('pdfSpec', e.target.files[0])} /></div>
             </div>
           </div>
 
@@ -403,10 +446,7 @@ export default function AddProductPage() {
                 <span className="toggle-label">Enable Color Variation</span>
               </div>
               {formData.colorsEnabled && (
-                <div className="mb-3">
-                  <label className="form-label">Colors (comma separated)</label>
-                  <input type="text" className="form-control" placeholder="e.g., Red, Blue, Green" value={formData.colorInput} onChange={e => handleChange('colorInput', e.target.value)} />
-                </div>
+                <div className="mb-3"><label className="form-label">Colors (comma separated)</label><input type="text" className="form-control" placeholder="e.g., Red, Blue, Green" value={formData.colorInput} onChange={e => handleChange('colorInput', e.target.value)} /></div>
               )}
               <div className="mb-3">
                 <label className="form-label fw-bold">Attributes</label>
@@ -430,15 +470,7 @@ export default function AddProductPage() {
               <div className="card-body">
                 <div className="table-responsive">
                   <table className="table table-bordered align-middle">
-                    <thead>
-                      <tr>
-                        <th>Variant</th>
-                        <th>Price (₹)</th>
-                        <th>SKU</th>
-                        <th>Quantity</th>
-                        <th>Photo</th>
-                      </tr>
-                    </thead>
+                    <thead><tr><th>Variant</th><th>Price (₹)</th><th>SKU</th><th>Quantity</th><th>Photo</th></tr></thead>
                     <tbody>
                       {formData.variants.map((variant, idx) => (
                         <tr key={idx}>
@@ -457,9 +489,9 @@ export default function AddProductPage() {
           )}
         </div>
 
-        {/* RIGHT COLUMN (unchanged) */}
+        {/* RIGHT COLUMN */}
         <div className="col-md-6">
-          {/* Product Settings (toggles) */}
+          {/* Product Settings */}
           <div className="form-card">
             <div className="card-header">Product Settings</div>
             <div className="card-body">
@@ -493,7 +525,13 @@ export default function AddProductPage() {
             <div className="card-header">Warranty</div>
             <div className="card-body">
               <div className="toggle-item"><label className="toggle-switch"><input type="checkbox" checked={formData.warrantyEnabled} onChange={e => handleChange('warrantyEnabled', e.target.checked)} /><span className="toggle-slider"></span></label><span className="toggle-label">Enable warranty</span></div>
-              <div className="mt-2"><label className="form-label">Select Warranty</label><select className="form-select" value={formData.warrantyType} onChange={e => handleChange('warrantyType', e.target.value)}><option value="">Select Warranty</option><option value="1 year">1 year</option><option value="2 years">2 years</option><option value="3 years">3 years</option><option value="Lifetime">Lifetime</option></select></div>
+              <div className="mt-2">
+                <label className="form-label">Select Warranty</label>
+                <select className="form-select" value={formData.warrantyType} onChange={e => handleChange('warrantyType', e.target.value)}>
+                  <option value="">Select Warranty</option>
+                  {warranties.map(w => <option key={w._id} value={w.name}>{w.name}</option>)}
+                </select>
+              </div>
               <div className="text-muted mb-2" style={{ fontSize: '0.8rem' }}>Show notes in warranty section</div>
               <div className="mt-2"><label className="form-label">Notes (Add from Preset)</label><div className="preset-note-box"><p className="mb-0">{formData.warrantyNote}</p></div><button type="button" className="btn btn-sm btn-outline-primary mt-2" onClick={() => router.push('/super-admin/product-managment/warranty-presets')}>+ Add New Notes</button></div>
             </div>
@@ -517,14 +555,11 @@ export default function AddProductPage() {
             </div>
           </div>
 
-          {/* Cash on Delivery – toggle */}
+          {/* Cash on Delivery */}
           <div className="form-card">
             <div className="card-header">Cash on Delivery</div>
             <div className="card-body">
-              <div className="toggle-item">
-                <label className="toggle-switch"><input type="checkbox" checked={formData.codAvailable} onChange={e => handleChange('codAvailable', e.target.checked)} /><span className="toggle-slider"></span></label>
-                <span className="toggle-label">Cash on delivery available</span>
-              </div>
+              <div className="toggle-item"><label className="toggle-switch"><input type="checkbox" checked={formData.codAvailable} onChange={e => handleChange('codAvailable', e.target.checked)} /><span className="toggle-slider"></span></label><span className="toggle-label">Cash on delivery available</span></div>
               <div className="text-muted mb-2" style={{ fontSize: '0.8rem' }}>Show notes in cash on delivery section</div>
               <div className="mt-2"><label className="form-label">Notes (Add from Preset)</label><div className="preset-note-box"><p className="mb-0">{formData.codNote}</p></div><button type="button" className="btn btn-sm btn-outline-primary mt-2" onClick={() => router.push('/super-admin/product-managment/cod-presets')}>+ Add New Preset</button></div>
             </div>

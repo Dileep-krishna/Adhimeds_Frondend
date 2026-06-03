@@ -1,85 +1,84 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./attribute.css";
-
-// Initial medical attributes data
-const initialMedicalAttributes = [
-  { name: "Dosage Form", values: ["Tablet", "Capsule", "Liquid", "Injection", "Cream", "Ointment", "Syrup", "Inhaler"] },
-  { name: "Strength", values: ["100mg", "250mg", "500mg", "750mg", "1g", "10mg/ml", "20mg/ml"] },
-  { name: "Pack Size", values: ["10 tablets", "20 tablets", "50 tablets", "100 tablets", "30 ml", "100 ml", "200 ml"] },
-  { name: "Active Ingredient", values: ["Paracetamol", "Ibuprofen", "Amoxicillin", "Cetirizine", "Omeprazole", "Atorvastatin", "Metformin"] },
-  { name: "Prescription Required", values: ["Yes", "No"] },
-  { name: "Storage Condition", values: ["Room Temperature", "Refrigerated (2-8°C)", "Protect from Light", "Dry Place"] },
-  { name: "Shelf Life (Months)", values: ["12", "18", "24", "36", "48"] },
-  { name: "Route of Administration", values: ["Oral", "Topical", "Intravenous", "Intramuscular", "Subcutaneous", "Inhalation"] },
-  { name: "Category (Therapeutic Class)", values: ["Analgesic", "Antibiotic", "Antihistamine", "Antacid", "Antihypertensive", "Antidiabetic", "Antiviral"] },
-  { name: "Unit", values: ["Tablet", "Capsule", "ml", "mg", "g", "Patch", "Spray"] },
-  { name: "Flavour (for syrups)", values: ["Strawberry", "Orange", "Grape", "Mint", "Unflavoured", "Cherry"] },
-  { name: "Manufacturer", values: ["Cipla", "Sun Pharma", "Pfizer", "Novartis", "GlaxoSmithKline", "Abbott", "Dr. Reddy's"] },
-];
+import { createAttributeAPI, deleteAttributeAPI, getAttributesAPI, updateAttributeAPI } from "../../../../services/attributeAPI";
+// adjust path as needed
 
 export default function AttributesPage() {
-  const [attributes, setAttributes] = useState(initialMedicalAttributes);
+  const [attributes, setAttributes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [editIndex, setEditIndex] = useState(null);
+  const [editId, setEditId] = useState(null);
   const [attributeName, setAttributeName] = useState("");
   const [attributeValues, setAttributeValues] = useState([""]);
 
-  // Open modal for adding new attribute
+  // Fetch attributes from API
+  const fetchAttributes = async () => {
+    setLoading(true);
+    try {
+      const response = await getAttributesAPI();
+      if (response.success) {
+        setAttributes(response.data);
+        setError(null);
+      } else {
+        setError("Failed to load attributes");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAttributes();
+  }, []);
+
+  // Open modal for adding
   const openAddModal = () => {
     setIsEditMode(false);
+    setEditId(null);
     setAttributeName("");
     setAttributeValues([""]);
     setShowModal(true);
   };
 
-  // Open modal for editing existing attribute
-  const openEditModal = (index) => {
-    const attr = attributes[index];
+  // Open modal for editing
+  const openEditModal = (attribute) => {
     setIsEditMode(true);
-    setEditIndex(index);
-    setAttributeName(attr.name);
-    setAttributeValues([...attr.values]);
+    setEditId(attribute._id);
+    setAttributeName(attribute.name);
+    setAttributeValues([...attribute.values]);
     setShowModal(true);
   };
 
-  // Close modal and reset form
   const closeModal = () => {
     setShowModal(false);
     setAttributeName("");
     setAttributeValues([""]);
     setIsEditMode(false);
-    setEditIndex(null);
+    setEditId(null);
   };
 
-  // Handle attribute name change
-  const handleNameChange = (e) => {
-    setAttributeName(e.target.value);
-  };
-
-  // Handle value input change
+  const handleNameChange = (e) => setAttributeName(e.target.value);
   const handleValueChange = (idx, newValue) => {
     const updated = [...attributeValues];
     updated[idx] = newValue;
     setAttributeValues(updated);
   };
-
-  // Add a new empty value field
-  const addMoreValue = () => {
-    setAttributeValues([...attributeValues, ""]);
-  };
-
-  // Remove a value field at given index
+  const addMoreValue = () => setAttributeValues([...attributeValues, ""]);
   const removeValue = (idx) => {
     const updated = attributeValues.filter((_, i) => i !== idx);
     setAttributeValues(updated);
   };
 
   // Save attribute (create or update)
-  const saveAttribute = () => {
+  const saveAttribute = async () => {
     if (!attributeName.trim()) {
       alert("Attribute name is required");
       return;
@@ -90,30 +89,67 @@ export default function AttributesPage() {
       return;
     }
 
-    const newAttribute = {
+    const payload = {
       name: attributeName.trim(),
       values: filteredValues,
     };
 
-    if (isEditMode) {
-      // Update existing attribute
-      const updatedAttributes = [...attributes];
-      updatedAttributes[editIndex] = newAttribute;
-      setAttributes(updatedAttributes);
-    } else {
-      // Add new attribute
-      setAttributes([...attributes, newAttribute]);
+    try {
+      let response;
+      if (isEditMode) {
+        response = await updateAttributeAPI(editId, payload);
+      } else {
+        response = await createAttributeAPI(payload);
+      }
+
+      if (response.success) {
+        fetchAttributes(); // refresh list
+        closeModal();
+      } else {
+        alert(response.message || "Operation failed");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Server error. Please try again.");
     }
-    closeModal();
   };
 
   // Delete attribute
-  const deleteAttribute = (index) => {
-    if (window.confirm(`Delete attribute "${attributes[index].name}" permanently?`)) {
-      const updated = attributes.filter((_, i) => i !== index);
-      setAttributes(updated);
+  const deleteAttribute = async (id, name) => {
+    if (window.confirm(`Delete attribute "${name}" permanently?`)) {
+      try {
+        const response = await deleteAttributeAPI(id);
+        if (response.success) {
+          fetchAttributes();
+        } else {
+          alert(response.message || "Delete failed");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Server error. Could not delete.");
+      }
     }
   };
+
+  if (loading) {
+    return (
+      <div className="attributes-container text-center py-5">
+        <div className="spinner-border text-success" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+        <p className="mt-2">Loading attributes...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="attributes-container text-center py-5">
+        <div className="alert alert-danger">{error}</div>
+        <button className="btn btn-primary" onClick={fetchAttributes}>Retry</button>
+      </div>
+    );
+  }
 
   return (
     <div className="attributes-container">
@@ -134,8 +170,8 @@ export default function AttributesPage() {
             </tr>
           </thead>
           <tbody>
-            {attributes.map((attr, idx) => (
-              <tr key={idx}>
+            {attributes.map((attr) => (
+              <tr key={attr._id}>
                 <td><strong>{attr.name}</strong></td>
                 <td>
                   <div className="value-chips">
@@ -145,10 +181,10 @@ export default function AttributesPage() {
                   </div>
                 </td>
                 <td>
-                  <button className="btn-icon edit" onClick={() => openEditModal(idx)}>
+                  <button className="btn-icon edit" onClick={() => openEditModal(attr)}>
                     <i className="bi bi-pencil"></i>
                   </button>
-                  <button className="btn-icon delete" onClick={() => deleteAttribute(idx)}>
+                  <button className="btn-icon delete" onClick={() => deleteAttribute(attr._id, attr.name)}>
                     <i className="bi bi-trash"></i>
                   </button>
                 </td>
@@ -158,7 +194,7 @@ export default function AttributesPage() {
         </table>
       </div>
 
-      {/* Modal for Add / Edit */}
+      {/* Modal (unchanged UI, only uses backend IDs now) */}
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>

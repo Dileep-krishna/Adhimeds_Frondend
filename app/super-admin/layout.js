@@ -3,69 +3,106 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import "./super-admin.css";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import "./super-admin.css";
+
 export default function SuperAdminLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [openDropdowns, setOpenDropdowns] = useState({});
   const pathname = usePathname();
   const router = useRouter();
+
+  // Mobile responsiveness
   useEffect(() => {
     const checkMobile = () => {
       const mobile = window.innerWidth <= 768;
       setIsMobile(mobile);
-      setSidebarOpen(!mobile);
+      setSidebarOpen((prev) => {
+        if (mobile) return false;
+        return prev ?? true;
+      });
     };
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
+  // ✅ FIXED: Keep product dropdown open when inside /product-managment
+  useEffect(() => {
+    const isInProduct = pathname.includes("/product-managment");
+    
+    if (!isInProduct) {
+      // Outside product management – close everything
+      setOpenDropdowns({
+        main: false,
+        staffMain: false,
+        storeMain: false,
+        deliveryBoysMain: false,
+        Products: false,
+        "Product Setup": false,
+        "Product Operation": false,
+        Brand: false,
+        Notes: false,
+        "Size Guide": false,
+      });
+    } else if (!pathname.includes("/product-managment/product-setup")) {
+      // Inside product management but not in product setup – close only setup sub‑menus
+      setOpenDropdowns((prev) => ({
+        ...prev,
+        Brand: false,
+        Notes: false,
+        "Size Guide": false,
+      }));
+    }
+  }, [pathname]);
 
-  // const toggleDropdown = (key) => {
-  //   setOpenDropdowns((prev) => ({ ...prev, [key]: !prev[key] }));
-  // };
+  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
+  
+  const closeAllDropdowns = () => {
+    setOpenDropdowns({
+      main: false,
+      staffMain: false,
+      storeMain: false,
+      deliveryBoysMain: false,
+      Products: false,
+      "Product Setup": false,
+      "Product Operation": false,
+      Brand: false,
+      Notes: false,
+      "Size Guide": false,
+    });
+  };
+
   const toggleMainDropdown = () => {
     setOpenDropdowns((prev) => ({
       main: !prev.main,
       staffMain: false,
       storeMain: false,
+      deliveryBoysMain: false,
       Products: false,
       "Product Setup": false,
       "Product Operation": false,
+      Brand: false,
+      Notes: false,
+      "Size Guide": false,
     }));
   };
 
-  const closeAllDropdowns = () => {
-    setOpenDropdowns({});
-  };
-
-  // ================= MENUS =================
-
-  const mainMenuItems = [
-    { name: "Dashboard", path: "/super-admin/dashboard", icon: "bi-speedometer2" },
+  // ================= MENU DEFINITIONS =================
+  const directMenuItems = [
     { name: "Order Management", path: "/super-admin/orders", icon: "bi-cart-check" },
-
-
-    { name: "Delivery Boys", path: "/super-admin/delivery-boys", icon: "bi-truck" },
     { name: "Notifications", path: "/super-admin/notifications", icon: "bi-bell" },
-    // { name: "Category Management", path: "/super-admin/category-managment", icon: "bi-tags" },
     { name: "Reports", path: "/super-admin/reports", icon: "bi-file-text" },
     { name: "Settings", path: "/super-admin/settings", icon: "bi-gear" },
-
   ];
-
-
-  const beforeProductItems = mainMenuItems.slice(0, 2); // Dashboard + Orders
-  const afterProductItems = mainMenuItems.slice(2);     // remaining pages
 
   const productMenu = [
     {
       name: "Products Home",
       icon: "bi-box",
-      path: "/super-admin/product-managment", // 👈 MAIN NAVIGATION
+      path: "/super-admin/product-managment",
       children: [
         { name: "All Products", path: "/super-admin/product-managment/products/all-product" },
         { name: "Add Product", path: "/super-admin/product-managment/products/add-product" },
@@ -76,18 +113,29 @@ export default function SuperAdminLayout({ children }) {
       icon: "bi-sliders",
       children: [
         { name: "Category", path: "/super-admin/product-managment/product-setup/category" },
-        { name: "Brand", path: "/super-admin/product-managment/product-setup/Brand" },
-        { name: "Colors", path: "/super-admin/product-managment/product-setup/Colors" },
+        {
+          name: "Brand",
+          children: [
+            { name: "All Brands", path: "/super-admin/product-managment/product-setup/Brand" },
+            { name: "Add Brand", path: "/super-admin/product-managment/product-setup/Brand/addBrand" },
+            { name: "Brand Bulk Import", path: "/super-admin/product-managment/product-setup/Brand/brand-bulk-import" },
+          ],
+        },
+        { name: "Colors", path: "/super-admin/product-managment/product-setup/colors" },
         { name: "Attribute", path: "/super-admin/product-managment/product-setup/Attribute" },
-        { name: "Size Guide", path: "/super-admin/product-managment/product-setup/size-guide" },
+        {
+          name: "Size Guide",
+          children: [
+            { name: "All Size Guide", path: "/super-admin/product-managment/product-setup/size-guide/size-chart" },
+            { name: "Measurement Points", path: "/super-admin/product-managment/product-setup/size-guide/MeasurementPoints" },
+          ],
+        },
         { name: "Warranty", path: "/super-admin/product-managment/product-setup/warranty" },
-
-        // 👇 UPDATED NOTES WITH SUB MENU
         {
           name: "Notes",
           children: [
             { name: "All Notes", path: "/super-admin/product-managment/product-setup/notes" },
-            { name: "Add Note", path: "/super-admin/product-managment/product-setup/notes/add" },
+            { name: "Add Note", path: "/super-admin/product-managment/product-setup/notes/addNote" },
           ],
         },
       ],
@@ -96,11 +144,11 @@ export default function SuperAdminLayout({ children }) {
       name: "Product Operation",
       icon: "bi-gear-wide-connected",
       children: [
-        { name: "Product Reviews", path: "/super-admin/bulk-import" },
-        { name: "Smart Bar", path: "/super-admin/bulk-import" },
-        { name: "Custom Label", path: "/super-admin/bulk-import" },
-        { name: "Bulk Import", path: "/super-admin/bulk-import" },
-        { name: "Bulk Export", path: "/super-admin/bulk-import" },
+        { name: "Product Reviews", path: "/super-admin/product-managment/product-operation/product-review" },
+        { name: "Smart Bar", path: "/super-admin/product-managment/product-operation/smart-bar" },
+        { name: "Custom Label", path: "/super-admin/product-managment/product-operation/custom-label" },
+        { name: "Bulk Import", path: "/super-admin/product-managment/product-operation/bulk-import" },
+        { name: "Bulk Export", path: "/super-admin/product-managment/product-operation/bulk-export" },
       ],
     },
   ];
@@ -115,10 +163,17 @@ export default function SuperAdminLayout({ children }) {
     { name: "Add Store", path: "/super-admin/store-managment/add" },
   ];
 
+  const deliveryBoysMenu = [
+    { name: "All Delivery Boys", path: "/super-admin/delivery-boys" },
+    { name: "Add Delivery Boy", path: "/super-admin/delivery-boys/delivery-boysAdd" },
+  ];
+
   const isProductActive = pathname.includes("/product");
   const isStaffActive = pathname.includes("/staff");
+  const isStoreActive = pathname.includes("/store-managment");
+  const isDeliveryActive = pathname.includes("/delivery-boys");
 
-  const renderMainLink = (item) => (
+  const renderDirectLink = (item) => (
     <Link
       key={item.path}
       href={item.path}
@@ -130,234 +185,270 @@ export default function SuperAdminLayout({ children }) {
     </Link>
   );
 
+  const dropdownVariants = {
+    hidden: { height: 0, opacity: 0, transition: { duration: 0.3, ease: "easeInOut" } },
+    visible: { height: "auto", opacity: 1, transition: { duration: 0.4, ease: "easeInOut" } }
+  };
+
+  const nestedVariants = {
+    hidden: { height: 0, opacity: 0, transition: { duration: 0.25, ease: "easeInOut" } },
+    visible: { height: "auto", opacity: 1, transition: { duration: 0.3, ease: "easeInOut" } }
+  };
+
+  const pageVariants = {
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
+    exit: { opacity: 0, y: -10, transition: { duration: 0.2 } }
+  };
 
   return (
     <div className="super-admin-layout">
-      {/* MOBILE BUTTON */}
       <button className="mobile-menu-btn" onClick={toggleSidebar}>
         <i className={`bi ${sidebarOpen ? "bi-x-lg" : "bi-list"}`}></i>
       </button>
 
-      {/* SIDEBAR */}
       <aside className={`sidebar ${sidebarOpen ? "open" : "closed"}`}>
         <div className="sidebar-header">
           <h2 className="logo">ADHIMEDS</h2>
         </div>
 
         <nav className="sidebar-nav">
-          {/* TOP ITEMS */}
-          {beforeProductItems.map(renderMainLink)}
+          {renderDirectLink(directMenuItems[0])}
 
-          {/* ================= PRODUCT ================= */}
-        <div className={`dropdown-parent ${isProductActive ? "active-parent" : ""}`}>
-  <div className="dropdown-header-wrapper">
-
-    {/* ✅ MAIN PRODUCT BUTTON */}
-    <button
-      className="dropdown-main-link"
-      onClick={toggleMainDropdown}
-    >
-      <i className="bi bi-box"></i>
-      <span>Product Management</span>
-    </button>
-
-    {/* ✅ CHEVRON */}
-    <button
-      className="chevron-toggle"
-      onClick={toggleMainDropdown}
-    >
-      <i className={`bi bi-chevron-${openDropdowns.main ? "up" : "down"}`}></i>
-    </button>
-
-  </div>
-
-  {/* ================= SUB MENU ================= */}
- <div className={`dropdown-menu ${openDropdowns.main ? "show" : ""}`}>
-
-  {productMenu.map((menu, index) => (
-    <div key={index} className="nested-dropdown">
-
-      {/* ✅ LEVEL 1 */}
-      <div
-        className="dropdown-item"
-        onClick={() => {
-          if (menu.path) router.push(menu.path);
-
-          setOpenDropdowns((prev) => ({
-            main: true,
-
-            // ✅ close others + toggle current
-            Products: false,
-            "Product Setup": false,
-            "Product Operation": false,
-
-            [menu.name]: !prev[menu.name],
-          }));
-        }}
-      >
-        <span>
-          <i className={`bi ${menu.icon}`}></i> {menu.name}
-        </span>
-
-        <i className={`bi bi-chevron-${openDropdowns[menu.name] ? "up" : "down"}`}></i>
-      </div>
-
-      {/* ✅ LEVEL 2 */}
-      {openDropdowns[menu.name] && (
-        <div className="nested-menu show">
-
-          {menu.children.map((sub, i) => (
-            <div key={i}>
-
-              {sub.children ? (
-                <>
-                  {/* ✅ LEVEL 2 ITEM */}
-                  <div
-                    className="dropdown-sub-item"
-                    onClick={() =>
-                      setOpenDropdowns((prev) => ({
-                        ...prev,
-
-                        // ✅ toggle sub-sub menu
-                        [sub.name]: !prev[sub.name],
-                      }))
-                    }
-                  >
-                    {sub.name}
-                  </div>
-
-                  {/* ✅ LEVEL 3 */}
-                  {openDropdowns[sub.name] && (
-                    <div className="nested-menu show">
-                      {sub.children.map((child, j) => (
-                        <Link
-                          key={j}
-                          href={child.path}
-                          className="dropdown-sub-item ms-3"
-                        >
-                          {child.name}
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <Link
-                  href={sub.path}
-                  className={`dropdown-sub-item ${pathname === sub.path ? "active" : ""}`}
-                >
-                  {sub.name}
-                </Link>
-              )}
-
+          <div className="dropdown-parent">
+            <div className="dropdown-header-wrapper">
+              <button className="dropdown-main-link" onClick={toggleMainDropdown}>
+                <i className="bi bi-box"></i>
+                <span>Product Management</span>
+              </button>
+              <button className="chevron-toggle" onClick={toggleMainDropdown}>
+                <i className={`bi bi-chevron-${openDropdowns.main ? "up" : "down"}`}></i>
+              </button>
             </div>
-          ))}
 
-        </div>
-      )}
+            <AnimatePresence>
+              {openDropdowns.main && (
+                <motion.div
+                  className="dropdown-menu show"
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                  variants={dropdownVariants}
+                  style={{ display: "block", overflow: "hidden" }}
+                >
+                  {productMenu.map((menu, idx) => (
+                    <div key={idx} className="nested-dropdown">
+                      <div
+                        className="dropdown-item"
+                        onClick={() => {
+                          setOpenDropdowns((prev) => ({ ...prev, Brand: false, Notes: false, "Size Guide": false }));
+                          if (menu.path) router.push(menu.path);
+                          setOpenDropdowns((prev) => ({
+                            main: true,
+                            [menu.name]: !prev[menu.name],
+                          }));
+                        }}
+                      >
+                        <span><i className={`bi ${menu.icon}`}></i> {menu.name}</span>
+                        <i className={`bi bi-chevron-${openDropdowns[menu.name] ? "up" : "down"}`}></i>
+                      </div>
+                      <AnimatePresence>
+                        {openDropdowns[menu.name] && (
+                          <motion.div
+                            className="nested-menu show"
+                            initial="hidden"
+                            animate="visible"
+                            exit="hidden"
+                            variants={nestedVariants}
+                            style={{ overflow: "hidden" }}
+                          >
+                            {menu.children.map((sub, i) => (
+                              <div key={i}>
+                                {sub.children ? (
+                                  <>
+                                    <div
+                                      className="dropdown-sub-item"
+                                      onClick={() => {
+                                        setOpenDropdowns((prev) => {
+                                          const newState = { ...prev };
+                                          if (sub.name === "Brand") {
+                                            newState.Brand = !prev.Brand;
+                                            newState.Notes = false;
+                                            newState["Size Guide"] = false;
+                                          } else if (sub.name === "Notes") {
+                                            newState.Notes = !prev.Notes;
+                                            newState.Brand = false;
+                                            newState["Size Guide"] = false;
+                                          } else if (sub.name === "Size Guide") {
+                                            newState["Size Guide"] = !prev["Size Guide"];
+                                            newState.Brand = false;
+                                            newState.Notes = false;
+                                          }
+                                          return newState;
+                                        });
+                                      }}
+                                    >
+                                      {sub.name}
+                                    </div>
+                                    <AnimatePresence>
+                                      {openDropdowns[sub.name] && (
+                                        <motion.div
+                                          className="nested-menu show"
+                                          initial="hidden"
+                                          animate="visible"
+                                          exit="hidden"
+                                          variants={nestedVariants}
+                                          style={{ overflow: "hidden" }}
+                                        >
+                                          {sub.children.map((child, j) => (
+                                            <Link
+                                              key={j}
+                                              href={child.path}
+                                              className={`dropdown-sub-item ms-3 ${pathname === child.path ? "active" : ""}`}
+                                            >
+                                              {child.name}
+                                            </Link>
+                                          ))}
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
+                                  </>
+                                ) : (
+                                  <Link
+                                    href={sub.path}
+                                    className={`dropdown-sub-item ${pathname === sub.path ? "active" : ""}`}
+                                  >
+                                    {sub.name}
+                                  </Link>
+                                )}
+                              </div>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
-    </div>
-  ))}
-
-</div>
-</div>
-
-          {/* ================= STAFF ================= */}
-          <div className={`dropdown-parent ${isStaffActive ? "active-parent" : ""}`}>
+          <div className="dropdown-parent">
             <div className="dropdown-header-wrapper">
               <button
                 className="dropdown-main-link"
-                onClick={() =>
-                  setOpenDropdowns((prev) => ({
-                    staffMain: !prev.staffMain,
-                    main: false,
-                  }))
-                }
+                onClick={() => setOpenDropdowns((prev) => ({ staffMain: !prev.staffMain, main: false, storeMain: false, deliveryBoysMain: false }))}
               >
                 <i className="bi bi-people"></i>
                 <span>Staff Management</span>
               </button>
-
-              <button
-                className="chevron-toggle"
-                onClick={() => toggleDropdown("staffMain")}
-              >
+              <button className="chevron-toggle" onClick={() => setOpenDropdowns((prev) => ({ staffMain: !prev.staffMain }))}>
                 <i className={`bi bi-chevron-${openDropdowns.staffMain ? "up" : "down"}`}></i>
               </button>
             </div>
-
-            <div className={`dropdown-menu ${openDropdowns.staffMain ? "show" : ""}`}>
-              {staffMenu.map((item, i) => (
-                <Link
-                  key={i}
-                  href={item.path}
-                  className={`dropdown-sub-item ${pathname === item.path ? "active" : ""}`}
+            <AnimatePresence>
+              {openDropdowns.staffMain && (
+                <motion.div
+                  className="dropdown-menu show"
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                  variants={dropdownVariants}
+                  style={{ display: "block", overflow: "hidden" }}
                 >
-                  {item.name}
-                </Link>
-              ))}
-            </div>
+                  {staffMenu.map((item, i) => (
+                    <Link key={i} href={item.path} className={`dropdown-sub-item ${pathname === item.path ? "active" : ""}`}>
+                      {item.name}
+                    </Link>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-          {/* ================= STORE MANAGEMENT ================= */}
-          <div className={`dropdown-parent ${pathname.includes("/store-management") ? "active-parent" : ""}`}>
-            <div className="dropdown-header-wrapper">
 
+          <div className="dropdown-parent">
+            <div className="dropdown-header-wrapper">
               <button
                 className="dropdown-main-link"
-                onClick={() =>
-                  setOpenDropdowns((prev) => {
-                    const isOpen = prev.storeMain;
-
-                    // toggle store dropdown
-                    if (isOpen) {
-                      return { storeMain: false };
-                    }
-
-                    // open store and close others
-                    return {
-                      storeMain: true,
-                      main: false,
-                      staffMain: false,
-                    };
-                  })
-                }
+                onClick={() => setOpenDropdowns((prev) => ({ storeMain: !prev.storeMain, main: false, staffMain: false, deliveryBoysMain: false }))}
               >
                 <i className="bi bi-shop"></i>
                 <span>Store Management</span>
               </button>
-
-              <button
-                className="chevron-toggle"
-                onClick={() =>
-                  setOpenDropdowns((prev) => ({
-                    storeMain: !prev.storeMain,
-                  }))
-                }
-              >
+              <button className="chevron-toggle" onClick={() => setOpenDropdowns((prev) => ({ storeMain: !prev.storeMain }))}>
                 <i className={`bi bi-chevron-${openDropdowns.storeMain ? "up" : "down"}`}></i>
               </button>
             </div>
-
-            <div className={`dropdown-menu ${openDropdowns.storeMain ? "show" : ""}`}>
-              {storeMenu.map((item, i) => (
-                <Link
-                  key={i}
-                  href={item.path}
-                  className={`dropdown-sub-item ${pathname === item.path ? "active" : ""}`}
+            <AnimatePresence>
+              {openDropdowns.storeMain && (
+                <motion.div
+                  className="dropdown-menu show"
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                  variants={dropdownVariants}
+                  style={{ display: "block", overflow: "hidden" }}
                 >
-                  {item.name}
-                </Link>
-              ))}
-            </div>
+                  {storeMenu.map((item, i) => (
+                    <Link key={i} href={item.path} className={`dropdown-sub-item ${pathname === item.path ? "active" : ""}`}>
+                      {item.name}
+                    </Link>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
-          {/* BOTTOM ITEMS */}
-          {afterProductItems.map(renderMainLink)}
+          <div className="dropdown-parent">
+            <div className="dropdown-header-wrapper">
+              <button
+                className="dropdown-main-link"
+                onClick={() => setOpenDropdowns((prev) => ({ deliveryBoysMain: !prev.deliveryBoysMain, main: false, staffMain: false, storeMain: false }))}
+              >
+                <i className="bi bi-truck"></i>
+                <span>Delivery Boys</span>
+              </button>
+              <button className="chevron-toggle" onClick={() => setOpenDropdowns((prev) => ({ deliveryBoysMain: !prev.deliveryBoysMain }))}>
+                <i className={`bi bi-chevron-${openDropdowns.deliveryBoysMain ? "up" : "down"}`}></i>
+              </button>
+            </div>
+            <AnimatePresence>
+              {openDropdowns.deliveryBoysMain && (
+                <motion.div
+                  className="dropdown-menu show"
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                  variants={dropdownVariants}
+                  style={{ display: "block", overflow: "hidden" }}
+                >
+                  {deliveryBoysMenu.map((item, i) => (
+                    <Link key={i} href={item.path} className={`dropdown-sub-item ${pathname === item.path ? "active" : ""}`}>
+                      {item.name}
+                    </Link>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {directMenuItems.slice(1).map(renderDirectLink)}
         </nav>
       </aside>
 
-      {/* MAIN CONTENT */}
-      <main className="main-content">{children}</main>
+      <main className="main-content">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={pathname}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            variants={pageVariants}
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
+      </main>
     </div>
   );
 }

@@ -4,28 +4,20 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
 import './brand.css';
-import { createBrand, deleteBrand, getAllBrands, updateBrand } from '../../../../services/brandAPI';
+import { getAllBrands, deleteBrand } from '../../../../services/brandAPI';
 import SERVERURL from '../../../../services/serverURL';
 
 export default function BrandManagement() {
   const router = useRouter();
-  const [showModal, setShowModal] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
-  const [editBrand, setEditBrand] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [bulkAction, setBulkAction] = useState('');
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  // ✅ Removed 'categories' from formData
-  const [formData, setFormData] = useState({
-    name: '',
-    logo: null,
-    metaTitle: '',
-    metaDescription: '',
-    metaKeywords: '',
-  });
+  
+  // ✅ New state for view offcanvas
+  const [showOffcanvas, setShowOffcanvas] = useState(false);
+  const [selectedBrand, setSelectedBrand] = useState(null);
 
   const fetchBrands = async () => {
     setLoading(true);
@@ -47,74 +39,6 @@ export default function BrandManagement() {
   useEffect(() => {
     fetchBrands();
   }, []);
-
-  const handleChange = (e) => {
-    const { name, value, files } = e.target;
-    if (name === 'logo') {
-      setFormData({ ...formData, logo: files[0] });
-    } else {
-      setFormData({ ...formData, [name]: value });
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!formData.name.trim()) {
-      toast.error('Brand name is required');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const payload = { ...formData };
-      if (editBrand) {
-        const res = await updateBrand(editBrand._id, payload);
-        if (res.success) {
-          toast.success('Brand updated successfully');
-          fetchBrands();
-        } else {
-          toast.error(res.message || 'Update failed');
-        }
-      } else {
-        const res = await createBrand(payload);
-        if (res.success) {
-          toast.success('Brand created successfully');
-          fetchBrands();
-        } else {
-          toast.error(res.message || 'Creation failed');
-        }
-      }
-      resetModal();
-    } catch (error) {
-      console.error(error);
-      toast.error('Server error while saving brand');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const resetModal = () => {
-    setFormData({
-      name: '',
-      logo: null,
-      metaTitle: '',
-      metaDescription: '',
-      metaKeywords: '',
-    });
-    setShowModal(false);
-    setEditBrand(null);
-  };
-
-  const handleEdit = (brand) => {
-    setEditBrand(brand);
-    setFormData({
-      name: brand.name,
-      logo: null,
-      metaTitle: brand.metaTitle || '',
-      metaDescription: brand.metaDescription || '',
-      metaKeywords: brand.metaKeywords || '',
-    });
-    setShowModal(true);
-  };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this brand permanently?')) return;
@@ -144,6 +68,12 @@ export default function BrandManagement() {
     return `${SERVERURL}${logoPath}`;
   };
 
+  // ✅ Open offcanvas with brand details
+  const openViewOffcanvas = (brand) => {
+    setSelectedBrand(brand);
+    setShowOffcanvas(true);
+  };
+
   const filteredBrands = brands
     .filter(b => activeTab !== 'unused' || b.products === 0)
     .filter(b => b.name?.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -158,7 +88,10 @@ export default function BrandManagement() {
 
       <div className="brands-header">
         <h1 className="brands-title">Medical Brands</h1>
-        <button className="btn-add-brand" onClick={() => setShowModal(true)}>
+        <button 
+          className="btn-add-brand" 
+          onClick={() => router.push('/super-admin/product-managment/product-setup/Brand/addBrand')}
+        >
           <i className="bi bi-plus-circle"></i> Add New Brand
         </button>
       </div>
@@ -218,10 +151,13 @@ export default function BrandManagement() {
                 <td>{brand.createdAt ? new Date(brand.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}--</td>
                 <td className="categories-cell">{brand.category || 'General'}--</td>
                 <td className="actions-cell">
-                  <button className="action-icon view" onClick={() => router.push(`/super-admin/brand/${brand._id}/products`)}>
+                  <button className="action-icon view" onClick={() => openViewOffcanvas(brand)}>
                     <i className="bi bi-eye"></i>
                   </button>
-                  <button className="action-icon edit" onClick={() => handleEdit(brand)}>
+                  <button 
+                    className="action-icon edit" 
+                    onClick={() => router.push(`/super-admin/product-managment/product-setup/Brand/edit/${brand._id}`)}
+                  >
                     <i className="bi bi-pencil"></i>
                   </button>
                   <button className="action-icon delete" onClick={() => handleDelete(brand._id)}>
@@ -239,47 +175,65 @@ export default function BrandManagement() {
         </table>
       </div>
 
-      {/* Add/Edit Modal – Category field removed */}
-      {showModal && (
-        <div className="modal-overlay" onClick={resetModal}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{editBrand ? 'Edit Brand' : 'Add Brand'}</h3>
-              <button className="close-modal" onClick={resetModal}>&times;</button>
-            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label>Brand Name *</label>
-                <input type="text" name="name" value={formData.name} onChange={handleChange} />
-              </div>
-              <div className="form-group">
-                <label>Brand Logo</label>
-                <input type="file" name="logo" accept="image/*" onChange={handleChange} />
-                <small>Recommended: 100x100px</small>
-              </div>
-              {/* ✅ Category field removed */}
-              <div className="form-group">
-                <label>Meta Title</label>
-                <input type="text" name="metaTitle" value={formData.metaTitle} onChange={handleChange} />
-              </div>
-              <div className="form-group">
-                <label>Meta Description</label>
-                <textarea name="metaDescription" value={formData.metaDescription} onChange={handleChange} rows="2" />
-              </div>
-              <div className="form-group">
-                <label>Meta Keywords</label>
-                <input type="text" name="metaKeywords" value={formData.metaKeywords} onChange={handleChange} />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn-cancel" onClick={resetModal}>Cancel</button>
-              <button className="btn-save" onClick={handleSubmit} disabled={saving}>
-                {saving ? 'Saving...' : (editBrand ? 'Update' : 'Save')}
-              </button>
-            </div>
-          </div>
+      {/* ✅ Sidebar Offcanvas for View Details */}
+      <div className={`offcanvas offcanvas-end ${showOffcanvas ? 'show' : ''}`} tabIndex="-1" style={{ visibility: showOffcanvas ? 'visible' : 'hidden' }}>
+        <div className="offcanvas-header">
+          <h5 className="offcanvas-title">
+            <i className="bi bi-building me-2"></i>Brand Details
+          </h5>
+          <button type="button" className="btn-close" onClick={() => setShowOffcanvas(false)}></button>
         </div>
-      )}
+        <div className="offcanvas-body">
+          {selectedBrand && (
+            <div className="brand-details">
+              <div className="text-center mb-4">
+                {selectedBrand.logo ? (
+                  <img 
+                    src={getImageUrl(selectedBrand.logo)} 
+                    alt={selectedBrand.name} 
+                    style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '12px' }}
+                  />
+                ) : (
+                  <div className="logo-placeholder-large">
+                    <i className="bi bi-building fs-1"></i>
+                  </div>
+                )}
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Brand Name:</span>
+                <span className="detail-value">{selectedBrand.name}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Category:</span>
+                <span className="detail-value">{selectedBrand.category || 'General'}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Products Count:</span>
+                <span className="detail-value">{selectedBrand.products || 0}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Created At:</span>
+                <span className="detail-value">
+                  {selectedBrand.createdAt ? new Date(selectedBrand.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A'}
+                </span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Meta Title:</span>
+                <span className="detail-value">{selectedBrand.metaTitle || 'Not set'}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Meta Description:</span>
+                <span className="detail-value">{selectedBrand.metaDescription || 'Not set'}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Meta Keywords:</span>
+                <span className="detail-value">{selectedBrand.metaKeywords || 'Not set'}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      {showOffcanvas && <div className="offcanvas-backdrop" onClick={() => setShowOffcanvas(false)}></div>}
     </div>
   );
 }

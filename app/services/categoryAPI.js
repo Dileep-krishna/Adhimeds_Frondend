@@ -1,4 +1,7 @@
 // ✅ CREATE CATEGORY
+
+import SERVERURL from './serverURL';
+
 export const createCategoryAPI = async (formData) => {
   const res = await fetch(`${SERVERURL}/category`, {  // ADDED "/category"
     method: "POST",

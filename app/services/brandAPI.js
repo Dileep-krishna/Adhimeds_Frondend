@@ -1,6 +1,5 @@
 import SERVERURL from './serverURL';
 
-// Helper to log and parse responses
 async function handleResponse(res, endpoint) {
   console.log(`🌐 ${endpoint} - Response status: ${res.status}`);
   const text = await res.text();
@@ -13,8 +12,6 @@ async function handleResponse(res, endpoint) {
   }
 }
 
-// ========== BRAND CRUD ==========
-
 // Get all brands
 export const getAllBrands = async () => {
   const url = `${SERVERURL}/brands`;
@@ -23,7 +20,7 @@ export const getAllBrands = async () => {
   return handleResponse(res, 'GET /brands');
 };
 
-// Get a single brand by ID
+// Get single brand
 export const getBrandById = async (brandId) => {
   const url = `${SERVERURL}/brands/${brandId}`;
   console.log(`📡 GET ${url}`);
@@ -31,47 +28,50 @@ export const getBrandById = async (brandId) => {
   return handleResponse(res, `GET /brands/${brandId}`);
 };
 
-// Create a new brand (with logo file)
+// Create brand
 export const createBrand = async (brandData) => {
   const url = `${SERVERURL}/brands`;
-  console.log(`📡 POST ${url} (FormData)`);
+  console.log(`📡 POST ${url}`);
 
-  const formData = new FormData();
-  formData.append('name', brandData.name);
-  if (brandData.logo) formData.append('logo', brandData.logo);
-  if (brandData.category) formData.append('category', brandData.category);
-  if (brandData.metaTitle) formData.append('metaTitle', brandData.metaTitle);
-  if (brandData.metaDescription) formData.append('metaDescription', brandData.metaDescription);
-  if (brandData.metaKeywords) formData.append('metaKeywords', brandData.metaKeywords);
+  let body = brandData;
+  let headers = {};
+
+  if (!(brandData instanceof FormData)) {
+    // If for some reason it's not FormData, convert to JSON
+    body = JSON.stringify(brandData);
+    headers = { 'Content-Type': 'application/json' };
+  }
 
   const res = await fetch(url, {
     method: 'POST',
-    body: formData, // do NOT set Content-Type – browser sets it with boundary
+    body,
+    headers,
   });
   return handleResponse(res, 'POST /brands');
 };
 
-// Update an existing brand (with optional logo file)
+// Update brand
 export const updateBrand = async (brandId, brandData) => {
   const url = `${SERVERURL}/brands/${brandId}`;
-  console.log(`📡 PUT ${url} (FormData)`);
+  console.log(`📡 PUT ${url}`);
 
-  const formData = new FormData();
-  if (brandData.name) formData.append('name', brandData.name);
-  if (brandData.logo) formData.append('logo', brandData.logo);
-  if (brandData.category) formData.append('category', brandData.category);
-  if (brandData.metaTitle) formData.append('metaTitle', brandData.metaTitle);
-  if (brandData.metaDescription) formData.append('metaDescription', brandData.metaDescription);
-  if (brandData.metaKeywords) formData.append('metaKeywords', brandData.metaKeywords);
+  let body = brandData;
+  let headers = {};
+
+  if (!(brandData instanceof FormData)) {
+    body = JSON.stringify(brandData);
+    headers = { 'Content-Type': 'application/json' };
+  }
 
   const res = await fetch(url, {
     method: 'PUT',
-    body: formData,
+    body,
+    headers,
   });
   return handleResponse(res, `PUT /brands/${brandId}`);
 };
 
-// Delete a brand
+// Delete brand
 export const deleteBrand = async (brandId) => {
   const url = `${SERVERURL}/brands/${brandId}`;
   console.log(`📡 DELETE ${url}`);

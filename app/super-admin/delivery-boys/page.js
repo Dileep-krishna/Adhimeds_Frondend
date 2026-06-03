@@ -1,38 +1,36 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import './delivery-boys.css';
 import {
-  addDeliveryBoyAPI,
-  deleteDeliveryBoyAPI,
   getDeliveryBoysAPI,
+  deleteDeliveryBoyAPI,
   updateDeliveryBoyAPI,
 } from '../../services/deliveryService';
 
+// Skeleton loader component
+const CardSkeleton = () => (
+  <div className="delivery-card skeleton">
+    <div className="card-header skeleton-header"></div>
+    <div className="card-avatar skeleton-avatar"></div>
+    <div className="card-name skeleton-text"></div>
+    <div className="card-details skeleton-details"></div>
+    <div className="card-actions skeleton-actions"></div>
+  </div>
+);
+
 export default function DeliveryBoysPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
-
   const [searchTerm, setSearchTerm] = useState('');
   const [districtFilter, setDistrictFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [showModal, setShowModal] = useState(false);
-  const [editingBoy, setEditingBoy] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    password: '',
-    aadharNumber: '',
-    aadharImage: null,
-    licenseNumber: '',
-    licenseImage: null,
-    bikeNumber: '',
-    district: 'Thiruvananthapuram',
-    status: 'active',
-  });
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [selectedBoy, setSelectedBoy] = useState(null);
+  const [showOffcanvas, setShowOffcanvas] = useState(false);
 
   const keralaDistricts = [
     'Thiruvananthapuram', 'Kollam', 'Pathanamthitta', 'Alappuzha',
@@ -50,7 +48,7 @@ export default function DeliveryBoysPage() {
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
   };
 
-  // ---------- Fetch delivery boys ----------
+  // Fetch delivery boys with caching and faster loading
   const { data: deliveryBoys = [], isLoading, error, refetch } = useQuery({
     queryKey: ['deliveryBoys'],
     queryFn: async () => {
@@ -82,94 +80,11 @@ export default function DeliveryBoysPage() {
           .slice(0, 2),
       }));
     },
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000, // cache for 5 minutes
+    refetchOnWindowFocus: false,
   });
 
-  // ---------- Add Mutation ----------
-  const addMutation = useMutation({
-    mutationFn: (data) => addDeliveryBoyAPI(data),
-    onMutate: async (newBoyData) => {
-      await queryClient.cancelQueries({ queryKey: ['deliveryBoys'] });
-      const previousBoys = queryClient.getQueryData(['deliveryBoys']);
-      const optimisticBoy = {
-        id: `temp-${Date.now()}`,
-        name: newBoyData.get('name'),
-        email: newBoyData.get('email'),
-        phone: newBoyData.get('phone'),
-        district: capitalizeDistrict(newBoyData.get('district')),
-        status: newBoyData.get('status'),
-        deliveries: 0,
-        rating: 0,
-        aadharNumber: newBoyData.get('aadharNumber'),
-        licenseNumber: newBoyData.get('licenseNumber'),
-        bikeNumber: newBoyData.get('bikeNumber'),
-        avatar: newBoyData.get('name')?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
-      };
-      queryClient.setQueryData(['deliveryBoys'], (old) => [optimisticBoy, ...(old || [])]);
-      return { previousBoys };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deliveryBoys'] });
-      showToast('Delivery boy added successfully!', 'success');
-      setShowModal(false);
-      resetForm();
-    },
-    onError: (err, _, context) => {
-      queryClient.setQueryData(['deliveryBoys'], context.previousBoys);
-      showToast(`Add failed: ${err.message}`, 'error');
-    },
-  });
-
-  // ---------- Update Mutation (with logging and force refetch) ----------
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => {
-      console.log('📤 Updating boy ID:', id);
-      console.log('📤 FormData entries:');
-      for (let pair of data.entries()) {
-        console.log(pair[0], pair[1]);
-      }
-      return updateDeliveryBoyAPI(id, data);
-    },
-    onMutate: async ({ id, data }) => {
-      await queryClient.cancelQueries({ queryKey: ['deliveryBoys'] });
-      const previousBoys = queryClient.getQueryData(['deliveryBoys']);
-      const updatedFields = {
-        name: data.get('name'),
-        email: data.get('email'),
-        phone: data.get('phone'),
-        district: capitalizeDistrict(data.get('district')),
-        status: data.get('status'),
-        aadharNumber: data.get('aadharNumber'),
-        licenseNumber: data.get('licenseNumber'),
-        bikeNumber: data.get('bikeNumber'),
-        avatar: data.get('name')?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
-      };
-      queryClient.setQueryData(['deliveryBoys'], (old) =>
-        old.map((boy) => (boy.id === id ? { ...boy, ...updatedFields } : boy))
-      );
-      return { previousBoys };
-    },
-    onSuccess: (result, variables, context) => {
-      console.log('✅ Update API response:', result);
-      if (result?.success === false) {
-        queryClient.setQueryData(['deliveryBoys'], context.previousBoys);
-        showToast(`Update failed: ${result.message}`, 'error');
-        return;
-      }
-      // Force a fresh fetch to replace optimistic data
-      queryClient.invalidateQueries({ queryKey: ['deliveryBoys'] });
-      showToast('Delivery boy updated successfully!', 'success');
-      setShowModal(false);
-      resetForm();
-    },
-    onError: (err, _, context) => {
-      console.error('❌ Update error:', err);
-      queryClient.setQueryData(['deliveryBoys'], context.previousBoys);
-      showToast(`Update error: ${err.message}`, 'error');
-    },
-  });
-
-  // ---------- Delete Mutation ----------
+  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: (id) => deleteDeliveryBoyAPI(id),
     onMutate: async (id) => {
@@ -188,7 +103,7 @@ export default function DeliveryBoysPage() {
     },
   });
 
-  // ---------- Toggle Status ----------
+  // Toggle status
   const toggleStatusMutation = useMutation({
     mutationFn: ({ id, status }) => {
       const form = new FormData();
@@ -212,91 +127,33 @@ export default function DeliveryBoysPage() {
     },
   });
 
-  const resetForm = () => {
-    setFormData({
-      name: '', email: '', phone: '', password: '',
-      aadharNumber: '', aadharImage: null,
-      licenseNumber: '', licenseImage: null, bikeNumber: '',
-      district: 'Thiruvananthapuram', status: 'active',
-    });
-    setEditingBoy(null);
+  const handleDelete = () => {
+    if (deleteConfirm) deleteMutation.mutate(deleteConfirm);
+  };
+
+  const openViewOffcanvas = (boy) => {
+    setSelectedBoy(boy);
+    setShowOffcanvas(true);
   };
 
   const totalBoys = deliveryBoys.length;
   const activeBoys = deliveryBoys.filter((b) => b.status === 'active').length;
   const topDeliveries = deliveryBoys.length ? Math.max(...deliveryBoys.map((b) => b.deliveries)) : 0;
 
-  const filteredBoys = deliveryBoys.filter((boy) => {
-    const matchesSearch =
-      boy.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      boy.phone.includes(searchTerm);
-    const matchesDistrict = districtFilter === 'all' || boy.district === districtFilter;
-    const matchesStatus = statusFilter === 'all' || boy.status === statusFilter;
-    return matchesSearch && matchesDistrict && matchesStatus;
-  });
-
-  const openModal = (boy = null) => {
-    if (boy) {
-      setEditingBoy(boy);
-      setFormData({
-        name: boy.name,
-        email: boy.email || '',
-        phone: boy.phone,
-        password: '',
-        aadharNumber: boy.aadharNumber || '',
-        aadharImage: null,
-        licenseNumber: boy.licenseNumber || '',
-        licenseImage: null,
-        bikeNumber: boy.bikeNumber || '',
-        district: boy.district,
-        status: boy.status,
-      });
-    } else {
-      setEditingBoy(null);
-      setFormData({
-        name: '', email: '', phone: '', password: '',
-        aadharNumber: '', aadharImage: null,
-        licenseNumber: '', licenseImage: null, bikeNumber: '',
-        district: 'Thiruvananthapuram', status: 'active',
-      });
-    }
-    setShowModal(true);
-  };
-
-  const handleSave = () => {
-    if (!formData.name || !formData.phone) {
-      showToast('Please fill in Name and Phone Number', 'error');
-      return;
-    }
-    const reqBody = new FormData();
-    reqBody.append('name', formData.name);
-    reqBody.append('email', formData.email || '');
-    reqBody.append('phone', formData.phone);
-    if (formData.password) reqBody.append('password', formData.password);
-    reqBody.append('aadharNumber', formData.aadharNumber || '');
-    reqBody.append('licenseNumber', formData.licenseNumber || '');
-    reqBody.append('bikeNumber', formData.bikeNumber || '');
-    reqBody.append('district', formData.district);
-    reqBody.append('status', formData.status);
-    if (formData.aadharImage) reqBody.append('aadharImage', formData.aadharImage);
-    if (formData.licenseImage) reqBody.append('licenseImage', formData.licenseImage);
-
-    if (editingBoy) {
-      updateMutation.mutate({ id: editingBoy.id, data: reqBody });
-    } else {
-      addMutation.mutate(reqBody);
-    }
-  };
-
-  const handleDelete = () => {
-    if (deleteConfirm) deleteMutation.mutate(deleteConfirm);
-  };
-
-  const isMutating =
-    addMutation.isPending || updateMutation.isPending || deleteMutation.isPending || toggleStatusMutation.isPending;
+  const filteredBoys = useMemo(() => {
+    return deliveryBoys.filter((boy) => {
+      const matchesSearch =
+        boy.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        boy.phone.includes(searchTerm);
+      const matchesDistrict = districtFilter === 'all' || boy.district === districtFilter;
+      const matchesStatus = statusFilter === 'all' || boy.status === statusFilter;
+      return matchesSearch && matchesDistrict && matchesStatus;
+    });
+  }, [deliveryBoys, searchTerm, districtFilter, statusFilter]);
 
   return (
-    <div className="delivery-page" suppressHydrationWarning>
+    <div className="delivery-page-full">
+      {/* Toast */}
       {toast.show && (
         <div className={`toast-notification ${toast.type}`}>
           <i className={`bi ${toast.type === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'}`}></i>
@@ -304,95 +161,198 @@ export default function DeliveryBoysPage() {
         </div>
       )}
 
-      <div className="hero-section">
+      {/* Hero Section */}
+      <div className="hero-section-full">
         <div className="hero-text">
           <h1 className="hero-title"><i className="bi bi-bicycle"></i> Delivery Fleet</h1>
           <p className="hero-subtitle">Manage your delivery partners, track performance, and optimise routes.</p>
         </div>
-        <button className="btn-glow" onClick={() => openModal()}>
+        <button className="btn-glow" onClick={() => router.push('/super-admin/delivery-boys/delivery-boysAdd')}>
           <i className="bi bi-plus-circle"></i> Add Delivery Boy
         </button>
       </div>
 
-      <div className="stats-mini">
-        <div className="stat-mini-card"><i className="bi bi-person-badge"></i><div><span className="stat-mini-num">{totalBoys}</span><span>Total Boys</span></div></div>
-        <div className="stat-mini-card"><i className="bi bi-check-circle-fill"></i><div><span className="stat-mini-num">{activeBoys}</span><span>Active</span></div></div>
-        <div className="stat-mini-card"><i className="bi bi-trophy-fill"></i><div><span className="stat-mini-num">{topDeliveries}</span><span>Top Deliveries</span></div></div>
+      {/* Stats Cards */}
+      <div className="stats-row-full">
+        <div className="stat-card">
+          <div className="stat-icon"><i className="bi bi-people-fill"></i></div>
+          <div className="stat-info">
+            <span className="stat-value">{totalBoys}</span>
+            <span className="stat-label">Total Boys</span>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon"><i className="bi bi-check-circle-fill"></i></div>
+          <div className="stat-info">
+            <span className="stat-value">{activeBoys}</span>
+            <span className="stat-label">Active</span>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon"><i className="bi bi-trophy-fill"></i></div>
+          <div className="stat-info">
+            <span className="stat-value">{topDeliveries}</span>
+            <span className="stat-label">Top Deliveries</span>
+          </div>
+        </div>
       </div>
 
-      <div className="filter-bar">
-        <div className="search-group"><i className="bi bi-search"></i><input type="text" placeholder="Search by name or phone..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-        <div className="filter-group"><label><i className="bi bi-geo-alt"></i> District</label><select value={districtFilter} onChange={(e) => setDistrictFilter(e.target.value)}><option value="all">All Districts</option>{keralaDistricts.map((d) => <option key={d}>{d}</option>)}</select></div>
-        <div className="filter-group"><label><i className="bi bi-flag"></i> Status</label><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="all">All</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="pending">Pending</option></select></div>
+      {/* Filter Bar */}
+      <div className="filter-bar-full">
+        <div className="search-group">
+          <i className="bi bi-search"></i>
+          <input type="text" placeholder="Search by name or phone..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        </div>
+        <div className="filter-group">
+          <label><i className="bi bi-geo-alt"></i> District</label>
+          <select value={districtFilter} onChange={(e) => setDistrictFilter(e.target.value)}>
+            <option value="all">All Districts</option>
+            {keralaDistricts.map((d) => <option key={d}>{d}</option>)}
+          </select>
+        </div>
+        <div className="filter-group">
+          <label><i className="bi bi-flag"></i> Status</label>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="pending">Pending</option>
+          </select>
+        </div>
       </div>
 
-      <div className="delivery-grid">
+      {/* Cards Grid with Skeleton Loader */}
+      <div className="delivery-grid-full">
         {isLoading ? (
-          <div className="loading-state"><div className="spinner"></div><p>Loading delivery boys...</p></div>
+          Array(6).fill(0).map((_, i) => <CardSkeleton key={i} />)
         ) : error ? (
-          <div className="error-state"><i className="bi bi-exclamation-triangle-fill"></i><p>{error.message}</p><button className="btn-retry" onClick={() => refetch()}>Retry</button></div>
+          <div className="error-state-full">
+            <i className="bi bi-exclamation-triangle-fill"></i>
+            <p>{error.message}</p>
+            <button className="btn-retry" onClick={() => refetch()}>Retry</button>
+          </div>
         ) : filteredBoys.length === 0 ? (
-          <div className="empty-state"><i className="bi bi-emoji-frown"></i><p>No delivery boys found</p></div>
+          <div className="empty-state-full">
+            <i className="bi bi-emoji-frown"></i>
+            <p>No delivery boys found</p>
+          </div>
         ) : (
           filteredBoys.map((boy) => (
-            <div className="delivery-card premium-card" key={boy.id} data-status={boy.status}>
-              <div className="card-badge" data-status={boy.status}>
-                {boy.status === 'active' ? 'Active' : boy.status === 'inactive' ? 'Inactive' : 'Pending'}
+            <div className="delivery-card" key={boy.id}>
+              <div className="card-header">
+                <span className={`status-badge ${boy.status}`}>
+                  {boy.status === 'active' ? 'Active' : boy.status === 'inactive' ? 'Inactive' : 'Pending'}
+                </span>
+                <div className="card-actions-top">
+                  <button className="icon-btn view" onClick={() => openViewOffcanvas(boy)} title="View Details">
+                    <i className="bi bi-eye-fill"></i>
+                  </button>
+                </div>
               </div>
-              <div className="avatar-wrapper">
-                <div className="avatar-glow">{boy.avatar}</div>
+              <div className="card-avatar">
+                <div className="avatar-circle">{boy.avatar}</div>
                 <button className="status-toggle" onClick={() => toggleStatusMutation.mutate({ id: boy.id, status: boy.status === 'active' ? 'inactive' : 'active' })}>
                   <i className={`bi ${boy.status === 'active' ? 'bi-toggle-on' : 'bi-toggle-off'}`}></i>
                 </button>
               </div>
-              <h3 className="delivery-name">{boy.name}</h3>
-              <div className="delivery-details">
+              <h3 className="card-name">{boy.name}</h3>
+              <div className="card-details">
                 <p><i className="bi bi-telephone-fill"></i> {boy.phone}</p>
-                <p><i className="bi bi-pin-map-fill"></i> District: <strong>{boy.district}</strong></p>
-                <p><i className="bi bi-truck"></i> Deliveries: <strong>{boy.deliveries}</strong></p>
+                <p><i className="bi bi-pin-map-fill"></i> {boy.district}</p>
+                <p><i className="bi bi-truck"></i> <strong>{boy.deliveries}</strong> deliveries</p>
                 <p className="rating"><i className="bi bi-star-fill"></i> {boy.rating} ★</p>
               </div>
               <div className="card-actions">
-                <button className="action-btn edit" onClick={() => openModal(boy)}><i className="bi bi-pencil"></i> Edit</button>
-                <button className="action-btn delete" onClick={() => setDeleteConfirm(boy.id)}><i className="bi bi-trash"></i> Delete</button>
+                <button className="action-btn edit" onClick={() => router.push(`/super-admin/delivery-boys/delivery-boysEdit/${boy.id}`)}>
+                  <i className="bi bi-pencil"></i> Edit
+                </button>
+                <button className="action-btn delete" onClick={() => setDeleteConfirm(boy.id)}>
+                  <i className="bi bi-trash"></i> Delete
+                </button>
               </div>
             </div>
           ))
         )}
       </div>
 
-      {/* Modal */}
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header"><h3><i className="bi bi-person-plus"></i> {editingBoy ? 'Edit Delivery Boy' : 'Add New Delivery Boy'}</h3><button className="close" onClick={() => setShowModal(false)}>&times;</button></div>
-            <div className="modal-body">
-              <div className="form-group"><label>Full Name</label><input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g., Rajesh Kumar" /></div>
-              <div className="form-group"><label>Email</label><input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="example@gmail.com" /></div>
-              <div className="form-group"><label>Phone Number</label><input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+91 98765 43210" /></div>
-              <div className="form-group"><label>Password</label><input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="Enter password" /></div>
-              <div className="form-group"><label>Aadhar Number</label><input type="text" value={formData.aadharNumber} onChange={(e) => setFormData({ ...formData, aadharNumber: e.target.value })} placeholder="1234 1234 1234" /></div>
-              <div className="form-group"><label>Aadhar Image</label><input type="file" onChange={(e) => setFormData({ ...formData, aadharImage: e.target.files[0] })} /></div>
-              <div className="form-group"><label>License Number</label><input type="text" value={formData.licenseNumber} onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })} placeholder="KL123456" /></div>
-              <div className="form-group"><label>License Image</label><input type="file" onChange={(e) => setFormData({ ...formData, licenseImage: e.target.files[0] })} /></div>
-              <div className="form-group"><label>Bike Number</label><input type="text" value={formData.bikeNumber} onChange={(e) => setFormData({ ...formData, bikeNumber: e.target.value })} placeholder="KL07AB1234" /></div>
-              <div className="form-group"><label>District</label><select value={formData.district} onChange={(e) => setFormData({ ...formData, district: e.target.value })}>{keralaDistricts.map((d) => <option key={d}>{d}</option>)}</select></div>
-              <div className="form-group"><label>Status</label><select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}><option value="active">Active</option><option value="inactive">Inactive</option><option value="blocked">Blocked</option></select></div>
+            <div className="modal-header">
+              <h3><i className="bi bi-exclamation-triangle-fill"></i> Confirm Delete</h3>
+              <button className="close" onClick={() => setDeleteConfirm(null)}>&times;</button>
             </div>
-            <div className="modal-footer"><button className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button><button className="btn-primary" onClick={handleSave} disabled={isMutating}>{isMutating ? 'Saving...' : editingBoy ? 'Update' : 'Add'} Boy</button></div>
+            <div className="modal-body">
+              <p>Are you sure you want to delete this delivery boy? This action cannot be undone.</p>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="btn-danger" onClick={handleDelete}>Delete Permanently</button>
+            </div>
           </div>
         </div>
       )}
 
-      {deleteConfirm && (
-        <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
-          <div className="modal-content delete-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header"><h3><i className="bi bi-exclamation-triangle-fill"></i> Confirm Delete</h3><button className="close" onClick={() => setDeleteConfirm(null)}>&times;</button></div>
-            <div className="modal-body"><p>Are you sure you want to delete this delivery boy? This action cannot be undone.</p></div>
-            <div className="modal-footer"><button className="btn-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button><button className="btn-danger" onClick={handleDelete}>Delete Permanently</button></div>
-          </div>
+      {/* Offcanvas Side Modal with clear heading */}
+      <div className={`offcanvas ${showOffcanvas ? 'show' : ''}`}>
+        <div className="offcanvas-header">
+          <h5 className="offcanvas-title">
+            <i className="bi bi-person-badge me-2"></i>Delivery Boy Details
+          </h5>
+          <button type="button" className="btn-close" onClick={() => setShowOffcanvas(false)}></button>
         </div>
-      )}
+        <div className="offcanvas-body">
+          {selectedBoy && (
+            <div className="details-container">
+              <div className="detail-avatar">
+                <div className="avatar-large">{selectedBoy.avatar}</div>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Full Name:</span>
+                <span className="detail-value">{selectedBoy.name}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Email:</span>
+                <span className="detail-value">{selectedBoy.email || 'Not provided'}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Phone:</span>
+                <span className="detail-value">{selectedBoy.phone}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">District:</span>
+                <span className="detail-value">{selectedBoy.district}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Status:</span>
+                <span className={`status-badge ${selectedBoy.status}`}>{selectedBoy.status}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Deliveries:</span>
+                <span className="detail-value">{selectedBoy.deliveries}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Rating:</span>
+                <span className="detail-value">{selectedBoy.rating} ★</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Aadhar Number:</span>
+                <span className="detail-value">{selectedBoy.aadharNumber || 'Not provided'}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">License Number:</span>
+                <span className="detail-value">{selectedBoy.licenseNumber || 'Not provided'}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Bike Number:</span>
+                <span className="detail-value">{selectedBoy.bikeNumber || 'Not provided'}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      {showOffcanvas && <div className="offcanvas-backdrop" onClick={() => setShowOffcanvas(false)}></div>}
     </div>
   );
 }
