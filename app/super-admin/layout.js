@@ -81,7 +81,15 @@ export default function SuperAdminLayout({ children }) {
         { name: "Attribute", path: "/super-admin/product-managment/product-setup/Attribute" },
         { name: "Size Guide", path: "/super-admin/product-managment/product-setup/size-guide" },
         { name: "Warranty", path: "/super-admin/product-managment/product-setup/warranty" },
-        { name: "Notes", path: "/super-admin/product-managment/product-setup/notes" },
+
+        // 👇 UPDATED NOTES WITH SUB MENU
+        {
+          name: "Notes",
+          children: [
+            { name: "All Notes", path: "/super-admin/product-managment/product-setup/notes" },
+            { name: "Add Note", path: "/super-admin/product-managment/product-setup/notes/add" },
+          ],
+        },
       ],
     },
     {
@@ -141,94 +149,118 @@ export default function SuperAdminLayout({ children }) {
           {beforeProductItems.map(renderMainLink)}
 
           {/* ================= PRODUCT ================= */}
-          <div className={`dropdown-parent ${isProductActive ? "active-parent" : ""}`}>
-            <div className="dropdown-header-wrapper">
+        <div className={`dropdown-parent ${isProductActive ? "active-parent" : ""}`}>
+  <div className="dropdown-header-wrapper">
 
-              {/* ✅ MAIN PRODUCT BUTTON */}
-              <button
-                className="dropdown-main-link"
-                onClick={() => {
-                  setOpenDropdowns((prev) => {
-                    const isOpen = prev.main;
+    {/* ✅ MAIN PRODUCT BUTTON */}
+    <button
+      className="dropdown-main-link"
+      onClick={toggleMainDropdown}
+    >
+      <i className="bi bi-box"></i>
+      <span>Product Management</span>
+    </button>
 
-                    if (isOpen) {
-                      return {
-                        main: false,
-                        Products: false,
-                        "Product Setup": false,
-                        "Product Operation": false,
-                      };
-                    }
+    {/* ✅ CHEVRON */}
+    <button
+      className="chevron-toggle"
+      onClick={toggleMainDropdown}
+    >
+      <i className={`bi bi-chevron-${openDropdowns.main ? "up" : "down"}`}></i>
+    </button>
 
-                    return {
-                      main: true,
-                      Products: false,
-                      "Product Setup": false,
-                      "Product Operation": false,
-                    };
-                  });
-                }}
-              >
-                <i className="bi bi-box"></i>
-                <span>Product Management</span>
-              </button>
+  </div>
 
-              {/* chevron toggle */}
-              <button
-                className="chevron-toggle"
-                onClick={toggleMainDropdown}
-              >
-                <i className={`bi bi-chevron-${openDropdowns.main ? "up" : "down"}`}></i>
-              </button>
+  {/* ================= SUB MENU ================= */}
+ <div className={`dropdown-menu ${openDropdowns.main ? "show" : ""}`}>
 
-            </div>
+  {productMenu.map((menu, index) => (
+    <div key={index} className="nested-dropdown">
 
-            {/* ✅ SUB MENU */}
-            <div className={`dropdown-menu ${openDropdowns.main ? "show" : ""}`}>
-              {productMenu.map((menu, index) => (
-                <div key={index} className="nested-dropdown">
+      {/* ✅ LEVEL 1 */}
+      <div
+        className="dropdown-item"
+        onClick={() => {
+          if (menu.path) router.push(menu.path);
 
+          setOpenDropdowns((prev) => ({
+            main: true,
+
+            // ✅ close others + toggle current
+            Products: false,
+            "Product Setup": false,
+            "Product Operation": false,
+
+            [menu.name]: !prev[menu.name],
+          }));
+        }}
+      >
+        <span>
+          <i className={`bi ${menu.icon}`}></i> {menu.name}
+        </span>
+
+        <i className={`bi bi-chevron-${openDropdowns[menu.name] ? "up" : "down"}`}></i>
+      </div>
+
+      {/* ✅ LEVEL 2 */}
+      {openDropdowns[menu.name] && (
+        <div className="nested-menu show">
+
+          {menu.children.map((sub, i) => (
+            <div key={i}>
+
+              {sub.children ? (
+                <>
+                  {/* ✅ LEVEL 2 ITEM */}
                   <div
-                    className="dropdown-item"
-                    onClick={() => {
-                      if (menu.path) {
-                        router.push(menu.path);
-                      }
+                    className="dropdown-sub-item"
+                    onClick={() =>
+                      setOpenDropdowns((prev) => ({
+                        ...prev,
 
-                      setOpenDropdowns(() => ({
-                        main: true, // keep parent open
-                        Products: false,
-                        "Product Setup": false,
-                        "Product Operation": false,
-                        [menu.name]: true, // ✅ ONLY ONE OPEN
-                      }));
-                    }}
+                        // ✅ toggle sub-sub menu
+                        [sub.name]: !prev[sub.name],
+                      }))
+                    }
                   >
-                    <span>
-                      <i className={`bi ${menu.icon}`}></i> {menu.name}
-                    </span>
-
-                    <i className={`bi bi-chevron-${openDropdowns[menu.name] ? "up" : "down"}`}></i>
+                    {sub.name}
                   </div>
 
-                  {/* SUB CHILDREN */}
-                  <div className={`nested-menu ${openDropdowns[menu.name] ? "show" : ""}`}>
-                    {menu.children.map((sub, i) => (
-                      <Link
-                        key={i}
-                        href={sub.path}
-                        className={`dropdown-sub-item ${pathname === sub.path ? "active" : ""
-                          }`}
-                      >
-                        {sub.name}
-                      </Link>
-                    ))}
-                  </div>
+                  {/* ✅ LEVEL 3 */}
+                  {openDropdowns[sub.name] && (
+                    <div className="nested-menu show">
+                      {sub.children.map((child, j) => (
+                        <Link
+                          key={j}
+                          href={child.path}
+                          className="dropdown-sub-item ms-3"
+                        >
+                          {child.name}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <Link
+                  href={sub.path}
+                  className={`dropdown-sub-item ${pathname === sub.path ? "active" : ""}`}
+                >
+                  {sub.name}
+                </Link>
+              )}
 
-                </div>
-              ))}
             </div>
-          </div>
+          ))}
+
+        </div>
+      )}
+
+    </div>
+  ))}
+
+</div>
+</div>
 
           {/* ================= STAFF ================= */}
           <div className={`dropdown-parent ${isStaffActive ? "active-parent" : ""}`}>
