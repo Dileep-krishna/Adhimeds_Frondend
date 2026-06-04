@@ -1,0 +1,56 @@
+/* custom-review.css – shared for Add/Edit pages */
+
+.custom-review-page {
+  background-color: #f8fafc;
+  min-height: 100vh;
+}
+
+/* Star rating container */
+.rating-stars {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* Star button */
+.star-btn {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  color: #cbd5e1;
+  transition: all 0.2s ease;
+  padding: 0;
+  line-height: 1;
+}
+
+/* Active (selected) star */
+.star-btn.active {
+  color: #fbbf24;
+  text-shadow: 0 0 2px rgba(0,0,0,0.1);
+}
+
+/* Hover effect */
+.star-btn:hover {
+  color: #f59e0b;
+  transform: scale(1.05);
+}
+
+/* Form labels */
+.form-label {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+/* Card styling */
+.card {
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+/* Image previews */
+.preview-img {
+  object-fit: cover;
+  border-radius: 0.25rem;
+  border: 1px solid #dee2e6;
+}

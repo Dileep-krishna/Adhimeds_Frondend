@@ -3,11 +3,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './all-products.css';
 import { deleteProductAPI, getProductsAPI, updateProductAPI } from '../../../../services/productService';
+import { getAllCustomReviewsAPI } from '../../../../services/customReviewService';
 import SERVERURL from '../../../../services/serverURL';
 
 export default function AllProductsPage() {
@@ -26,16 +28,44 @@ export default function AllProductsPage() {
   const [filterOption, setFilterOption] = useState('');
   const [sortOption, setSortOption] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  
+  // Side modal state
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const response = await getProductsAPI();
-      if (response.success) {
-        setProducts(response.data);
-      } else {
-        toast.error(response.message || 'Failed to load products');
-      }
+      const [productsRes, reviewsRes] = await Promise.all([
+        getProductsAPI(),
+        getAllCustomReviewsAPI(),
+      ]);
+
+      if (!productsRes.success) throw new Error(productsRes.message || 'Failed to load products');
+      
+      const productsData = productsRes.data;
+      const allReviews = reviewsRes.success ? reviewsRes.data : [];
+
+      // Group reviews by productId and calculate average rating
+      const reviewsByProduct = {};
+      allReviews.forEach(review => {
+        const pid = review.productId?._id || review.productId;
+        if (!reviewsByProduct[pid]) reviewsByProduct[pid] = [];
+        reviewsByProduct[pid].push(review);
+      });
+
+      const productsWithRating = productsData.map(product => {
+        const productReviews = reviewsByProduct[product._id] || [];
+        const totalRating = productReviews.reduce((sum, r) => sum + r.rating, 0);
+        const avgRating = productReviews.length ? parseFloat((totalRating / productReviews.length).toFixed(1)) : 0;
+        return {
+          ...product,
+          avgRating,
+          reviewCount: productReviews.length,
+        };
+      });
+
+      setProducts(productsWithRating);
     } catch (error) {
       console.error('Error fetching products:', error);
       toast.error('Server error while loading products');
@@ -65,7 +95,7 @@ export default function AllProductsPage() {
     if (filterOption === 'discount') result = result.filter(p => p.discount > 0);
     if (sortOption === 'price-asc') result.sort((a, b) => (a.unitPrice || 0) - (b.unitPrice || 0));
     if (sortOption === 'price-desc') result.sort((a, b) => (b.unitPrice || 0) - (a.unitPrice || 0));
-    if (sortOption === 'rating-desc') result.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    if (sortOption === 'rating-desc') result.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
     if (sortOption === 'name-asc') result.sort((a, b) => (a.productName || '').localeCompare(b.productName || ''));
     return result;
   }, [products, searchTerm, filterOption, sortOption]);
@@ -128,7 +158,12 @@ export default function AllProductsPage() {
   };
 
   const handleEdit = (id) => {
-    router.push(`/super-admin/product-managment/products/edit-product/${id}`);
+    router.push(`/super-admin/product-managment/edit-product/${id}`);
+  };
+
+  const openInfoModal = (product) => {
+    setSelectedProduct(product);
+    setShowInfoModal(true);
   };
 
   const toggleDropdown = () => setDropdownOpen(!dropdownOpen);
@@ -245,10 +280,23 @@ export default function AllProductsPage() {
                   </td>
                   <td>{product.brand}</td>
                   <td>{product.mainCategory}</td>
-                  <td>{product.rating ? `${'⭐'.repeat(product.rating)} ${product.rating}/5` : '—'}</td>
+                  <td>
+                    {product.avgRating > 0 ? (
+                      <div>
+                        <div className="stars">{'⭐'.repeat(Math.floor(product.avgRating))}</div>
+                        <small>{product.avgRating}/5 ({product.reviewCount} reviews)</small>
+                      </div>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
                   <td>₹{product.unitPrice}</td>
                   <td>{product.discount > 0 ? `${product.discount}%` : '—'}</td>
-                  <td><i className="bi bi-info-circle text-secondary"></i></td>
+                  <td>
+                    <button className="btn-icon info" onClick={() => openInfoModal(product)} title="View Details">
+                      <i className="bi bi-info-circle"></i>
+                    </button>
+                  </td>
                   <td>
                     <label className="switch">
                       <input type="checkbox" checked={product.published || false} onChange={() => togglePublished(product._id, product.published)} />
@@ -280,6 +328,71 @@ export default function AllProductsPage() {
           </table>
         )}
       </div>
+
+      {/* SIDE MODAL for Product Details */}
+      <AnimatePresence>
+        {showInfoModal && selectedProduct && (
+          <>
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'tween', duration: 0.3 }}
+              className="side-modal info-modal"
+            >
+              <div className="side-modal-header">
+                <h5>Product Details</h5>
+                <button className="close-modal" onClick={() => setShowInfoModal(false)}>×</button>
+              </div>
+              <div className="side-modal-body">
+                <div className="product-detail-card">
+                  {selectedProduct.thumbnail && (
+                    <div className="text-center mb-3">
+                      <img 
+                        src={getImageUrl(selectedProduct.thumbnail)} 
+                        alt={selectedProduct.productName} 
+                        className="product-detail-image"
+                        style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '1rem' }}
+                      />
+                    </div>
+                  )}
+                  <h4>{selectedProduct.productName}</h4>
+                  <p><strong>Brand:</strong> {selectedProduct.brand}</p>
+                  <p><strong>Category:</strong> {selectedProduct.mainCategory}</p>
+                  <p><strong>Unit:</strong> {selectedProduct.unit || 'N/A'}</p>
+                  <p><strong>Weight:</strong> {selectedProduct.weight} kg</p>
+                  <p><strong>Minimum Qty:</strong> {selectedProduct.minPurchaseQty}</p>
+                  <p><strong>Price:</strong> ₹{selectedProduct.unitPrice}</p>
+                  <p><strong>Discount:</strong> {selectedProduct.discount > 0 ? `${selectedProduct.discount}%` : 'None'}</p>
+                  <p><strong>Stock:</strong> {selectedProduct.stock}</p>
+                  <p><strong>SKU:</strong> {selectedProduct.sku || 'N/A'}</p>
+                  <p><strong>Barcode:</strong> {selectedProduct.barcode || 'N/A'}</p>
+                  <p><strong>HSN Code:</strong> {selectedProduct.hsnCode || 'N/A'}</p>
+                  <p><strong>GST Rate:</strong> {selectedProduct.gstRate || 0}%</p>
+                  <p><strong>Rating:</strong> {selectedProduct.avgRating > 0 ? `${selectedProduct.avgRating}/5 (${selectedProduct.reviewCount} reviews)` : 'No reviews yet'}</p>
+                  {selectedProduct.description && (
+                    <div className="mt-3">
+                      <strong>Description:</strong>
+                      <p className="mt-1">{selectedProduct.description}</p>
+                    </div>
+                  )}
+                  {selectedProduct.galleryImages?.length > 0 && (
+                    <div className="mt-3">
+                      <strong>Gallery Images:</strong>
+                      <div className="d-flex flex-wrap gap-2 mt-2">
+                        {selectedProduct.galleryImages.map((img, idx) => (
+                          <img key={idx} src={getImageUrl(img)} alt="gallery" width="60" height="60" style={{ objectFit: 'cover', borderRadius: '8px' }} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+            <div className="side-overlay" onClick={() => setShowInfoModal(false)} />
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

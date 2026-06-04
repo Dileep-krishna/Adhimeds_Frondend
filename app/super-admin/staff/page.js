@@ -227,7 +227,7 @@ export default function StaffManagement() {
           <p className="hero-subtitle">Manage your team members, roles, and assignments.</p>
         </div>
         <div className="hero-buttons">
-          <button className="btn-glow roles-perms" onClick={() => router.push('/super-admin/staff/role-permission')}>
+          <button className="btn-glow roles-perms" onClick={() => router.push('/super-admin/staff/RoleAdd')}>
             <i className="bi bi-shield-lock-fill"></i> Roles & Permissions
           </button>
           <button className="btn-glow" onClick={() => openModal()}>

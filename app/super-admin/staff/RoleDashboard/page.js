@@ -67,7 +67,7 @@ export default function AllRolesPage() {
           </h1>
           <p className="text-muted mt-1">Manage system roles and permissions</p>
         </div>
-        <Link href="/super-admin/staff/role-permission" className="btn btn-primary rounded-pill px-4 shadow-sm">
+        <Link href="/super-admin/staff/RoleAdd" className="btn btn-primary rounded-pill px-4 shadow-sm">
           <i className="bi bi-plus-circle me-2"></i> Add New Role
         </Link>
       </div>

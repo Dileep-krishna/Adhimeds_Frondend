@@ -5,543 +5,567 @@ import { useParams, useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
+import Select from 'react-select';
+
 import './edit-product.css';
-import { getProductByIdAPI, updateProductAPI } from '../../../../services/productService';
 import SERVERURL from '../../../../services/serverURL';
+import { getProductByIdAPI, updateProductAPI } from '../../../../services/productService';
+import { getAllBrands } from '../../../../services/brandAPI';
+import { getCategoriesAPI } from '../../../../services/categoryAPI';
+import { getWarrantiesAPI } from '../../../../services/warrentyAPI';
+import { getColorsAPI } from '../../../../services/colorAPI';
+import { getAttributesAPI } from '../../../../services/attributeAPI';
 
 export default function EditProductPage() {
   const { id } = useParams();
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+
+  // ========== DYNAMIC DROPDOWN DATA ==========
+  const [brands, setBrands] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [warranties, setWarranties] = useState([]);
+  const [colorOptions, setColorOptions] = useState([]);
+  const [attributeOptions, setAttributeOptions] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [selectedAttributeValues, setSelectedAttributeValues] = useState({});
+
+  // ========== FORM STATE ==========
   const [formData, setFormData] = useState({
     productName: '',
     mainCategory: '',
     brand: '',
     relatedCategories: [],
     unit: '',
-    weight: '',
+    weight: 0,
     minPurchaseQty: 1,
+    barcode: '',
     tags: [],
     tagInput: '',
     published: true,
     featured: false,
     todaysDeal: false,
-    refundable: false,
-    refundNote: 'This product is eligible for return within 7 days of delivery.',
-    thumbnail: null,
-    galleryImages: [],
-    description: '',
-    metaTitle: '',
-    metaDescription: '',
-    metaImage: null,
-    freeShipping: true,
-    flatRate: false,
-    quantityMultiply: false,
-    shippingDays: '',
-    shippingNote: 'This product is shipped within 2-3 business days.',
-    codAvailable: false,
-    codNote: 'Cash on delivery available for orders within India.',
-    attributes: [],
-    unitPrice: 0,
+    flashTitle: '',
     discount: 0,
     discountType: 'percent',
     discountStartDate: '',
     discountEndDate: '',
-    stock: 0,
-    sku: '',
-    barcode: '',
-    externalLink: '',
-    externalLinkText: '',
+    refundable: false,
+    refundNote: 'This product is eligible for return within 7 days of delivery.',
+    warrantyEnabled: false,
+    warrantyType: '',
+    warrantyNote: 'This is a demo warranty note...',
+    freeShipping: true,
+    flatRate: false,
+    quantityMultiply: false,
+    shippingDays: '',
+    showShippingTime: false,
+    showShippingNote: false,
+    shippingNote: 'This is a demo shipping note...',
+    codAvailable: false,
+    codNote: 'This is a demo delivery note...',
     hsnCode: '',
     gstRate: 0,
-    hideStock: 'none',
+    metaTitle: '',
+    metaDescription: '',
+    metaImage: null,
+    seoTags: [],
+    seoTagInput: '',
+    thumbnail: null,
+    galleryImages: [],
+    youtubeUrls: [''],
+    videoFile: null,
+    videoThumbnail: null,
+    pdfSpec: null,
+    unitPrice: 0,
+    stock: 0,
+    sku: '',
+    colorsEnabled: false,
+    selectedColors: [],
+    variants: [],
+    hideStockState: 'none',
     lowStockWarning: 0,
-    quantity: 1,
+    defaultQuantity: 1,
     frequentlyBought: [],
+    selectedAttributes: [],
   });
 
-  // Store existing image filenames to show previews
+  // Existing image previews
   const [existingThumbnail, setExistingThumbnail] = useState('');
   const [existingMetaImage, setExistingMetaImage] = useState('');
   const [existingGalleryImages, setExistingGalleryImages] = useState([]);
+  const [existingReviewerImageUrl, setExistingReviewerImageUrl] = useState('');
+  const [existingReviewImages, setExistingReviewImages] = useState([]);
 
-  // Helper to get full image URL
-  const getImageUrl = (filename) => {
-    if (!filename) return null;
-    return `${SERVERURL}/imgUploads/${filename}`;
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const getImageUrl = (filename) => filename ? `${SERVERURL}/imgUploads/${filename}` : '';
+
+  // Helper to parse API response arrays
+  const extractDataArray = (response) => {
+    if (Array.isArray(response)) return response;
+    if (response?.data && Array.isArray(response.data)) return response.data;
+    if (response?.success && Array.isArray(response.data)) return response.data;
+    return [];
   };
 
-  // Medical categories, units, attributes
-  const medicalCategories = [
-    'Medicine (Prescription)',
-    'Medicine (OTC)',
-    'Medical Equipment',
-    'Supplements & Vitamins',
-    'Ayurveda & Herbal',
-    'Diagnostics & Monitoring',
-    'Personal Care',
-    'First Aid',
-    'Mobility Aids',
-  ];
-
-  const medicalUnits = [
-    'Tablet', 'Capsule', 'ml', 'mg', 'g', 'Patch', 'Spray', 'Strip', 'Bottle', 'Inhaler', 'Vial',
-  ];
-
-  const medicalAttributes = [
-    { name: 'Dosage Form', values: ['Tablet', 'Capsule', 'Liquid', 'Injection', 'Cream', 'Ointment'] },
-    { name: 'Strength', values: ['100mg', '250mg', '500mg', '1g', '10mg/ml'] },
-    { name: 'Pack Size', values: ['10 tablets', '20 tablets', '50 tablets', '30ml', '100ml'] },
-    { name: 'Active Ingredient', values: ['Paracetamol', 'Ibuprofen', 'Amoxicillin', 'Cetirizine'] },
-    { name: 'Prescription Required', values: ['Yes', 'No'] },
-  ];
+  // Fetch all dropdown data
+  useEffect(() => {
+    const fetchDropdownData = async () => {
+      try {
+        const [brandRes, catRes, warrantyRes, colorRes, attrRes] = await Promise.all([
+          getAllBrands(),
+          getCategoriesAPI(),
+          getWarrantiesAPI(),
+          getColorsAPI(),
+          getAttributesAPI(),
+        ]);
+        setBrands(extractDataArray(brandRes));
+        setCategories(extractDataArray(catRes));
+        const rawWarranties = extractDataArray(warrantyRes);
+        const mappedWarranties = rawWarranties.map(w => ({ ...w, name: w.text || w.name || 'Unnamed' }));
+        setWarranties(mappedWarranties);
+        setColorOptions(extractDataArray(colorRes));
+        const attributes = extractDataArray(attrRes);
+        setAttributeOptions(attributes);
+        const initialSelections = {};
+        attributes.forEach(attr => { initialSelections[attr._id] = []; });
+        setSelectedAttributeValues(initialSelections);
+      } catch (error) {
+        console.error('Error loading dropdown data:', error);
+        toast.error('Failed to load dropdown data');
+      } finally {
+        setLoadingData(false);
+      }
+    };
+    fetchDropdownData();
+  }, []);
 
   // Fetch product data
   useEffect(() => {
-    console.log("🔍 Edit page mounted. ID from useParams():", id);
     if (!id) {
-      console.error("❌ No product ID in URL");
-      toast.error("Invalid product ID – missing from URL");
-      router.push('/super-admin/product-managment/all-products');
+      toast.error('Invalid product ID');
+      router.push('/super-admin/product-managment/products/all-product');
       return;
     }
-
     const fetchProduct = async () => {
       setLoading(true);
       try {
-        console.log(`📡 Calling getProductByIdAPI with ID: ${id}`);
-        const response = await getProductByIdAPI(id);
-        console.log("📦 API response:", response);
-
-        if (response.success && response.data) {
-          const product = response.data;
-          console.log("✅ Product loaded:", product);
-
-          // Store existing image filenames for preview
-          setExistingThumbnail(product.thumbnail || '');
-          setExistingMetaImage(product.metaImage || '');
-          setExistingGalleryImages(product.galleryImages || []);
-
-          // Populate formData with the fetched product
+        const res = await getProductByIdAPI(id);
+        if (res.success && res.data) {
+          const p = res.data;
           setFormData({
-            productName: product.productName || '',
-            mainCategory: product.mainCategory || '',
-            brand: product.brand || '',
-            relatedCategories: product.relatedCategories || [],
-            unit: product.unit || '',
-            weight: product.weight || '',
-            minPurchaseQty: product.minPurchaseQty || 1,
-            tags: product.tags || [],
+            productName: p.productName || '',
+            mainCategory: p.mainCategory || '',
+            brand: p.brand || '',
+            relatedCategories: p.relatedCategories || [],
+            unit: p.unit || '',
+            weight: p.weight || 0,
+            minPurchaseQty: p.minPurchaseQty || 1,
+            barcode: p.barcode || '',
+            tags: p.tags || [],
             tagInput: '',
-            published: product.published ?? true,
-            featured: product.featured ?? false,
-            todaysDeal: product.todaysDeal ?? false,
-            refundable: product.refundable ?? false,
-            refundNote: product.refundNote || 'This product is eligible for return within 7 days of delivery.',
+            published: p.published ?? true,
+            featured: p.featured ?? false,
+            todaysDeal: p.todaysDeal ?? false,
+            flashTitle: p.flashTitle || '',
+            discount: p.discount || 0,
+            discountType: p.discountType || 'percent',
+            discountStartDate: p.discountStartDate ? p.discountStartDate.split('T')[0] : '',
+            discountEndDate: p.discountEndDate ? p.discountEndDate.split('T')[0] : '',
+            refundable: p.refundable ?? false,
+            refundNote: p.refundNote || '',
+            warrantyEnabled: p.warrantyEnabled || false,
+            warrantyType: p.warrantyType || '',
+            warrantyNote: p.warrantyNote || '',
+            freeShipping: p.freeShipping ?? true,
+            flatRate: p.flatRate || false,
+            quantityMultiply: p.quantityMultiply || false,
+            shippingDays: p.shippingDays || '',
+            showShippingTime: p.showShippingTime || false,
+            showShippingNote: p.showShippingNote || false,
+            shippingNote: p.shippingNote || '',
+            codAvailable: p.codAvailable || false,
+            codNote: p.codNote || '',
+            hsnCode: p.hsnCode || '',
+            gstRate: p.gstRate || 0,
+            metaTitle: p.metaTitle || '',
+            metaDescription: p.metaDescription || '',
+            metaImage: null,
+            seoTags: p.seoTags || [],
+            seoTagInput: '',
             thumbnail: null,
             galleryImages: [],
-            description: product.description || '',
-            metaTitle: product.metaTitle || '',
-            metaDescription: product.metaDescription || '',
-            metaImage: null,
-            freeShipping: product.freeShipping ?? true,
-            flatRate: product.flatRate ?? false,
-            quantityMultiply: product.quantityMultiply ?? false,
-            shippingDays: product.shippingDays || '',
-            shippingNote: product.shippingNote || 'This product is shipped within 2-3 business days.',
-            codAvailable: product.codAvailable ?? false,
-            codNote: product.codNote || 'Cash on delivery available for orders within India.',
-            attributes: product.attributes || [],
-            unitPrice: product.unitPrice || 0,
-            discount: product.discount || 0,
-            discountType: product.discountType || 'percent',
-            discountStartDate: product.discountStartDate ? new Date(product.discountStartDate).toISOString().split('T')[0] : '',
-            discountEndDate: product.discountEndDate ? new Date(product.discountEndDate).toISOString().split('T')[0] : '',
-            stock: product.stock || 0,
-            sku: product.sku || '',
-            barcode: product.barcode || '',
-            externalLink: product.externalLink || '',
-            externalLinkText: product.externalLinkText || '',
-            hsnCode: product.hsnCode || '',
-            gstRate: product.gstRate || 0,
-            hideStock: product.hideStock || 'none',
-            lowStockWarning: product.lowStockWarning || 0,
-            quantity: product.quantity || 1,
-            frequentlyBought: product.frequentlyBought || [],
+            youtubeUrls: p.youtubeUrls || [''],
+            videoFile: null,
+            videoThumbnail: null,
+            pdfSpec: null,
+            unitPrice: p.unitPrice || 0,
+            stock: p.stock || 0,
+            sku: p.sku || '',
+            colorsEnabled: p.colorsEnabled || false,
+            selectedColors: p.selectedColors || [],
+            variants: p.variants || [],
+            hideStockState: p.hideStockState || 'none',
+            lowStockWarning: p.lowStockWarning || 0,
+            defaultQuantity: p.defaultQuantity || 1,
+            frequentlyBought: p.frequentlyBought || [],
+            selectedAttributes: p.selectedAttributes || [],
           });
+          setExistingThumbnail(p.thumbnail || '');
+          setExistingMetaImage(p.metaImage || '');
+          setExistingGalleryImages(p.galleryImages || []);
+          // For attribute values (if stored as selectedAttributeValues)
+          if (p.attributes && p.attributes.length) {
+            const attrSelections = {};
+            p.attributes.forEach(attr => {
+              const found = attributeOptions.find(a => a.name === attr.name);
+              if (found) attrSelections[found._id] = attr.values;
+            });
+            setSelectedAttributeValues(attrSelections);
+          }
         } else {
-          console.error("❌ API returned success=false:", response.message);
-          toast.error(response.message || "Failed to load product");
-          router.push("/super-admin/product-managment/all-products");
+          toast.error(res.message || 'Product not found');
+          router.push('/super-admin/product-managment/products/all-product');
         }
       } catch (error) {
-        console.error("🔥 Fetch error:", error);
-        toast.error("Server error – check console for details");
-        router.push("/super-admin/product-managment/all-products");
+        console.error(error);
+        toast.error('Server error loading product');
       } finally {
         setLoading(false);
       }
     };
-
     fetchProduct();
-  }, [id, router]);
+  }, [id, router, attributeOptions]);
+
+  // Compute variants from selected colors
+  const computeVariants = () => {
+    const colors = formData.colorsEnabled ? formData.selectedColors : [];
+    if (colors.length === 0) return [];
+    return colors.map(color => ({
+      variant: color,
+      price: formData.unitPrice,
+      sku: color.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+      quantity: 0,
+      photo: null,
+    }));
+  };
+  useEffect(() => {
+    if (formData.colorsEnabled) {
+      setFormData(prev => ({ ...prev, variants: computeVariants() }));
+    } else {
+      setFormData(prev => ({ ...prev, variants: [] }));
+    }
+  }, [formData.colorsEnabled, formData.selectedColors, formData.unitPrice]);
 
   // Handlers
-  const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  const handleChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
 
   const addTag = () => {
     if (formData.tagInput.trim() && !formData.tags.includes(formData.tagInput.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, prev.tagInput.trim()],
-        tagInput: '',
-      }));
+      setFormData(prev => ({ ...prev, tags: [...prev.tags, prev.tagInput.trim()], tagInput: '' }));
     }
   };
-  const removeTag = (tag) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(t => t !== tag),
-    }));
+  const removeTag = (tag) => setFormData(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
+
+  const addSeoTag = () => {
+    if (formData.seoTagInput.trim() && !formData.seoTags.includes(formData.seoTagInput.trim())) {
+      setFormData(prev => ({ ...prev, seoTags: [...prev.seoTags, prev.seoTagInput.trim()], seoTagInput: '' }));
+    }
   };
+  const removeSeoTag = (tag) => setFormData(prev => ({ ...prev, seoTags: prev.seoTags.filter(t => t !== tag) }));
 
   const handleGalleryChange = (e) => {
     const files = Array.from(e.target.files);
-    setFormData(prev => ({
-      ...prev,
-      galleryImages: [...prev.galleryImages, ...files],
-    }));
+    setFormData(prev => ({ ...prev, galleryImages: [...prev.galleryImages, ...files] }));
   };
-  const removeGalleryImage = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      galleryImages: prev.galleryImages.filter((_, i) => i !== index),
-    }));
+  const removeGalleryImage = (idx) => {
+    setFormData(prev => ({ ...prev, galleryImages: prev.galleryImages.filter((_, i) => i !== idx) }));
   };
 
-  const addFrequentlyBought = () => {
-    setFormData(prev => ({
-      ...prev,
-      frequentlyBought: [...prev.frequentlyBought, { product: '', category: '' }],
-    }));
+  const addYouTubeUrl = () => setFormData(prev => ({ ...prev, youtubeUrls: [...prev.youtubeUrls, ''] }));
+  const updateYouTubeUrl = (idx, val) => {
+    const updated = [...formData.youtubeUrls];
+    updated[idx] = val;
+    setFormData(prev => ({ ...prev, youtubeUrls: updated }));
   };
-  const updateFrequentlyBought = (index, field, value) => {
+  const removeYouTubeUrl = (idx) => {
+    setFormData(prev => ({ ...prev, youtubeUrls: prev.youtubeUrls.filter((_, i) => i !== idx) }));
+  };
+
+  const addFrequentlyBought = () => setFormData(prev => ({ ...prev, frequentlyBought: [...prev.frequentlyBought, { product: '', category: '' }] }));
+  const updateFrequentlyBought = (idx, field, value) => {
     const updated = [...formData.frequentlyBought];
-    updated[index][field] = value;
+    updated[idx][field] = value;
     setFormData(prev => ({ ...prev, frequentlyBought: updated }));
   };
-  const removeFrequentlyBought = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      frequentlyBought: prev.frequentlyBought.filter((_, i) => i !== index),
-    }));
+  const removeFrequentlyBought = (idx) => setFormData(prev => ({ ...prev, frequentlyBought: prev.frequentlyBought.filter((_, i) => i !== idx) }));
+
+  // React-Select options
+  const categorySelectOptions = categories.map(cat => ({ value: cat.name, label: cat.name }));
+  const selectedCategoryOptions = categorySelectOptions.filter(opt => formData.relatedCategories.includes(opt.value));
+
+  const colorSelectOptions = colorOptions.map(c => ({ value: c.name, label: c.name, colorCode: c.code }));
+  const selectedColorOptions = colorSelectOptions.filter(opt => formData.selectedColors.includes(opt.value));
+
+  const attributeSelectOptions = attributeOptions.map(attr => ({ value: attr._id, label: attr.name }));
+  const selectedAttributeOptions = attributeSelectOptions.filter(opt => formData.selectedAttributes.includes(opt.value));
+
+  const ColorOption = (props) => {
+    const { data, innerProps, isSelected } = props;
+    return (
+      <div {...innerProps} style={{ display: 'flex', alignItems: 'center', padding: '5px 10px', cursor: 'pointer', backgroundColor: isSelected ? '#e0e0e0' : 'transparent' }}>
+        <span style={{ display: 'inline-block', width: 20, height: 20, backgroundColor: data.colorCode, marginRight: 10, borderRadius: 3, border: '1px solid #ccc' }}></span>
+        <span>{data.label}</span>
+      </div>
+    );
   };
 
-  const generateBarcode = () => {
-    const randomCode = Math.random().toString(36).substring(2, 12).toUpperCase();
-    handleChange('barcode', randomCode);
-  };
-
-const handleSubmit = async (e) => {
-  e.preventDefault();
-
-  if (!formData.productName || !formData.mainCategory || !formData.brand) {
-    toast.error('Please fill in all required fields (*)');
-    return;
-  }
-
-  setSaving(true);
-  try {
-    const payload = { ...formData };
-    delete payload.thumbnail;
-    delete payload.metaImage;
-    delete payload.galleryImages;
-    delete payload.tagInput;
-
-    const numericFields = ['weight', 'minPurchaseQty', 'unitPrice', 'discount', 'stock', 'lowStockWarning', 'quantity', 'gstRate'];
-    numericFields.forEach(field => {
-      if (payload[field] !== undefined) payload[field] = Number(payload[field]) || 0;
+  const buildAttributesPayload = () => {
+    const payload = [];
+    formData.selectedAttributes.forEach(attrId => {
+      const attr = attributeOptions.find(a => a._id === attrId);
+      const values = selectedAttributeValues[attrId] || [];
+      if (attr && values.length) payload.push({ name: attr.name, values });
     });
+    return payload;
+  };
 
-    console.log("📤 Sending update payload:", JSON.stringify(payload, null, 2)); // ✅ ADD THIS
-
-    const response = await updateProductAPI(id, payload);
-    console.log("📥 Update response:", response); // ✅ ADD THIS
-
-    if (response.success) {
-      toast.success('Product updated successfully!');
-      router.push('/super-admin/product-managment/all-product');
-    } else {
-      toast.error(response.message || 'Failed to update product');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    // Mandatory fields
+    if (!formData.productName || !formData.mainCategory || !formData.brand) {
+      toast.error('Please fill all required fields');
+      return;
     }
-  } catch (error) {
-    console.error('Update error:', error);
-    toast.error('Network or server error');
-  } finally {
-    setSaving(false);
-  }
-};
+    setSaving(true);
+    try {
+      const payload = new FormData();
+      // Append all primitive fields
+      Object.entries(formData).forEach(([key, val]) => {
+        if (['thumbnail', 'metaImage', 'galleryImages', 'youtubeUrls', 'tags', 'seoTags', 'relatedCategories', 'selectedColors', 'selectedAttributes', 'variants', 'frequentlyBought', 'tagInput', 'seoTagInput', 'videoFile', 'videoThumbnail', 'pdfSpec'].includes(key)) return;
+        if (val !== undefined && val !== null) payload.append(key, val);
+      });
+      // Arrays
+      formData.relatedCategories.forEach(c => payload.append('relatedCategories[]', c));
+      formData.tags.forEach(t => payload.append('tags[]', t));
+      formData.seoTags.forEach(t => payload.append('seoTags[]', t));
+      formData.youtubeUrls.forEach(url => payload.append('youtubeUrls[]', url));
+      formData.selectedAttributes.forEach(attrId => payload.append('selectedAttributes[]', attrId));
+      formData.selectedColors.forEach(col => payload.append('selectedColors[]', col));
+      payload.append('variants', JSON.stringify(formData.variants));
+      payload.append('frequentlyBought', JSON.stringify(formData.frequentlyBought));
+      payload.append('attributes', JSON.stringify(buildAttributesPayload()));
+      // Files
+      if (formData.thumbnail) payload.append('thumbnail', formData.thumbnail);
+      if (formData.metaImage) payload.append('metaImage', formData.metaImage);
+      formData.galleryImages.forEach(file => payload.append('galleryImages[]', file));
+      if (formData.videoFile) payload.append('videoFile', formData.videoFile);
+      if (formData.videoThumbnail) payload.append('videoThumbnail', formData.videoThumbnail);
+      if (formData.pdfSpec) payload.append('pdfSpec', formData.pdfSpec);
+      // Existing images to keep (optional)
+      if (existingThumbnail) payload.append('existingThumbnail', existingThumbnail);
+      if (existingMetaImage) payload.append('existingMetaImage', existingMetaImage);
+      existingGalleryImages.forEach(img => payload.append('existingGalleryImages[]', img));
 
-  if (loading) {
-    return <div className="container-fluid py-4 text-center">Loading product data...</div>;
-  }
+      const res = await updateProductAPI(id, payload);
+      if (res.success) {
+        toast.success('Product updated successfully');
+        router.push('/super-admin/product-managment/products/all-product');
+      } else {
+        toast.error(res.message || 'Update failed');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Server error while updating');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading || loadingData) return <div className="text-center py-5"><div className="spinner-border text-primary" /></div>;
 
   return (
-    <div className="container-fluid py-4" style={{ maxWidth: '1400px' }}>
+    <div className="add-product-page"> {/* reuse same CSS class */}
       <Toaster position="top-right" />
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2 className="fw-bold mb-0">Edit Medical Product</h2>
-        <button type="submit" form="productForm" className="btn btn-primary px-4" disabled={saving}>
-          {saving ? 'Updating...' : 'Update Product'}
-        </button>
+      <div className="container-fluid py-4">
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <h1 className="page-title">Edit Product</h1>
+          <div className="d-flex gap-2">
+            <button type="button" className="btn-secondary" onClick={() => router.back()}>Cancel</button>
+            <button type="submit" form="editProductForm" className="btn-save" disabled={saving}>
+              {saving ? 'Updating...' : 'Update Product'}
+            </button>
+          </div>
+        </div>
+
+        <form id="editProductForm" className="row g-4" onSubmit={handleSubmit}>
+          {/* LEFT COLUMN */}
+          <div className="col-md-6">
+            {/* Basic Info */}
+            <div className="form-card">
+              <div className="card-header">Product Basic Information</div>
+              <div className="card-body">
+                <div className="mb-3"><label className="form-label">Product Name *</label><input type="text" className="form-control" value={formData.productName} onChange={e => handleChange('productName', e.target.value)} required /></div>
+                <div className="mb-3"><label className="form-label">Select Main Category *</label><select className="form-select" value={formData.mainCategory} onChange={e => handleChange('mainCategory', e.target.value)} required><option value="">Select Main Category</option>{categories.map(cat => <option key={cat._id} value={cat.name}>{cat.name}</option>)}</select></div>
+                <div className="mb-3"><label className="form-label">Brand / Manufacturer *</label><select className="form-select" value={formData.brand} onChange={e => handleChange('brand', e.target.value)} required><option value="">Select Brand</option>{brands.map(b => <option key={b._id} value={b.name}>{b.name}</option>)}</select></div>
+              </div>
+            </div>
+
+            {/* Configuration */}
+            <div className="form-card">
+              <div className="card-header">Product Configuration</div>
+              <div className="card-body">
+                <div className="mb-3"><label className="form-label">Related Categories</label><Select isMulti options={categorySelectOptions} value={selectedCategoryOptions} onChange={selected => handleChange('relatedCategories', selected.map(opt => opt.value))} classNamePrefix="react-select" /></div>
+                <div className="row g-2 mb-3"><div className="col-6"><label className="form-label">Unit *</label><input type="text" className="form-control" value={formData.unit} onChange={e => handleChange('unit', e.target.value)} placeholder="e.g., Tablet, Bottle" required /></div><div className="col-6"><label className="form-label">Weight (Kg)</label><input type="number" step="0.01" className="form-control" value={formData.weight} onChange={e => handleChange('weight', e.target.value)} /></div></div>
+                <div className="mb-3"><label className="form-label">Minimum Purchase Qty *</label><input type="number" min="1" className="form-control" value={formData.minPurchaseQty} onChange={e => handleChange('minPurchaseQty', e.target.value)} required /></div>
+                <div className="mb-3"><label className="form-label">Barcode</label><div className="input-group"><input type="text" className="form-control" value={formData.barcode} onChange={e => handleChange('barcode', e.target.value)} /><button type="button" className="btn btn-outline-secondary" onClick={() => handleChange('barcode', Math.random().toString(36).substring(2,12).toUpperCase())}>Generate</button></div></div>
+                <div className="mb-3"><label className="form-label">Tags</label><div className="tag-input-container">{formData.tags.map(tag => (<span key={tag} className="tag">{tag} <i className="bi bi-x-circle" onClick={() => removeTag(tag)}></i></span>))}<input type="text" className="tag-input" placeholder="Type and hit enter" value={formData.tagInput} onChange={e => handleChange('tagInput', e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())} /></div><small>Keywords help customers find the product</small></div>
+              </div>
+            </div>
+
+            {/* Files & Media */}
+            <div className="form-card">
+              <div className="card-header">Files & Media</div>
+              <div className="card-body">
+                <div className="mb-3"><label className="form-label">Thumbnail</label><input type="file" className="form-control" accept="image/*" onChange={e => handleChange('thumbnail', e.target.files[0])} />{existingThumbnail && <img src={getImageUrl(existingThumbnail)} alt="current" width="80" className="mt-2" />}</div>
+                <div className="mb-3"><label className="form-label">Gallery Images</label><input type="file" className="form-control" multiple accept="image/*" onChange={handleGalleryChange} /><div className="gallery-preview mt-2 d-flex flex-wrap gap-2">{existingGalleryImages.map((img, idx) => <img key={idx} src={getImageUrl(img)} width="60" className="border rounded" />)}{formData.galleryImages.map((img, idx) => <div key={idx} className="gallery-item" style={{ backgroundImage: `url(${URL.createObjectURL(img)})` }} onClick={() => removeGalleryImage(idx)}><i className="bi bi-trash"></i></div>)}</div></div>
+                <div className="mb-3"><label>YouTube links</label>{formData.youtubeUrls.map((url, idx) => (<div key={idx} className="input-group mb-2"><input type="url" className="form-control" value={url} onChange={e => updateYouTubeUrl(idx, e.target.value)} placeholder="YouTube URL" />{formData.youtubeUrls.length > 1 && <button type="button" className="btn btn-outline-danger" onClick={() => removeYouTubeUrl(idx)}><i className="bi bi-trash"></i></button>}</div>))}<button type="button" className="btn btn-sm btn-outline-secondary" onClick={addYouTubeUrl}>+ Add Another</button></div>
+                <div className="mb-3"><label>Video file</label><input type="file" className="form-control" accept="video/*" onChange={e => handleChange('videoFile', e.target.files[0])} /></div>
+                <div className="mb-3"><label>Video Thumbnail</label><input type="file" className="form-control" accept="image/*" onChange={e => handleChange('videoThumbnail', e.target.files[0])} /></div>
+                <div className="mb-3"><label>PDF Specification</label><input type="file" className="form-control" accept=".pdf" onChange={e => handleChange('pdfSpec', e.target.files[0])} /></div>
+              </div>
+            </div>
+
+            {/* SEO */}
+            <div className="form-card">
+              <div className="card-header">SEO Meta Tags</div>
+              <div className="card-body">
+                <div className="mb-3"><label>Meta Title</label><input type="text" className="form-control" value={formData.metaTitle} onChange={e => handleChange('metaTitle', e.target.value)} /></div>
+                <div className="mb-3"><label>Meta Description</label><textarea rows="3" className="form-control" value={formData.metaDescription} onChange={e => handleChange('metaDescription', e.target.value)} /></div>
+                <div className="mb-3"><label>Meta Image</label><input type="file" className="form-control" accept="image/*" onChange={e => handleChange('metaImage', e.target.files[0])} />{existingMetaImage && <img src={getImageUrl(existingMetaImage)} width="80" className="mt-2" />}</div>
+                <div className="mb-3"><label>SEO Tags</label><div className="tag-input-container">{formData.seoTags.map(tag => (<span key={tag} className="tag">{tag} <i className="bi bi-x-circle" onClick={() => removeSeoTag(tag)}></i></span>))}<input type="text" className="tag-input" placeholder="Type and hit enter" value={formData.seoTagInput} onChange={e => handleChange('seoTagInput', e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSeoTag())} /></div></div>
+              </div>
+            </div>
+
+            {/* Price & Stock */}
+            <div className="form-card">
+              <div className="card-header">Product price + stock</div>
+              <div className="card-body">
+                <div className="row g-2">
+                  <div className="col-12"><label className="form-label">Unit price * (₹)</label><input type="number" className="form-control" value={formData.unitPrice} onChange={e => handleChange('unitPrice', e.target.value)} /></div>
+                  <div className="col-6"><label>Discount</label><input type="number" className="form-control" value={formData.discount} onChange={e => handleChange('discount', e.target.value)} /></div>
+                  <div className="col-6"><label>Discount Type</label><select className="form-select" value={formData.discountType} onChange={e => handleChange('discountType', e.target.value)}><option value="percent">Percent</option><option value="fixed">Fixed</option></select></div>
+                  <div className="col-6"><label>Start Date</label><input type="date" className="form-control" value={formData.discountStartDate} onChange={e => handleChange('discountStartDate', e.target.value)} /></div>
+                  <div className="col-6"><label>End Date</label><input type="date" className="form-control" value={formData.discountEndDate} onChange={e => handleChange('discountEndDate', e.target.value)} /></div>
+                  <div className="col-12"><label>Stock</label><input type="number" className="form-control" value={formData.stock} onChange={e => handleChange('stock', e.target.value)} /></div>
+                  <div className="col-12"><label>SKU</label><div className="input-group"><input type="text" className="form-control" value={formData.sku} onChange={e => handleChange('sku', e.target.value)} /><button type="button" className="btn btn-outline-secondary" onClick={() => handleChange('sku', Math.random().toString(36).substring(2,10).toUpperCase())}>Generate</button></div></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Colors */}
+            <div className="form-card">
+              <div className="card-header">Colors</div>
+              <div className="card-body">
+                <div className="toggle-item"><label className="toggle-switch"><input type="checkbox" checked={formData.colorsEnabled} onChange={e => { handleChange('colorsEnabled', e.target.checked); if (!e.target.checked) handleChange('selectedColors', []); }} /><span className="toggle-slider"></span></label><span className="toggle-label">Enable Color Variation</span></div>
+                {formData.colorsEnabled && (<div className="mt-2"><label className="form-label">Select Colors</label><Select isMulti options={colorSelectOptions} value={selectedColorOptions} onChange={selected => handleChange('selectedColors', selected.map(opt => opt.value))} classNamePrefix="react-select" components={{ Option: ColorOption }} /><small>Variants will be auto‑generated</small></div>)}
+              </div>
+            </div>
+
+            {/* Attributes */}
+            <div className="form-card">
+              <div className="card-header">Attributes</div>
+              <div className="card-body">
+                <div className="mb-3"><label className="form-label">Choose attributes</label><Select isMulti options={attributeSelectOptions} value={selectedAttributeOptions} onChange={selected => handleChange('selectedAttributes', selected.map(opt => opt.value))} classNamePrefix="react-select" /></div>
+                {formData.selectedAttributes.map(attrId => {
+                  const attr = attributeOptions.find(a => a._id === attrId);
+                  if (!attr) return null;
+                  const valueOptions = (attr.values || []).map(v => ({ value: v, label: v }));
+                  const selectedValues = (selectedAttributeValues[attrId] || []).map(v => ({ value: v, label: v }));
+                  return (<div key={attrId} className="mb-3 border p-2 rounded"><label className="fw-bold">{attr.name}</label><Select isMulti options={valueOptions} value={selectedValues} onChange={selected => setSelectedAttributeValues(prev => ({ ...prev, [attrId]: selected.map(opt => opt.value) }))} classNamePrefix="react-select" /><small>Select values for this attribute</small></div>);
+                })}
+              </div>
+            </div>
+
+            {/* Variants table */}
+            {formData.variants.length > 0 && (<div className="form-card"><div className="card-header">Product Variants</div><div className="card-body"><div className="table-responsive"><table className="table table-bordered"><thead><tr><th>Variant</th><th>Price (₹)</th><th>SKU</th><th>Quantity</th><th>Photo</th></tr></thead><tbody>{formData.variants.map((v, idx) => (<tr key={idx}><td>{v.variant}</td><td><input type="number" className="form-control" value={v.price} onChange={e => { const newVar = [...formData.variants]; newVar[idx].price = parseFloat(e.target.value); setFormData(prev => ({ ...prev, variants: newVar })); }} /></td><td><input type="text" className="form-control" value={v.sku} onChange={e => { const newVar = [...formData.variants]; newVar[idx].sku = e.target.value; setFormData(prev => ({ ...prev, variants: newVar })); }} /></td><td><input type="number" className="form-control" value={v.quantity} onChange={e => { const newVar = [...formData.variants]; newVar[idx].quantity = parseInt(e.target.value); setFormData(prev => ({ ...prev, variants: newVar })); }} /></td><td><input type="file" className="form-control" onChange={e => { const newVar = [...formData.variants]; newVar[idx].photo = e.target.files[0]; setFormData(prev => ({ ...prev, variants: newVar })); }} /></td></tr>))}</tbody></table></div></div></div>)}
+
+          </div>{/* end left column */}
+
+          {/* RIGHT COLUMN */}
+          <div className="col-md-6">
+            <div className="form-card">
+              <div className="card-header">Product Settings</div>
+              <div className="card-body">
+                <div className="toggle-item"><label className="toggle-switch"><input type="checkbox" checked={formData.published} onChange={e => handleChange('published', e.target.checked)} /><span className="toggle-slider"></span></label><span className="toggle-label">Published</span></div>
+                <div className="toggle-item"><label className="toggle-switch"><input type="checkbox" checked={formData.featured} onChange={e => handleChange('featured', e.target.checked)} /><span className="toggle-slider"></span></label><span className="toggle-label">Featured</span></div>
+                <div className="toggle-item"><label className="toggle-switch"><input type="checkbox" checked={formData.todaysDeal} onChange={e => handleChange('todaysDeal', e.target.checked)} /><span className="toggle-slider"></span></label><span className="toggle-label">Today's Deal</span></div>
+              </div>
+            </div>
+
+            <div className="form-card">
+              <div className="card-header">Flash Sale</div>
+              <div className="card-body">
+                <div className="mb-3"><label>Choose Flash Title</label><select className="form-select" value={formData.flashTitle} onChange={e => handleChange('flashTitle', e.target.value)}><option value="">Select Flash Title</option><option>Flash Sale</option><option>Flash Deal</option></select></div>
+                <div className="row g-2"><div className="col-6"><label>Discount</label><input type="number" className="form-control" value={formData.discount} onChange={e => handleChange('discount', e.target.value)} /></div><div className="col-6"><label>Discount Type</label><select className="form-select" value={formData.discountType} onChange={e => handleChange('discountType', e.target.value)}><option value="percent">Percent</option><option value="fixed">Fixed</option></select></div><div className="col-6"><label>Start Date</label><input type="date" className="form-control" value={formData.discountStartDate} onChange={e => handleChange('discountStartDate', e.target.value)} /></div><div className="col-6"><label>End Date</label><input type="date" className="form-control" value={formData.discountEndDate} onChange={e => handleChange('discountEndDate', e.target.value)} /></div></div>
+              </div>
+            </div>
+
+            <div className="form-card">
+              <div className="card-header">Refund</div>
+              <div className="card-body">
+                <div className="toggle-item"><label className="toggle-switch"><input type="checkbox" checked={formData.refundable} onChange={e => handleChange('refundable', e.target.checked)} /><span className="toggle-slider"></span></label><span className="toggle-label">Refundable</span></div>
+                <div className="mt-2"><label className="form-label">Refund Note</label><div className="preset-note-box"><p className="mb-0">{formData.refundNote}</p></div></div>
+              </div>
+            </div>
+
+            <div className="form-card">
+              <div className="card-header">Warranty</div>
+              <div className="card-body">
+                <div className="toggle-item"><label className="toggle-switch"><input type="checkbox" checked={formData.warrantyEnabled} onChange={e => handleChange('warrantyEnabled', e.target.checked)} /><span className="toggle-slider"></span></label><span className="toggle-label">Enable warranty</span></div>
+                <div className="mt-2"><label className="form-label">Select Warranty</label><select className="form-select" value={formData.warrantyType} onChange={e => handleChange('warrantyType', e.target.value)}><option value="">Select Warranty</option>{warranties.map(w => <option key={w._id} value={w.name}>{w.name}</option>)}</select></div>
+                <div className="mt-2"><label className="form-label">Warranty Note</label><div className="preset-note-box"><p className="mb-0">{formData.warrantyNote}</p></div></div>
+              </div>
+            </div>
+
+            <div className="form-card">
+              <div className="card-header">Shipping</div>
+              <div className="card-body">
+                <div className="mb-3"><label className="fw-bold">Shipping Configuration</label><div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.freeShipping} onChange={e => handleChange('freeShipping', e.target.checked)} /><label>Free Shipping</label></div><div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.flatRate} onChange={e => handleChange('flatRate', e.target.checked)} /><label>Flat Rate</label></div><div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.quantityMultiply} onChange={e => handleChange('quantityMultiply', e.target.checked)} /><label>Quantity Multiply</label></div></div>
+                <div className="mb-3"><label className="fw-bold">Estimated Shipping Time</label><div className="mb-2"><label>Shipping Days</label><input type="text" className="form-control" placeholder="e.g., 7-15 days" value={formData.shippingDays} onChange={e => handleChange('shippingDays', e.target.value)} /></div><div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.showShippingTime} onChange={e => handleChange('showShippingTime', e.target.checked)} /><label>Show time in PDP</label></div><div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.showShippingNote} onChange={e => handleChange('showShippingNote', e.target.checked)} /><label>Show note in shipping section</label></div></div>
+                <div><label className="form-label">Shipping Note</label><div className="preset-note-box"><p className="mb-0">{formData.shippingNote}</p></div></div>
+              </div>
+            </div>
+
+            <div className="form-card">
+              <div className="card-header">Cash on Delivery</div>
+              <div className="card-body">
+                <div className="toggle-item"><label className="toggle-switch"><input type="checkbox" checked={formData.codAvailable} onChange={e => handleChange('codAvailable', e.target.checked)} /><span className="toggle-slider"></span></label><span className="toggle-label">COD available</span></div>
+                <div className="mt-2"><label className="form-label">COD Note</label><div className="preset-note-box"><p className="mb-0">{formData.codNote}</p></div></div>
+              </div>
+            </div>
+
+            <div className="form-card">
+              <div className="card-header">HSN & GST</div>
+              <div className="card-body"><div className="mb-3"><label>HSN Code</label><input type="text" className="form-control" value={formData.hsnCode} onChange={e => handleChange('hsnCode', e.target.value)} /></div><div className="mb-3"><label>GST Rate (%)</label><input type="number" step="0.01" className="form-control" value={formData.gstRate} onChange={e => handleChange('gstRate', e.target.value)} /></div></div>
+            </div>
+
+            <div className="form-card">
+              <div className="card-header">Stock & Order Display</div>
+              <div className="card-body"><div className="mb-3"><label className="fw-bold">Hide Stock Visibility</label><div className="form-check"><input className="form-check-input" type="radio" name="hideStockState" value="none" checked={formData.hideStockState === 'none'} onChange={e => handleChange('hideStockState', e.target.value)} /><label>Show Stock Quantity</label></div><div className="form-check"><input className="form-check-input" type="radio" name="hideStockState" value="text_only" checked={formData.hideStockState === 'text_only'} onChange={e => handleChange('hideStockState', e.target.value)} /><label>Show Stock With Text Only</label></div></div><div className="mb-3"><label>Low Stock Warning</label><input type="number" className="form-control" value={formData.lowStockWarning} onChange={e => handleChange('lowStockWarning', parseInt(e.target.value))} /></div><div className="mb-3"><label>Default Quantity in Cart</label><input type="number" className="form-control" value={formData.defaultQuantity} onChange={e => handleChange('defaultQuantity', parseInt(e.target.value))} /></div></div>
+            </div>
+
+            <div className="form-card">
+              <div className="card-header">Frequently Bought</div>
+              <div className="card-body">
+                {formData.frequentlyBought.map((item, idx) => (<div key={idx} className="row g-2 mb-2 align-items-end"><div className="col-5"><select className="form-select" value={item.product} onChange={e => updateFrequentlyBought(idx, 'product', e.target.value)}><option value="">Select Product</option>{/* You can fetch product list here if needed */}<option>Sample Product</option></select></div><div className="col-5"><select className="form-select" value={item.category} onChange={e => updateFrequentlyBought(idx, 'category', e.target.value)}><option value="">Select Category</option>{categories.map(c => <option key={c._id} value={c.name}>{c.name}</option>)}</select></div><div className="col-2">{formData.frequentlyBought.length > 1 && <button type="button" className="btn btn-sm btn-danger" onClick={() => removeFrequentlyBought(idx)}>Remove</button>}</div></div>))}
+                <button type="button" className="btn btn-sm btn-outline-primary" onClick={addFrequentlyBought}>+ Add More</button>
+              </div>
+            </div>
+          </div>
+        </form>
       </div>
-
-      <form id="productForm" onSubmit={handleSubmit}>
-        {/* SECTION 1: BASIC INFORMATION */}
-        <div className="form-section">
-          <div className="form-section-header">Product Basic Information</div>
-          <div className="form-section-body">
-            <div className="row g-3">
-              <div className="col-md-6">
-                <label className="form-label">Product Name *</label>
-                <input type="text" className="form-control" required placeholder="e.g., Paracetamol 500mg Tablets" value={formData.productName} onChange={e => handleChange('productName', e.target.value)} />
-              </div>
-              <div className="col-md-6">
-                <label className="form-label">Select Main Category *</label>
-                <select className="form-select" required value={formData.mainCategory} onChange={e => handleChange('mainCategory', e.target.value)}>
-                  <option value="">Select Main Category</option>
-                  {medicalCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                </select>
-              </div>
-              <div className="col-md-6">
-                <label className="form-label">Brand / Manufacturer *</label>
-                <input type="text" className="form-control" required placeholder="e.g., Cipla, Sun Pharma, Himalaya" value={formData.brand} onChange={e => handleChange('brand', e.target.value)} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* SECTION 2: PRODUCT CONFIGURATION */}
-        <div className="form-section">
-          <div className="form-section-header">Product Configuration</div>
-          <div className="form-section-body">
-            <div className="row g-3">
-              <div className="col-md-6">
-                <label className="form-label">Related Categories</label>
-                <select className="form-select" multiple size="3">
-                  {medicalCategories.map(cat => <option key={cat}>{cat}</option>)}
-                </select>
-                <small className="text-muted">Hold Ctrl/Cmd to select multiple</small>
-              </div>
-              <div className="col-md-3">
-                <label className="form-label">Unit *</label>
-                <select className="form-select" value={formData.unit} onChange={e => handleChange('unit', e.target.value)}>
-                  <option value="">Select Unit</option>
-                  {medicalUnits.map(u => <option key={u} value={u}>{u}</option>)}
-                </select>
-              </div>
-              <div className="col-md-3">
-                <label className="form-label">Weight (In Kg) / Volume</label>
-                <input type="number" step="0.01" className="form-control" placeholder="e.g., 0.5" value={formData.weight} onChange={e => handleChange('weight', e.target.value)} />
-              </div>
-              <div className="col-md-6">
-                <label className="form-label">Minimum Purchase Qty *</label>
-                <input type="number" className="form-control" min="1" value={formData.minPurchaseQty} onChange={e => handleChange('minPurchaseQty', e.target.value)} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* SECTION 3: BARCODE & TAGS */}
-        <div className="form-section">
-          <div className="form-section-header">Barcode & Tags</div>
-          <div className="form-section-body">
-            <div className="row g-3">
-              <div className="col-md-6">
-                <label className="form-label">Barcode</label>
-                <div className="input-group">
-                  <input type="text" className="form-control" placeholder="Enter barcode manually or generate" value={formData.barcode} onChange={e => handleChange('barcode', e.target.value)} />
-                  <button type="button" className="btn btn-outline-secondary" onClick={generateBarcode}>Generate</button>
-                </div>
-              </div>
-              <div className="col-md-6">
-                <label className="form-label">Tags *</label>
-                <div className="tag-input-container">
-                  {formData.tags.map(tag => (
-                    <span key={tag} className="tag">{tag} <i className="bi bi-x-circle" onClick={() => removeTag(tag)}></i></span>
-                  ))}
-                  <input type="text" className="tag-input" placeholder="Type and hit enter to add a tag (e.g., fever, pain relief)" value={formData.tagInput} onChange={e => handleChange('tagInput', e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())} />
-                </div>
-                <small className="text-muted">These keywords help customers find the product via search.</small>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* SECTION 4: PRODUCT SETTINGS */}
-        <div className="form-section">
-          <div className="form-section-header">Product Settings</div>
-          <div className="form-section-body">
-            <div className="row g-3">
-              <div className="col-md-4">
-                <div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.published} onChange={e => handleChange('published', e.target.checked)} /><label className="form-check-label">Published</label></div>
-                <div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.featured} onChange={e => handleChange('featured', e.target.checked)} /><label className="form-check-label">Featured</label></div>
-                <div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.todaysDeal} onChange={e => handleChange('todaysDeal', e.target.checked)} /><label className="form-check-label">Today's Deal</label></div>
-              </div>
-            </div>
-            <hr className="my-3" />
-            <div className="row">
-              <div className="col-md-6"><div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.refundable} onChange={e => handleChange('refundable', e.target.checked)} /><label className="form-check-label">Refundable</label></div></div>
-              <div className="col-md-6"><label className="form-label">Refund Note</label><textarea rows="2" className="form-control" value={formData.refundNote} onChange={e => handleChange('refundNote', e.target.value)} /></div>
-            </div>
-          </div>
-        </div>
-
-        {/* SECTION 5: FILES & MEDIA */}
-        <div className="form-section">
-          <div className="form-section-header">Files & Media</div>
-          <div className="form-section-body">
-            <div className="row g-3">
-              <div className="col-md-6">
-                <label className="form-label">Current Thumbnail</label>
-                {existingThumbnail && (
-                  <div className="mb-2">
-                    <img src={getImageUrl(existingThumbnail)} alt="Thumbnail" width="100" className="img-thumbnail" />
-                    <div className="text-muted small">Upload a new image to replace it</div>
-                  </div>
-                )}
-                <label className="form-label">Replace Thumbnail (optional)</label>
-                <input type="file" className="form-control" accept="image/*" onChange={e => handleChange('thumbnail', e.target.files[0])} />
-              </div>
-              <div className="col-md-6">
-                <label className="form-label">Current Gallery Images</label>
-                {existingGalleryImages.length > 0 && (
-                  <div className="d-flex flex-wrap gap-2 mb-2">
-                    {existingGalleryImages.map((img, idx) => (
-                      <img key={idx} src={getImageUrl(img)} alt={`Gallery ${idx}`} width="60" height="60" style={{ objectFit: 'cover', borderRadius: '4px' }} />
-                    ))}
-                    <div className="text-muted small w-100">Upload new images to replace the whole gallery (old will be removed)</div>
-                  </div>
-                )}
-                <label className="form-label">Add New Gallery Images (optional)</label>
-                <input type="file" className="form-control" multiple accept="image/*" onChange={handleGalleryChange} />
-                <div className="gallery-preview">
-                  {formData.galleryImages.map((img, idx) => (
-                    <div key={idx} className="gallery-item" style={{ backgroundImage: `url(${img instanceof File ? URL.createObjectURL(img) : ''})`, backgroundSize: 'cover' }} onClick={() => removeGalleryImage(idx)}>
-                      <i className="bi bi-trash text-white bg-dark rounded-circle p-1"></i>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* SECTION 6: PRODUCT DESCRIPTION */}
-        <div className="form-section">
-          <div className="form-section-header">Product Description</div>
-          <div className="form-section-body">
-            <textarea className="form-control" rows="6" placeholder="Include usage instructions, ingredients, precautions, etc." value={formData.description} onChange={e => handleChange('description', e.target.value)} />
-          </div>
-        </div>
-
-        {/* SECTION 7: SEO META TAGS */}
-        <div className="form-section">
-          <div className="form-section-header">SEO Meta Tags</div>
-          <div className="form-section-body">
-            <div className="mb-3"><label className="form-label">Meta Title</label><input type="text" className="form-control" placeholder="e.g., Buy Paracetamol 500mg Online" value={formData.metaTitle} onChange={e => handleChange('metaTitle', e.target.value)} /></div>
-            <div className="mb-3"><label className="form-label">Meta Description</label><textarea rows="2" className="form-control" placeholder="Brief description for search engines" value={formData.metaDescription} onChange={e => handleChange('metaDescription', e.target.value)} /></div>
-            <div>
-              <label className="form-label">Current Meta Image</label>
-              {existingMetaImage && (
-                <div className="mb-2">
-                  <img src={getImageUrl(existingMetaImage)} alt="Meta Image" width="100" className="img-thumbnail" />
-                  <div className="text-muted small">Upload a new image to replace it</div>
-                </div>
-              )}
-              <label className="form-label">Replace Meta Image (optional)</label>
-              <input type="file" className="form-control" onChange={e => handleChange('metaImage', e.target.files[0])} />
-            </div>
-          </div>
-        </div>
-
-        {/* SECTION 8: SHIPPING */}
-        <div className="form-section">
-          <div className="form-section-header">Shipping</div>
-          <div className="form-section-body">
-            <div className="row g-3">
-              <div className="col-md-4">
-                <div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.freeShipping} onChange={e => handleChange('freeShipping', e.target.checked)} /><label>Free Shipping</label></div>
-                <div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.flatRate} onChange={e => handleChange('flatRate', e.target.checked)} /><label>Flat Rate</label></div>
-                <div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.quantityMultiply} onChange={e => handleChange('quantityMultiply', e.target.checked)} /><label>Is Product Quantity Multiply</label></div>
-              </div>
-              <div className="col-md-4"><label>Estimated Shipping Time</label><input type="text" className="form-control" placeholder="e.g., 3-5 days" value={formData.shippingDays} onChange={e => handleChange('shippingDays', e.target.value)} /></div>
-              <div className="col-md-4"><label>Shipping Notes</label><textarea rows="3" className="form-control" value={formData.shippingNote} onChange={e => handleChange('shippingNote', e.target.value)} /></div>
-            </div>
-          </div>
-        </div>
-
-        {/* SECTION 9: CASH ON DELIVERY */}
-        <div className="form-section">
-          <div className="form-section-header">Cash on Delivery</div>
-          <div className="form-section-body">
-            <div className="row g-3">
-              <div className="col-md-6"><div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.codAvailable} onChange={e => handleChange('codAvailable', e.target.checked)} /><label>Cash on delivery available</label></div></div>
-              <div className="col-md-6"><label>COD Notes</label><textarea rows="3" className="form-control" value={formData.codNote} onChange={e => handleChange('codNote', e.target.value)} /></div>
-            </div>
-          </div>
-        </div>
-
-        {/* SECTION 10: PRODUCT PRICE + STOCK */}
-        <div className="form-section">
-          <div className="form-section-header">Product price + stock</div>
-          <div className="form-section-body">
-            <div className="row g-3">
-              <div className="col-md-6"><label>Attributes</label><select className="form-select" multiple size="3">{medicalAttributes.map(attr => <option key={attr.name}>{attr.name}</option>)}</select></div>
-              <div className="col-md-3"><label>Unit price * (₹)</label><input type="number" className="form-control" value={formData.unitPrice} onChange={e => handleChange('unitPrice', e.target.value)} /></div>
-              <div className="col-md-3"><label>Discount (%)</label><input type="number" className="form-control" value={formData.discount} onChange={e => handleChange('discount', e.target.value)} /></div>
-              <div className="col-md-3"><label>Discount Type</label><select className="form-select" value={formData.discountType} onChange={e => handleChange('discountType', e.target.value)}><option value="percent">Percent</option><option value="fixed">Fixed</option></select></div>
-              <div className="col-md-3"><label>Discount Start Date</label><input type="date" className="form-control" value={formData.discountStartDate} onChange={e => handleChange('discountStartDate', e.target.value)} /></div>
-              <div className="col-md-3"><label>Discount End Date</label><input type="date" className="form-control" value={formData.discountEndDate} onChange={e => handleChange('discountEndDate', e.target.value)} /></div>
-              <div className="col-md-3"><label>Stock</label><input type="number" className="form-control" value={formData.stock} onChange={e => handleChange('stock', e.target.value)} /></div>
-              <div className="col-md-3"><label>SKU</label><div className="input-group"><input type="text" className="form-control" value={formData.sku} onChange={e => handleChange('sku', e.target.value)} /><button type="button" className="btn btn-outline-secondary">Generate</button></div></div>
-              <div className="col-md-3"><label>Product External Link</label><input type="url" className="form-control" placeholder="External link" value={formData.externalLink} onChange={e => handleChange('externalLink', e.target.value)} /></div>
-              <div className="col-md-3"><label>Link Button Text</label><input type="text" className="form-control" placeholder="e.g., More Info" value={formData.externalLinkText} onChange={e => handleChange('externalLinkText', e.target.value)} /></div>
-            </div>
-            <hr />
-            <div className="row g-3">
-              <div className="col-md-3"><label>HSN Code</label><input type="text" className="form-control" value={formData.hsnCode} onChange={e => handleChange('hsnCode', e.target.value)} /></div>
-              <div className="col-md-3"><label>GST Rate (%)</label><input type="number" className="form-control" step="0.01" value={formData.gstRate} onChange={e => handleChange('gstRate', e.target.value)} /></div>
-            </div>
-            <hr />
-            <div className="row g-3">
-              <div className="col-md-4"><label>Hide Stock Visibility State</label><select className="form-select" value={formData.hideStock} onChange={e => handleChange('hideStock', e.target.value)}><option value="none">Show Stock Quantity</option><option value="text_only">Show Stock With Text Only</option></select></div>
-              <div className="col-md-4"><label>Low Stock Quantity Warning</label><input type="number" className="form-control" value={formData.lowStockWarning} onChange={e => handleChange('lowStockWarning', e.target.value)} /></div>
-              <div className="col-md-4"><label>Quantity (default in cart)</label><input type="number" className="form-control" value={formData.quantity} onChange={e => handleChange('quantity', e.target.value)} /></div>
-            </div>
-            <hr />
-            <div className="mt-3">
-              <label>Frequently Bought Together</label>
-              {formData.frequentlyBought.map((item, idx) => (
-                <div key={idx} className="row g-2 mb-2 align-items-end">
-                  <div className="col-5"><select className="form-select" value={item.product} onChange={e => updateFrequentlyBought(idx, 'product', e.target.value)}><option>Select Product</option><option>Paracetamol 500mg</option><option>Vitamin C Tablets</option></select></div>
-                  <div className="col-5"><select className="form-select" value={item.category} onChange={e => updateFrequentlyBought(idx, 'category', e.target.value)}><option>Select Category</option><option>Medicine</option><option>Supplements</option></select></div>
-                  <div className="col-2"><button type="button" className="btn btn-sm btn-danger" onClick={() => removeFrequentlyBought(idx)}>Remove</button></div>
-                </div>
-              ))}
-              <button type="button" className="btn btn-sm btn-outline-primary" onClick={addFrequentlyBought}>+ Add More</button>
-            </div>
-          </div>
-        </div>
-
-        <div className="d-flex justify-content-end gap-2 mt-4 mb-5">
-          <button type="button" className="btn btn-secondary" onClick={() => router.back()}>Cancel</button>
-          <button type="submit" className="btn btn-primary px-5" disabled={saving}>{saving ? 'Updating...' : 'Update Product'}</button>
-        </div>
-      </form>
     </div>
   );
 }

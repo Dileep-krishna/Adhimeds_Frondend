@@ -12,6 +12,7 @@ import { getCategoriesAPI } from '../../../../services/categoryAPI';
 import { getWarrantiesAPI } from '../../../../services/warrentyAPI';
 import { getColorsAPI } from '../../../../services/colorAPI';
 import { getAttributesAPI } from '../../../../services/attributeAPI';
+import Select from 'react-select';
 
 export default function AddProductPage() {
   const router = useRouter();
@@ -24,7 +25,7 @@ export default function AddProductPage() {
   const [attributeOptions, setAttributeOptions] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  // For attributes, store selected values per attribute
+  // For attributes, store selected values per attribute (as array of strings)
   const [selectedAttributeValues, setSelectedAttributeValues] = useState({});
 
   const extractDataArray = (response) => {
@@ -96,90 +97,90 @@ export default function AddProductPage() {
     thumbnail: null, galleryImages: [], youtubeUrls: [''],
     videoFile: null, videoThumbnail: null, pdfSpec: null,
     unitPrice: 0, stock: 0, sku: '',
-    colorsEnabled: false, colorInput: '',
+    colorsEnabled: false, selectedColors: [],   // array for react-select
     variants: [],
     hideStockState: 'none',
     lowStockWarning: 0,
     defaultQuantity: 1,
     frequentlyBought: [{ product: '', category: '' }],
+    selectedAttributes: []   // stores IDs of attributes selected for this product
   });
 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [generatingVariants, setGeneratingVariants] = useState(false);
 
-  // ========== COMPUTE VARIANTS ==========
+  // ========== COMPUTE VARIANTS (ONLY COLORS) ==========
   const computeVariants = () => {
-    // Colors selected as comma-separated string
-    const colors = formData.colorsEnabled
-      ? formData.colorInput.split(',').map(c => c.trim()).filter(c => c)
-      : [];
+    const colors = formData.colorsEnabled ? formData.selectedColors : [];
+    if (colors.length === 0) return [];
 
-    // Attribute value lists: for each attribute that has selected values, push the array of selected values
-    const attrLists = [];
-    Object.keys(selectedAttributeValues).forEach(attrId => {
-      const selectedVals = selectedAttributeValues[attrId];
-      if (selectedVals && selectedVals.length) {
-        attrLists.push(selectedVals);
-      }
-    });
-
-    // Cartesian product of attribute value lists
-    let combinations = [[]];
-    for (const list of attrLists) {
-      const newCombos = [];
-      for (const combo of combinations) {
-        for (const val of list) {
-          newCombos.push([...combo, val]);
-        }
-      }
-      combinations = newCombos;
-    }
-    if (combinations.length === 0) combinations = [[]];
-    let baseNames = colors.length ? colors : [''];
     const variants = [];
-    for (const color of baseNames) {
-      for (const combo of combinations) {
-        let variantName = color;
-        if (combo.length) variantName += (variantName ? ' / ' : '') + combo.join(' / ');
-        const sku = variantName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-        variants.push({
-          variant: variantName,
-          price: formData.unitPrice,
-          sku: sku,
-          quantity: 0,
-          photo: null,
-        });
-      }
+    for (const color of colors) {
+      const variantName = color;
+      const sku = variantName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      variants.push({
+        variant: variantName,
+        price: formData.unitPrice,
+        sku: sku,
+        quantity: 0,
+        photo: null,
+      });
     }
     return variants;
   };
 
-  const handleChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
+  // Auto‑generate variants when colors or color toggle changes
+  useEffect(() => {
+    if (formData.colorsEnabled) {
+      const newVariants = computeVariants();
+      setFormData(prev => ({ ...prev, variants: newVariants }));
+    } else {
+      setFormData(prev => ({ ...prev, variants: [] }));
+    }
+  }, [formData.colorsEnabled, formData.selectedColors]);
 
-  // Colors multi‑select (with swatch)
-  const handleColorSelect = (e) => {
-    const selected = Array.from(e.target.selectedOptions, opt => opt.value);
-    setFormData(prev => ({ ...prev, colorInput: selected.join(',') }));
+  const handleChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
-  // Attribute value change handler
-  const handleAttributeValueChange = (attrId, selectedValues) => {
+  // Colors multi‑select using react‑select (with swatch)
+  const colorSelectOptions = colorOptions.map(color => ({
+    value: color.name,
+    label: color.name,
+    colorCode: color.code
+  }));
+
+  const handleColorSelectChange = (selectedOptions) => {
+    const selectedColors = selectedOptions ? selectedOptions.map(opt => opt.value) : [];
+    setFormData(prev => ({ ...prev, selectedColors }));
+  };
+
+  // Related Categories multi‑select using react‑select
+  const categorySelectOptions = categories.map(cat => ({
+    value: cat.name,
+    label: cat.name
+  }));
+
+  const handleRelatedCategoriesChange = (selectedOptions) => {
+    const selected = selectedOptions ? selectedOptions.map(opt => opt.value) : [];
+    setFormData(prev => ({ ...prev, relatedCategories: selected }));
+  };
+
+  // ========== ATTRIBUTE HANDLERS ==========
+  const handleAttributeSelectChange = (selectedOptions) => {
+    const selectedIds = selectedOptions ? selectedOptions.map(opt => opt.value) : [];
+    setFormData(prev => ({ ...prev, selectedAttributes: selectedIds }));
+  };
+
+  const handleAttributeValuesChange = (attrId, selectedOptions) => {
+    const selectedValues = selectedOptions ? selectedOptions.map(opt => opt.value) : [];
     setSelectedAttributeValues(prev => ({
       ...prev,
       [attrId]: selectedValues
     }));
-  };
-
-  const generateVariants = () => {
-    if (!formData.colorsEnabled && Object.keys(selectedAttributeValues).every(id => selectedAttributeValues[id].length === 0)) {
-      toast.error('Enable color variation or select at least one attribute value');
-      return;
-    }
-    setGeneratingVariants(true);
-    const newVariants = computeVariants();
-    setFormData(prev => ({ ...prev, variants: newVariants }));
-    setGeneratingVariants(false);
   };
 
   const updateVariant = (idx, field, value) => {
@@ -202,18 +203,13 @@ export default function AddProductPage() {
     setFormData(prev => ({ ...prev, frequentlyBought: updated }));
   };
 
-  // ========== RELATED CATEGORIES ==========
-  const handleRelatedCategoriesChange = (e) => {
-    const selected = Array.from(e.target.selectedOptions, opt => opt.value);
-    setFormData(prev => ({ ...prev, relatedCategories: selected }));
-  };
-
   // ========== TAGS ==========
   const addTag = () => {
     if (formData.tagInput.trim() && !formData.tags.includes(formData.tagInput.trim())) {
       setFormData(prev => ({ ...prev, tags: [...prev.tags, prev.tagInput.trim()], tagInput: '' }));
     }
   };
+
   const removeTag = (tag) => setFormData(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
 
   // ========== SEO TAGS ==========
@@ -255,37 +251,24 @@ export default function AddProductPage() {
     setFormData(prev => ({ ...prev, youtubeUrls: updated }));
   };
 
-  // ========== SAVE PRODUCT ==========
-  // Convert selectedAttributeValues into the format expected by backend (an array of { name, values })
+  // ========== SAVE PRODUCT – FIXED WITH EXPLICIT APPENDS ==========
   const buildAttributesPayload = () => {
     const payload = [];
-    attributeOptions.forEach(attr => {
-      const selectedVals = selectedAttributeValues[attr._id] || [];
-      if (selectedVals.length) {
+    formData.selectedAttributes.forEach(attrId => {
+      const attr = attributeOptions.find(a => a._id === attrId);
+      const values = selectedAttributeValues[attrId] || [];
+      if (attr && values.length) {
         payload.push({
           name: attr.name,
-          values: selectedVals
+          values: values
         });
       }
     });
     return payload;
   };
-  const handleAttributeSelect = (e) => {
-  const value = e.target.value;
-
-  setFormData(prev => {
-    const exists = prev.selectedAttributes.includes(value);
-
-    return {
-      ...prev,
-      selectedAttributes: exists
-        ? prev.selectedAttributes.filter(v => v !== value)
-        : [...prev.selectedAttributes, value]
-    };
-  });
-};
 
   const saveProduct = async (status) => {
+    // Only check required fields (you can remove these checks if you want all optional)
     if (!formData.productName || !formData.mainCategory || !formData.brand) {
       toast.error('Please fill in all required fields (*)');
       return false;
@@ -293,27 +276,70 @@ export default function AddProductPage() {
     setSaving(true);
     try {
       const payload = new FormData();
-      // Copy all formData except 'attributes' (we'll add from selectedAttributeValues)
-      Object.keys(formData).forEach(key => {
-        if (['galleryImages', 'youtubeUrls', 'relatedCategories', 'tags', 'seoTags', 'variants', 'frequentlyBought'].includes(key)) {
-          if (key === 'relatedCategories') formData[key].forEach(val => payload.append(`${key}[]`, val));
-          else if (key === 'tags') formData[key].forEach(val => payload.append(`${key}[]`, val));
-          else if (key === 'seoTags') formData[key].forEach(val => payload.append(`${key}[]`, val));
-          else if (key === 'youtubeUrls') formData[key].forEach(val => payload.append(`${key}[]`, val));
-          else if (key === 'galleryImages') formData[key].forEach(file => payload.append(`${key}[]`, file));
-          else if (key === 'variants') payload.append(key, JSON.stringify(formData[key]));
-          else if (key === 'frequentlyBought') payload.append(key, JSON.stringify(formData[key]));
-        } else if (key === 'thumbnail' && formData.thumbnail) payload.append('thumbnail', formData.thumbnail);
-        else if (key === 'videoFile' && formData.videoFile) payload.append('videoFile', formData.videoFile);
-        else if (key === 'videoThumbnail' && formData.videoThumbnail) payload.append('videoThumbnail', formData.videoThumbnail);
-        else if (key === 'pdfSpec' && formData.pdfSpec) payload.append('pdfSpec', formData.pdfSpec);
-        else if (key === 'metaImage' && formData.metaImage) payload.append('metaImage', formData.metaImage);
-        else if (typeof formData[key] !== 'object') payload.append(key, formData[key]);
-      });
-      // Add attributes payload
-      const attributesArray = buildAttributesPayload();
-      payload.append('attributes', JSON.stringify(attributesArray));
+
+      // ---------- Explicitly append all fields (primitives & files) ----------
+      payload.append('productName', formData.productName || '');
+      payload.append('mainCategory', formData.mainCategory || '');
+      payload.append('brand', formData.brand || '');
+      payload.append('unit', formData.unit || '');
+      payload.append('weight', formData.weight || 0);
+      payload.append('minPurchaseQty', formData.minPurchaseQty || 1);
+      payload.append('barcode', formData.barcode || '');
       payload.append('published', status === 'publish' ? true : status === 'unpublish' ? false : false);
+      payload.append('featured', formData.featured || false);
+      payload.append('todaysDeal', formData.todaysDeal || false);
+      payload.append('flashTitle', formData.flashTitle || '');
+      payload.append('discount', formData.discount || 0);
+      payload.append('discountType', formData.discountType || 'percent');
+      payload.append('discountStartDate', formData.discountStartDate || '');
+      payload.append('discountEndDate', formData.discountEndDate || '');
+      payload.append('refundable', formData.refundable || false);
+      payload.append('refundNote', formData.refundNote || '');
+      payload.append('warrantyEnabled', formData.warrantyEnabled || false);
+      payload.append('warrantyType', formData.warrantyType || '');
+      payload.append('warrantyNote', formData.warrantyNote || '');
+      payload.append('freeShipping', formData.freeShipping || false);
+      payload.append('flatRate', formData.flatRate || false);
+      payload.append('quantityMultiply', formData.quantityMultiply || false);
+      payload.append('shippingDays', formData.shippingDays || '');
+      payload.append('showShippingTime', formData.showShippingTime || false);
+      payload.append('showShippingNote', formData.showShippingNote || false);
+      payload.append('shippingNote', formData.shippingNote || '');
+      payload.append('codAvailable', formData.codAvailable || false);
+      payload.append('codNote', formData.codNote || '');
+      payload.append('hsnCode', formData.hsnCode || '');
+      payload.append('gstRate', formData.gstRate || 0);
+      payload.append('metaTitle', formData.metaTitle || '');
+      payload.append('metaDescription', formData.metaDescription || '');
+      payload.append('unitPrice', formData.unitPrice || 0);
+      payload.append('stock', formData.stock || 0);
+      payload.append('sku', formData.sku || '');
+      payload.append('colorsEnabled', formData.colorsEnabled || false);
+      payload.append('colorInput', (formData.selectedColors || []).join(','));
+      payload.append('hideStockState', formData.hideStockState || 'none');
+      payload.append('lowStockWarning', formData.lowStockWarning || 0);
+      payload.append('defaultQuantity', formData.defaultQuantity || 1);
+
+      // Arrays
+      (formData.relatedCategories || []).forEach(cat => payload.append('relatedCategories[]', cat));
+      (formData.tags || []).forEach(tag => payload.append('tags[]', tag));
+      (formData.seoTags || []).forEach(tag => payload.append('seoTags[]', tag));
+      (formData.youtubeUrls || []).forEach(url => payload.append('youtubeUrls[]', url));
+      (formData.galleryImages || []).forEach(file => payload.append('galleryImages[]', file));
+      (formData.selectedAttributes || []).forEach(attrId => payload.append('selectedAttributes[]', attrId));
+
+      // Complex objects
+      payload.append('variants', JSON.stringify(formData.variants || []));
+      payload.append('frequentlyBought', JSON.stringify(formData.frequentlyBought || []));
+      payload.append('attributes', JSON.stringify(buildAttributesPayload()));
+
+      // Files (only if they exist)
+      if (formData.thumbnail) payload.append('thumbnail', formData.thumbnail);
+      if (formData.videoFile) payload.append('videoFile', formData.videoFile);
+      if (formData.videoThumbnail) payload.append('videoThumbnail', formData.videoThumbnail);
+      if (formData.pdfSpec) payload.append('pdfSpec', formData.pdfSpec);
+      if (formData.metaImage) payload.append('metaImage', formData.metaImage);
+
       const response = await createProductAPI(payload);
       if (response.success) {
         toast.success(`Product ${status === 'publish' ? 'published' : status === 'unpublish' ? 'unpublished' : 'saved as draft'} successfully!`);
@@ -352,7 +378,6 @@ export default function AddProductPage() {
       setDeleting(false);
     }
   };
-  
 
   if (loadingData) {
     return (
@@ -364,6 +389,37 @@ export default function AddProductPage() {
       </div>
     );
   }
+
+  // Prepare options for react-select (attribute names)
+  const attributeSelectOptions = attributeOptions.map(attr => ({
+    value: attr._id,
+    label: attr.name
+  }));
+
+  const selectedAttributeOptions = attributeSelectOptions.filter(opt =>
+    formData.selectedAttributes.includes(opt.value)
+  );
+
+  // For colors, selected options
+  const selectedColorOptions = colorSelectOptions.filter(opt =>
+    formData.selectedColors.includes(opt.value)
+  );
+
+  // For related categories
+  const selectedCategoryOptions = categorySelectOptions.filter(opt =>
+    formData.relatedCategories.includes(opt.value)
+  );
+
+  // Custom Option component for color swatch
+  const ColorOption = (props) => {
+    const { data, innerProps, isSelected } = props;
+    return (
+      <div {...innerProps} style={{ display: 'flex', alignItems: 'center', padding: '5px 10px', cursor: 'pointer', backgroundColor: isSelected ? '#e0e0e0' : 'transparent' }}>
+        <span style={{ display: 'inline-block', width: '20px', height: '20px', backgroundColor: data.colorCode, marginRight: '10px', borderRadius: '3px', border: '1px solid #ccc' }}></span>
+        <span>{data.label}</span>
+      </div>
+    );
+  };
 
   return (
     <div className="add-product-page">
@@ -414,10 +470,15 @@ export default function AddProductPage() {
             <div className="card-body">
               <div className="mb-3">
                 <label className="form-label">Related Categories *</label>
-                <select className="form-select" multiple size="4" value={formData.relatedCategories} onChange={handleRelatedCategoriesChange}>
-                  {categories.map(cat => <option key={cat._id} value={cat.name}>{cat.name}</option>)}
-                </select>
-                <small className="text-muted">Hold Ctrl/Cmd to select multiple</small>
+                <Select
+                  isMulti
+                  options={categorySelectOptions}
+                  value={selectedCategoryOptions}
+                  onChange={handleRelatedCategoriesChange}
+                  placeholder="Select related categories..."
+                  classNamePrefix="react-select"
+                />
+                <small className="text-muted">Select one or more related categories</small>
               </div>
               <div className="row g-2 mb-3">
                 <div className="col-6"><label className="form-label">Unit *</label><input type="text" className="form-control" placeholder="e.g., Tablet, Bottle" value={formData.unit} onChange={e => handleChange('unit', e.target.value)} /></div>
@@ -499,7 +560,7 @@ export default function AddProductPage() {
             </div>
           </div>
 
-          {/* ========== COLOR SELECTION CARD ========== */}
+          {/* ========== COLOR SELECTION CARD – react‑select with swatch ========== */}
           <div className="form-card">
             <div className="card-header">Colors</div>
             <div className="card-body">
@@ -507,7 +568,7 @@ export default function AddProductPage() {
                 <label className="toggle-switch">
                   <input type="checkbox" checked={formData.colorsEnabled} onChange={e => {
                     handleChange('colorsEnabled', e.target.checked);
-                    if (!e.target.checked) setFormData(prev => ({ ...prev, variants: [] }));
+                    if (!e.target.checked) setFormData(prev => ({ ...prev, selectedColors: [] }));
                   }} />
                   <span className="toggle-slider"></span>
                 </label>
@@ -517,40 +578,62 @@ export default function AddProductPage() {
               {formData.colorsEnabled && (
                 <div className="mt-2">
                   <label className="form-label">Select Colors *</label>
-                  <select multiple className="form-select" value={formData.colorInput.split(',')} onChange={handleColorSelect} style={{ minHeight: '100px' }}>
-                    {colorOptions.map(color => (
-                      <option key={color._id} value={color.name}>
-                        <span style={{ display: 'inline-block', width: '16px', height: '16px', backgroundColor: color.code, marginRight: '8px', borderRadius: '2px' }}></span>
-                        {color.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Select
+                    isMulti
+                    options={colorSelectOptions}
+                    value={selectedColorOptions}
+                    onChange={handleColorSelectChange}
+                    placeholder="Select colors..."
+                    classNamePrefix="react-select"
+                    components={{ Option: ColorOption }}
+                  />
+                  <small className="text-muted">Choose one or more colors – variants will be created automatically</small>
                 </div>
               )}
             </div>
           </div>
 
-          {/* ========== ATTRIBUTES CARD – always displays all attributes ========== */}
-        <div className="mb-3">
-  <label className="form-label">Attribute</label>
-  <select className="form-select" value={formData.selectedAttribute} onChange={e => handleChange('selectedAttribute', e.target.value)}>
-    <option value="">Select Attribute</option>
-    {attributeOptions.map(attr => (
-      <option key={attr._id} value={attr.name}>{attr.name}</option>
-    ))}
-  </select>
-</div>
-
-          {/* Generate Variants Button & Variants Table */}
+          {/* ========== ATTRIBUTES SECTION ========== */}
           <div className="form-card">
-            <div className="card-header">Generate Variants</div>
+            <div className="card-header">Attributes</div>
             <div className="card-body">
-              <button type="button" className="btn btn-primary w-100" onClick={generateVariants} disabled={generatingVariants}>
-                {generatingVariants ? 'Generating...' : 'Generate Variants'}
-              </button>
+              <div className="mb-3">
+                <label className="form-label">Choose attributes for this product</label>
+                <Select
+                  isMulti
+                  options={attributeSelectOptions}
+                  value={selectedAttributeOptions}
+                  onChange={handleAttributeSelectChange}
+                  placeholder="Select attributes..."
+                  classNamePrefix="react-select"
+                />
+                <small className="text-muted">e.g., Size, Fabric, Liter, Sleeve, Storage</small>
+              </div>
+
+              {formData.selectedAttributes.map(attrId => {
+                const attr = attributeOptions.find(a => a._id === attrId);
+                if (!attr) return null;
+                const valueOptions = (attr.values || []).map(val => ({ value: val, label: val }));
+                const selectedValueOptions = (selectedAttributeValues[attrId] || []).map(val => ({ value: val, label: val }));
+                return (
+                  <div key={attrId} className="mb-3 border p-2 rounded">
+                    <label className="form-label fw-bold">{attr.name}</label>
+                    <Select
+                      isMulti
+                      options={valueOptions}
+                      value={selectedValueOptions}
+                      onChange={(selected) => handleAttributeValuesChange(attrId, selected)}
+                      placeholder={`Select ${attr.name} values...`}
+                      classNamePrefix="react-select"
+                    />
+                    <small className="text-muted">Choose one or more values for this attribute</small>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
+          {/* Variants Table – shown automatically when variants exist */}
           {formData.variants.length > 0 && (
             <div className="form-card">
               <div className="card-header">Product Variants</div>
@@ -607,17 +690,58 @@ export default function AddProductPage() {
             <div className="card-body">
               <div className="toggle-item"><label className="toggle-switch"><input type="checkbox" checked={formData.refundable} onChange={e => handleChange('refundable', e.target.checked)} /><span className="toggle-slider"></span></label><span className="toggle-label">Refundable</span></div>
               <div className="text-muted mb-2" style={{ fontSize: '0.8rem' }}>Show notes in refund section</div>
-              <div><label className="form-label">Note (Add from preset)</label><div className="preset-note-box"><p className="mb-0">{formData.refundNote}</p></div><button type="button" className="btn btn-sm btn-outline-primary mt-2" onClick={() => router.push('/super-admin/product-managment/refund-presets')}>+ Add New Preset</button></div>
+              <div><label className="form-label">Note (Add from preset)</label><div className="preset-note-box"><p className="mb-0">{formData.refundNote}</p></div><button type="button" className="btn btn-sm btn-outline-primary mt-2" onClick={() => router.push('/super-admin/product-managment/product-setup/notes/addNote')}>+ Add New Preset</button></div>
             </div>
           </div>
 
           <div className="form-card">
             <div className="card-header">Warranty</div>
             <div className="card-body">
-              <div className="toggle-item"><label className="toggle-switch"><input type="checkbox" checked={formData.warrantyEnabled} onChange={e => handleChange('warrantyEnabled', e.target.checked)} /><span className="toggle-slider"></span></label><span className="toggle-label">Enable warranty</span></div>
-              <div className="mt-2"><label className="form-label">Select Warranty</label><select className="form-select" value={formData.warrantyType} onChange={e => handleChange('warrantyType', e.target.value)}><option value="">Select Warranty</option>{warranties.map(w => <option key={w._id} value={w.name}>{w.name}</option>)}</select></div>
+              <div className="toggle-item">
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={formData.warrantyEnabled}
+                    onChange={e => handleChange('warrantyEnabled', e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+                <span className="toggle-label">Enable warranty</span>
+              </div>
+
+              <div className="mt-2">
+                <label className="form-label">Select Warranty</label>
+                <select
+                  className="form-select"
+                  value={formData.warrantyType}
+                  onChange={e => handleChange('warrantyType', e.target.value)}
+                >
+                  <option value="">Select Warranty</option>
+                  {warranties.map(w => (
+                    <option key={w._id} value={w.name}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
+
               <div className="text-muted mb-2 mt-2">Show notes in warranty section</div>
-              <div><label className="form-label">Notes (Add from Preset)</label><div className="preset-note-box"><p className="mb-0">{formData.warrantyNote}</p></div><button type="button" className="btn btn-sm btn-outline-primary mt-2" onClick={() => router.push('/super-admin/product-managment/warranty-presets')}>+ Add New Notes</button></div>
+
+              <div>
+                <label className="form-label">Notes (Add from Preset)</label>
+                <div className="preset-note-box">
+                  <p className="mb-0">{formData.warrantyNote}</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-primary mt-2"
+                  onClick={() =>
+                    router.push(
+                      '/super-admin/product-managment/product-setup/notes/addNote?type=Warranty'
+                    )
+                  }
+                >
+                  + Add New Notes
+                </button>
+              </div>
             </div>
           </div>
 
@@ -634,7 +758,7 @@ export default function AddProductPage() {
                 <div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.showShippingTime} onChange={e => handleChange('showShippingTime', e.target.checked)} /><label className="form-check-label">Show estimated shipping time in product description page</label></div>
                 <div className="form-check"><input className="form-check-input" type="checkbox" checked={formData.showShippingNote} onChange={e => handleChange('showShippingNote', e.target.checked)} /><label className="form-check-label">Show notes in shipping time section</label></div>
               </div>
-              <div><label className="form-label">Notes (Add from Preset)</label><div className="preset-note-box"><p className="mb-0">{formData.shippingNote}</p></div><button type="button" className="btn btn-sm btn-outline-primary mt-2" onClick={() => router.push('/super-admin/product-managment/shipping-presets')}>+ Add New Notes</button></div>
+              <div><label className="form-label">Notes (Add from Preset)</label><div className="preset-note-box"><p className="mb-0">{formData.shippingNote}</p></div><button type="button" className="btn btn-sm btn-outline-primary mt-2" onClick={() => router.push('/super-admin/product-managment/product-setup/notes/addNote')}>+ Add New Notes</button></div>
             </div>
           </div>
 

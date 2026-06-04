@@ -1,17 +1,17 @@
-/* product-management.css – Card Dashboard */
+/* product-management.css – Modern White Dashboard */
 
 .product-management-dashboard {
-  background: #e8f5e9;
+  background: #f8fafc;   /* light gray‑white background – clean and modern */
   min-height: 100vh;
   padding: 1rem 0;
 }
 
 .section-title {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 700;
-  color: #1b5e20;
+  color: #1e293b;        /* dark slate for high contrast */
   letter-spacing: 0.5px;
-  border-left: 4px solid #2e7d32;
+  border-left: 4px solid #3b82f6;  /* clean blue accent – modern and bright */
   padding-left: 0.75rem;
   margin-bottom: 1rem;
 }
@@ -19,55 +19,71 @@
 .product-card {
   border: none;
   border-radius: 1rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  transition: transform 0.2s, box-shadow 0.2s;
-  background: white;
+  background: #ffffff;    /* pure white card background */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .product-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
 }
 
 .card-icon {
   font-size: 2rem;
-  color: #2e7d32;
+  color: #3b82f6;         /* modern blue accent (no green) */
 }
 
 .card-title {
   font-size: 1rem;
+  font-weight: 600;
   margin-bottom: 0.5rem;
-  color: #1b5e20;
+  color: #0f172a;         /* very dark, crisp text */
 }
 
 .card-text {
-  font-size: 0.8rem;
-  line-height: 1.4;
-  color: #5f6c5f;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #475569;        /* medium slate – readable and soft */
 }
 
+/* Buttons – modern outline style */
 .btn-outline-success {
-  border-color: #c8e6c9;
-  color: #2e7d32;
+  border: 1px solid #cbd5e1;
+  color: #1e293b;
+  background: white;
   border-radius: 2rem;
-  padding: 0.25rem 0.9rem;
+  padding: 0.35rem 1rem;
   font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.2s;
 }
 
 .btn-outline-success:hover {
-  background-color: #2e7d32;
-  border-color: #2e7d32;
+  background: #3b82f6;
+  border-color: #3b82f6;
   color: white;
 }
 
-/* Action buttons row (already styled by Bootstrap, but ensure spacing) */
-.btn-outline-primary, .btn-outline-success, .btn-primary {
+/* Other action buttons (consistent style) */
+.btn-outline-primary, .btn-primary {
   border-radius: 2rem;
   padding: 0.4rem 1rem;
+  font-weight: 500;
 }
 
+.btn-primary {
+  background: #3b82f6;
+  border: none;
+}
+
+.btn-primary:hover {
+  background: #2563eb;
+}
+
+/* Responsive */
 @media (max-width: 768px) {
   .product-card {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
   }
 }

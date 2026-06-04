@@ -29,37 +29,43 @@ export default function SuperAdminLayout({ children }) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // ✅ FIXED: Keep product dropdown open when inside /product-managment
-  useEffect(() => {
-    const isInProduct = pathname.includes("/product-managment");
-    
-    if (!isInProduct) {
-      // Outside product management – close everything
-      setOpenDropdowns({
-        main: false,
-        staffMain: false,
-        storeMain: false,
-        deliveryBoysMain: false,
-        Products: false,
-        "Product Setup": false,
-        "Product Operation": false,
-        Brand: false,
-        Notes: false,
-        "Size Guide": false,
-      });
-    } else if (!pathname.includes("/product-managment/product-setup")) {
-      // Inside product management but not in product setup – close only setup sub‑menus
-      setOpenDropdowns((prev) => ({
-        ...prev,
-        Brand: false,
-        Notes: false,
-        "Size Guide": false,
-      }));
-    }
-  }, [pathname]);
+  // Keep dropdowns open based on route
+// ✅ FIXED: Keep product, staff, store, delivery dropdowns open when inside their sections
+useEffect(() => {
+  const isInProduct = pathname.includes("/product-managment");
+  const isInStaff = pathname.includes("/staff");
+  const isInStore = pathname.includes("/store-managment");
+  const isInDelivery = pathname.includes("/delivery-boys");
+
+  if (!isInProduct) {
+    // Outside product management – close product dropdowns only
+    setOpenDropdowns((prev) => ({
+      ...prev,
+      main: false,
+      Products: false,
+      "Product Setup": false,
+      "Product Operation": false,
+      Brand: false,
+      Notes: false,
+      "Size Guide": false,
+      // Keep staff/store/delivery open if we are inside their sections
+      staffMain: isInStaff ? prev.staffMain : false,
+      storeMain: isInStore ? prev.storeMain : false,
+      deliveryBoysMain: isInDelivery ? prev.deliveryBoysMain : false,
+    }));
+  } else if (!pathname.includes("/product-managment/product-setup")) {
+    // Inside product management but not in product setup – close only setup sub‑menus
+    setOpenDropdowns((prev) => ({
+      ...prev,
+      Brand: false,
+      Notes: false,
+      "Size Guide": false,
+    }));
+  }
+}, [pathname]);
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
-  
+
   const closeAllDropdowns = () => {
     setOpenDropdowns({
       main: false,
@@ -92,6 +98,7 @@ export default function SuperAdminLayout({ children }) {
 
   // ================= MENU DEFINITIONS =================
   const directMenuItems = [
+    { name: "DashBoard", path: "/super-admin/dashboard", icon: "bi-speedometer2" },
     { name: "Order Management", path: "/super-admin/orders", icon: "bi-cart-check" },
     { name: "Notifications", path: "/super-admin/notifications", icon: "bi-bell" },
     { name: "Reports", path: "/super-admin/reports", icon: "bi-file-text" },
@@ -144,7 +151,7 @@ export default function SuperAdminLayout({ children }) {
       name: "Product Operation",
       icon: "bi-gear-wide-connected",
       children: [
-        { name: "Product Reviews", path: "/super-admin/product-managment/product-operation/product-review" },
+{ name: "Product Review", path: "/super-admin/product-managment/product-operation/product-review" },
         { name: "Smart Bar", path: "/super-admin/product-managment/product-operation/smart-bar" },
         { name: "Custom Label", path: "/super-admin/product-managment/product-operation/custom-label" },
         { name: "Bulk Import", path: "/super-admin/product-managment/product-operation/bulk-import" },
@@ -155,7 +162,7 @@ export default function SuperAdminLayout({ children }) {
 
   const staffMenu = [
     { name: "All Staff", path: "/super-admin/staff" },
-    { name: "Roles & Permission", path: "/super-admin/staff/permissions" },
+    { name: "Roles & Permission", path: "/super-admin/staff/RoleDashboard" },
   ];
 
   const storeMenu = [
@@ -208,9 +215,13 @@ export default function SuperAdminLayout({ children }) {
       </button>
 
       <aside className={`sidebar ${sidebarOpen ? "open" : "closed"}`}>
-        <div className="sidebar-header">
-          <h2 className="logo">ADHIMEDS</h2>
-        </div>
+  <div className="sidebar-header">
+  {/* 🔵 ROUND LOGO with image */}
+  <div className="logo-circle">
+    <img src="/images/logo.webp" alt="ADHIMEDS Logo" className="logo-img" />
+  </div>
+  <h2 className="logo-text">ADHIMEDS</h2>
+</div>
 
         <nav className="sidebar-nav">
           {renderDirectLink(directMenuItems[0])}
@@ -444,6 +455,8 @@ export default function SuperAdminLayout({ children }) {
             animate="animate"
             exit="exit"
             variants={pageVariants}
+            // 🔵 Add extra spacing when on dashboard page
+            className={pathname === "/super-admin/dashboard" ? "dashboard-content" : ""}
           >
             {children}
           </motion.div>

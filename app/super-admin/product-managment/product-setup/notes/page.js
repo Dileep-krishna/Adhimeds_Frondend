@@ -1,132 +1,191 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import Link from 'next/link';
+import toast, { Toaster } from 'react-hot-toast';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap-icons/font/bootstrap-icons.css';
+import { getNotesAPI, deleteNoteAPI } from '../../../../services/noteAPI';
+import './notes-dashboard.css';   // separate CSS
 
-import './notes.css';
-import { deleteNoteAPI, getNotesAPI } from '../../../../services/noteAPI';
-
-function NotesPage() {
+export default function NotesDashboardPage() {
   const router = useRouter();
-  const [activeFilter, setActiveFilter] = useState('all');
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [deletingId, setDeletingId] = useState(null);
 
-  const fetchNotes = async () => {
+  const noteTypes = ['Shipping', 'Refund', 'Warranty', 'Delivery', 'Medical Advice', 'Prescription', 'Lab Result'];
+
+  const fetchNotes = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await getNotesAPI();
-      if (response.success) {
-        setNotes(response.data);
+      const res = await getNotesAPI();   // ✅ use getNotesAPI (no ID)
+      if (res.success) {
+        setNotes(res.data);
       } else {
-        toast.error(response.message || 'Failed to load notes');
+        toast.error(res.message || 'Failed to load notes');
       }
     } catch (error) {
-      console.error('Fetch notes error:', error);
-      toast.error('Network error');
+      console.error(error);
+      toast.error('Server error while loading notes');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchNotes();
-  }, []);
+  }, [fetchNotes]);
 
   const handleDelete = async (id) => {
-    if (window.confirm('Delete this note permanently?')) {
-      try {
-        const response = await deleteNoteAPI(id);
-        if (response.success) {
-          toast.success('Note deleted');
-          fetchNotes(); // refresh list
-        } else {
-          toast.error(response.message || 'Delete failed');
-        }
-      } catch (error) {
-        console.error('Delete error:', error);
-        toast.error('Network error');
+    if (!confirm('Are you sure you want to delete this note?')) return;
+    setDeletingId(id);
+    try {
+      const res = await deleteNoteAPI(id);
+      if (res.success) {
+        toast.success('Note deleted successfully');
+        fetchNotes();
+      } else {
+        toast.error(res.message || 'Delete failed');
       }
+    } catch (error) {
+      console.error(error);
+      toast.error('Server error');
+    } finally {
+      setDeletingId(null);
     }
   };
 
-  const handleEdit = (note) => {
-    const targetPath = `/super-admin/product-managment/product-setup/notes/editNote/${note._id}`;
-    console.log('Navigating to:', targetPath);
-    router.push(targetPath);
-  };
-
+  // Filter notes
   const filteredNotes = notes.filter(note => {
-    if (activeFilter === 'inhouse') return note.user === 'In-House';
-    if (activeFilter === 'seller') return note.user === 'Seller';
-    return true;
+    const matchesSearch = note.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          note.type?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = typeFilter === 'all' || note.type === typeFilter;
+    return matchesSearch && matchesType;
   });
 
   return (
-    <div className="notes-container">
-      <ToastContainer position="top-right" autoClose={3000} />
-      <div className="header-actions">
-        <h4 className="page-title">All Notes</h4>
-        <button className="btn-add" onClick={() => router.push('/super-admin/product-managment/product-setup/notes/addNote')}>
-          + Add Note
-        </button>
-      </div>
-
-      <div className="filter-bar">
-        <div className="filter-buttons">
-          <button className={`filter-btn ${activeFilter === 'all' ? 'active' : ''}`} onClick={() => setActiveFilter('all')}>All</button>
-          <button className={`filter-btn ${activeFilter === 'inhouse' ? 'active' : ''}`} onClick={() => setActiveFilter('inhouse')}>In-House</button>
-          <button className={`filter-btn ${activeFilter === 'seller' ? 'active' : ''}`} onClick={() => setActiveFilter('seller')}>Seller</button>
+    <div className="notes-dashboard">
+      <Toaster position="top-right" />
+      <div className="container-fluid py-4">
+        {/* Header */}
+        <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+          <h2 className="page-title">Notes Management</h2>
+          <button
+            className="btn-add-note"
+            onClick={() => router.push('/super-admin/product-managment/product-setup/notes/addNote')}
+          >
+            <i className="bi bi-plus-circle me-1"></i> Add New Note
+          </button>
         </div>
-        <div className="text-muted small">Seller Can Add Note? – This is a global setting (not implemented here)</div>
-      </div>
 
-      <div className="table-responsive">
-        <table className="med-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>User</th>
-              <th>Type</th>
-              <th>Description</th>
-              <th>Seller Can Access?</th>
-              <th>Options</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredNotes.map((note, idx) => (
-              <tr key={note._id}>
-                <td>{idx + 1}</td>
-                <td>{note.user}</td>
-                <td>{note.type}</td>
-                <td>{note.description}</td>
-                <td>
-                  <span className={`badge ${note.sellerCanAccess ? 'badge-success' : 'badge-secondary'}`}>
-                    {note.sellerCanAccess ? 'Yes' : 'No'}
-                  </span>
-                </td>
-                <td>
-                  <button className="btn-icon edit" onClick={() => handleEdit(note)}>
-                    <i className="bi bi-pencil"></i>
-                  </button>
-                  <button className="btn-icon delete" onClick={() => handleDelete(note._id)}>
-                    <i className="bi bi-trash"></i>
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {!loading && filteredNotes.length === 0 && (
-              <tr><td colSpan="6" className="text-center">No notes found. Add one!</td></tr>
-            )}
-            {loading && (
-              <tr><td colSpan="6" className="text-center">Loading...</td></tr>
-            )}
-          </tbody>
-        </table>
+        {/* Filters */}
+        <div className="filter-bar mb-4">
+          <div className="row g-3 align-items-end">
+            <div className="col-md-4">
+              <label className="form-label fw-semibold">Search</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Search by type or description..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="col-md-3">
+              <label className="form-label fw-semibold">Filter by Type</label>
+              <select
+                className="form-select"
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+              >
+                <option value="all">All Types</option>
+                {noteTypes.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-md-2">
+              <button
+                className="btn-reset w-100"
+                onClick={() => { setSearchTerm(''); setTypeFilter('all'); }}
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Notes Table */}
+        <div className="form-card">
+          <div className="card-header">All Notes</div>
+          <div className="card-body p-0">
+            <div className="table-responsive">
+              <table className="med-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>User</th>
+                    <th>Seller Can Access</th>
+                    <th>Options</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td colSpan="6" className="text-center py-5"><div className="spinner-border text-primary" /></td></tr>
+                  ) : filteredNotes.length === 0 ? (
+                    <tr><td colSpan="6" className="text-center py-4 text-muted">No notes found.</td></tr>
+                  ) : (
+                    filteredNotes.map((note, idx) => (
+                      <tr key={note._id}>
+                        <td className="fw-semibold">{idx + 1}</td>
+                        <td><span className="badge-type">{note.type}</span></td>
+                        <td>{note.description.length > 100 ? note.description.substring(0, 100) + '...' : note.description}</td>
+                        <td>{note.user || 'In-House'}</td>
+                        <td>
+                          {note.sellerCanAccess ? (
+                            <i className="bi bi-check-circle-fill text-success"></i>
+                          ) : (
+                            <i className="bi bi-x-circle-fill text-danger"></i>
+                          )}
+                        </td>
+                        <td>
+                          <div className="action-icons">
+                           <Link
+  href={`/super-admin/product-managment/product-setup/notes/addNote?id=${note._id}`}
+  className="action-btn edit-btn"
+  title="Edit"
+>
+  <i className="bi bi-pencil"></i>
+</Link>
+                            <button
+                              className="action-btn delete-btn"
+                              onClick={() => handleDelete(note._id)}
+                              disabled={deletingId === note._id}
+                              title="Delete"
+                            >
+                              {deletingId === note._id ? (
+                                <span className="spinner-border spinner-border-sm" style={{ width: '1rem', height: '1rem' }}></span>
+                              ) : (
+                                <i className="bi bi-trash"></i>
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
-
-export default NotesPage;

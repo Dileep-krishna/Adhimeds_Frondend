@@ -8,7 +8,6 @@ async function handleResponse(res, endpoint) {
   console.log(`📡 ${endpoint} - Response status:`, res.status);
   console.log(`📡 ${endpoint} - Content-Type:`, res.headers.get('content-type'));
 
-  // Always read as text first to log and then parse
   const text = await res.text();
   console.log(`📄 ${endpoint} - Response body preview (first 400 chars):`, text.substring(0, 400));
 
@@ -17,7 +16,6 @@ async function handleResponse(res, endpoint) {
     throw new Error('Server returned empty response');
   }
 
-  // Try to parse JSON
   try {
     const json = JSON.parse(text);
     console.log(`✅ ${endpoint} - Successfully parsed JSON`);
@@ -29,17 +27,24 @@ async function handleResponse(res, endpoint) {
   }
 }
 
-// ✅ CREATE PRODUCT
+// ✅ CREATE PRODUCT – now works with both JSON and FormData
 export const createProductAPI = async (productData) => {
   const url = `${SERVERURL}/products`;
+  const isFormData = productData instanceof FormData;
   console.log(`🚀 POST ${url}`);
-  console.log('   Payload:', JSON.stringify(productData, null, 2));
+  if (isFormData) {
+    console.log('   Payload: FormData (cannot stringify)');
+  } else {
+    console.log('   Payload:', JSON.stringify(productData, null, 2));
+  }
 
   try {
+    const headers = isFormData ? {} : { "Content-Type": "application/json" };
+    const body = isFormData ? productData : JSON.stringify(productData);
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(productData),
+      headers,
+      body,
     });
     return await handleResponse(res, 'POST /products');
   } catch (error) {
@@ -80,12 +85,23 @@ export const getProductByIdAPI = async (id) => {
   }
 };
 
+// ✅ UPDATE PRODUCT – now works with both JSON and FormData
 export const updateProductAPI = async (id, productData) => {
   const url = `${SERVERURL}/products/${id}`;
+  const isFormData = productData instanceof FormData;
+  console.log(`🔄 PUT ${url}`);
+  if (isFormData) {
+    console.log('   Payload: FormData (cannot stringify)');
+  } else {
+    console.log('   Payload:', JSON.stringify(productData, null, 2));
+  }
+
+  const headers = isFormData ? {} : { "Content-Type": "application/json" };
+  const body = isFormData ? productData : JSON.stringify(productData);
   const res = await fetch(url, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(productData),
+    headers,
+    body,
   });
   return handleResponse(res, `PUT /products/${id}`);
 };

@@ -16,7 +16,7 @@ import {
 export default function RolesPermissionsPage() {
   const router = useRouter();
   const params = useParams();
-  const roleId = params?.id; // if present, we are in edit mode
+  const roleId = params?.id;
 
   const [roleName, setRoleName] = useState('');
   const [originalRoleName, setOriginalRoleName] = useState('');
@@ -24,15 +24,34 @@ export default function RolesPermissionsPage() {
   const [loading, setLoading] = useState(!!roleId);
   const [permissionsData, setPermissionsData] = useState({});
 
-  // Permission modules (same as before)
+  // ================= PERMISSION MODULES (based on your menu) =================
   const permissionModules = {
-    Products: ['View Products', 'Add Product', 'Edit Product', 'Delete Product'],
-    Inventory: ['View Stock', 'Adjust Stock', 'Transfer Stock', 'Manage Batches'],
-    Orders: ['View Orders', 'Create Order', 'Edit Order', 'Cancel Order'],
-    Customers: ['View Customers', 'Add Customer', 'Edit Customer', 'Delete Customer'],
-    Staff: ['View Staff', 'Add Staff', 'Edit Staff', 'Delete Staff', 'Manage Roles'],
-    Reports: ['View Reports', 'Export Reports', 'Schedule Reports'],
-    Settings: ['View Settings', 'Edit Settings', 'Manage Integrations'],
+    Dashboard: ['View Dashboard'],
+    'Order Management': ['View Orders'],
+    Notifications: ['View Notifications'],
+    Reports: ['View Reports'],
+    Settings: ['View Settings'],
+    'Products Home': ['View All Products', 'Add Product'],
+    'Product Setup': [
+      'View Category',
+      'View Brands',
+      'Add Brand',
+      'Brand Bulk Import',
+      'View Colors',
+      'View Attribute',
+      'View Size Guide',
+      'View Measurement Points',
+      'View Warranty',
+      'View All Notes',
+      'Add Note',
+    ],
+    'Product Operation': [
+      'View Product Reviews',
+      'View Smart Bar',
+      'View Custom Label',
+      'Bulk Import',
+      'Bulk Export',
+    ],
   };
 
   // Load role & permissions when editing
@@ -41,7 +60,6 @@ export default function RolesPermissionsPage() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // 1. Get role details
         const roleRes = await getRoleById(roleId);
         if (roleRes.success) {
           const role = roleRes.data;
@@ -49,11 +67,10 @@ export default function RolesPermissionsPage() {
           setOriginalRoleName(role.name);
         } else {
           toast.error('Role not found');
-          router.push('/super-admin/staff/permissions');
+          router.push('/super-admin/staff/RoleDashboard'); // 👈 redirect to staff page
           return;
         }
 
-        // 2. Get permissions for this role
         const permRes = await getRolePermissions(roleName || roleRes.data.name);
         if (permRes.success && permRes.data) {
           const permsObj = {};
@@ -72,7 +89,6 @@ export default function RolesPermissionsPage() {
     fetchData();
   }, [roleId, router, roleName]);
 
-  // Toggle permission (add/remove)
   const togglePermission = (module, action) => {
     setPermissionsData((prev) => {
       const current = prev[module] || [];
@@ -98,10 +114,8 @@ export default function RolesPermissionsPage() {
 
     setSaving(true);
     try {
-      // Step 1: Create or update role
       let roleResult;
       if (roleId) {
-        // Update existing role (only if name changed)
         if (roleName.trim() !== originalRoleName) {
           roleResult = await updateRole(roleId, { name: roleName.trim() });
           if (!roleResult.success) {
@@ -111,7 +125,6 @@ export default function RolesPermissionsPage() {
           }
         }
       } else {
-        // Create new role
         roleResult = await createRole({ name: roleName.trim() });
         if (!roleResult.success) {
           toast.error(roleResult.message || 'Failed to create role');
@@ -120,7 +133,6 @@ export default function RolesPermissionsPage() {
         }
       }
 
-      // Step 2: Save permissions (using the role name as key)
       const finalRoleName = roleName.trim();
       const permissionsArray = Object.entries(permissionsData).map(
         ([module, actions]) => ({ module, actions })
@@ -132,7 +144,7 @@ export default function RolesPermissionsPage() {
             ? 'Role and permissions updated successfully'
             : `Role "${finalRoleName}" created with permissions`
         );
-        router.push('/super-admin/staff/permissions');
+        router.push('/super-admin/staff/RoleDashboard'); // 👈 redirect to staff page
       } else {
         toast.error(permResult.message || 'Permissions not saved, but role was saved');
       }
@@ -160,7 +172,6 @@ export default function RolesPermissionsPage() {
     <div className="roles-design-page">
       <Toaster position="top-right" />
       <div className="container-fluid py-4">
-        {/* Role Information Card */}
         <div className="role-info-card">
           <h3 className="card-title">
             <i className="bi bi-info-circle-fill"></i> Role Information
@@ -178,7 +189,6 @@ export default function RolesPermissionsPage() {
           </div>
         </div>
 
-        {/* Permissions Section (fully functional) */}
         <div className="permissions-section">
           <h3 className="section-title">
             <i className="bi bi-grid-3x3-gap-fill"></i> Permissions for{' '}
@@ -193,12 +203,15 @@ export default function RolesPermissionsPage() {
                 <div className="permission-body">
                   {actions.map((action) => (
                     <label key={`${module}-${action}`} className="permission-item">
-                      <input
-                        type="checkbox"
-                        checked={hasPermission(module, action)}
-                        onChange={() => togglePermission(module, action)}
-                      />
-                      <span>{action}</span>
+                      <div className="toggle-switch">
+                        <input
+                          type="checkbox"
+                          checked={hasPermission(module, action)}
+                          onChange={() => togglePermission(module, action)}
+                        />
+                        <span className="toggle-slider"></span>
+                      </div>
+                      <span className="permission-label">{action}</span>
                     </label>
                   ))}
                 </div>
@@ -208,10 +221,9 @@ export default function RolesPermissionsPage() {
         </div>
 
         <div className="permission-hint">
-          <i className="bi bi-info-circle"></i> Check/uncheck permissions to grant or revoke access.
+          <i className="bi bi-info-circle"></i> Toggle ON/OFF to grant or revoke access.
         </div>
 
-        {/* Save Button */}
         <div className="save-footer">
           <button
             className="btn-save-all"
