@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import toast, { Toaster } from "react-hot-toast";
 import "./animations.css";
+import SERVERURL from "../services/serverURL";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,28 +16,79 @@ export default function LoginPage() {
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
-      alert("Please enter both email and password.");
+      toast.error("Please enter both email and password.");
       return;
     }
     setIsLoading(true);
-    setTimeout(() => {
+    
+    // Log start
+    console.log("🔍 Starting login attempt");
+    console.log("   Email:", email);
+    console.log("   Password length:", password.length);
+    
+    // Use the backend login route (adjust URL if needed)
+  const backendUrl = `${SERVERURL}/login`;
+console.log("🌐 Fetching URL:", backendUrl)
+    
+    try {
+      const response = await fetch(backendUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      
+      console.log("📡 Response received:");
+      console.log("   Status:", response.status);
+      console.log("   Status text:", response.statusText);
+      console.log("   Content-Type:", response.headers.get("content-type"));
+      
+      // Get raw text for debugging
+      const rawText = await response.text();
+      console.log("📄 Raw response body (first 500 chars):", rawText.substring(0, 500));
+      
+      // Try to parse JSON
+      try {
+        const data = JSON.parse(rawText);
+        console.log("✅ Parsed JSON:", data);
+        
+        if (data.success) {
+          if (rememberMe) {
+            localStorage.setItem("adminToken", data.data.token);
+            localStorage.setItem("admin", JSON.stringify(data.data.admin));
+          } else {
+            sessionStorage.setItem("adminToken", data.data.token);
+            sessionStorage.setItem("admin", JSON.stringify(data.data.admin));
+          }
+          toast.success("Login successful!");
+          router.push("/super-admin/dashboard");
+        } else {
+          toast.error(data.message || "Invalid credentials");
+        }
+      } catch (jsonError) {
+        console.error("❌ Failed to parse JSON. Response is not JSON.");
+        toast.error("Server returned invalid response. Check backend.");
+      }
+    } catch (error) {
+      console.error("🔥 Network or fetch error:", error);
+      toast.error("Cannot connect to backend. Is the server running?");
+    } finally {
       setIsLoading(false);
-      router.push("/super-admin/dashboard");
-    }, 1000);
+      console.log("🏁 Login attempt finished");
+    }
   };
 
   const handleForgotPassword = () => {
-    alert("Password reset link would be sent to your email. (Demo)");
+    toast("Password reset link would be sent to your email (demo).", { icon: "🔐" });
   };
 
-  // Professional medical background image
   const backgroundImageUrl =
     "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?q=80&w=2053&auto=format";
 
   return (
     <div className="container-fluid vh-100 p-0 overflow-hidden">
+      <Toaster position="top-right" />
       <div className="row g-0 h-100">
-        {/* LEFT SIDE - BACKGROUND IMAGE + BRANDING TEXT + ANIMATED LOGO */}
+        {/* LEFT SIDE */}
         <div
           className="col-lg-6 d-none d-lg-flex flex-column justify-content-center align-items-center position-relative"
           style={{
@@ -44,15 +97,11 @@ export default function LoginPage() {
             backgroundPosition: "center",
           }}
         >
-          {/* Dark overlay for better text readability */}
           <div
             className="position-absolute top-0 start-0 w-100 h-100"
             style={{ backgroundColor: "rgba(10, 25, 47, 0.65)" }}
           ></div>
-
-          {/* Content on top of the image */}
           <div className="text-center text-white position-relative z-1 px-4 animate-fade-up">
-            {/* Animated Logo Option */}
             <div className="mb-4 animate-float">
               <img
                 src="/images/logo.webp"
@@ -64,7 +113,6 @@ export default function LoginPage() {
                 onError={(e) => (e.target.style.display = "none")}
               />
             </div>
-
             <h1 className="display-4 fw-bold mb-2">ADHIMEDICINE</h1>
             <p className="lead mb-3">ADHIVEDA PHARMACEUTICAL PVT LTD</p>
             <div className="w-25 bg-white mx-auto my-3" style={{ height: "2px" }}></div>
@@ -72,14 +120,13 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* RIGHT SIDE - LOGIN FORM + BRANDING */}
+        {/* RIGHT SIDE */}
         <div className="col-12 col-lg-6 d-flex justify-content-center align-items-center bg-light p-4">
           <div
             className="card border-0 shadow-lg w-100 animate-zoom-in"
             style={{ maxWidth: "480px" }}
           >
             <div className="card-body p-4 p-md-5">
-              {/* Branding Section (optional; you can remove if you want only left side branding) */}
               <div className="text-center mb-4 animate-fade-up">
                 <div className="mx-auto mb-3" style={{ width: "80px", height: "80px" }}>
                   <img
@@ -95,8 +142,7 @@ export default function LoginPage() {
                 <p className="text-muted small">Secure access to your medical dashboard</p>
               </div>
 
-              {/* Login Form */}
-    <form onSubmit={handleLogin}>
+              <form onSubmit={handleLogin}>
                 <div className="mb-3 animate-fade-up delay-100">
                   <label className="form-label fw-semibold">Email Address</label>
                   <div className="input-group">
@@ -106,7 +152,7 @@ export default function LoginPage() {
                     <input
                       type="email"
                       className="form-control border-start-0 ps-0"
-                      placeholder="admin@example.com"
+                      placeholder="admin@adhimeds.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -187,7 +233,7 @@ export default function LoginPage() {
               </div>
 
               <div className="mt-3 text-center small text-muted animate-fade-up delay-600">
-                Demo: admin@example.com / any password
+                Demo: admin@adhimeds.com / Admin@123
               </div>
             </div>
           </div>

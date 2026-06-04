@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,6 +11,84 @@ import './all-products.css';
 import { deleteProductAPI, getProductsAPI, updateProductAPI } from '../../../../services/productService';
 import { getAllCustomReviewsAPI } from '../../../../services/customReviewService';
 import SERVERURL from '../../../../services/serverURL';
+
+// Custom debounce hook (JavaScript version)
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
+
+// Memoized product row component
+const ProductRow = memo(({ product, onTogglePublished, onToggleFeatured, onToggleTodayDeal, onEdit, onDelete, onInfo, getImageUrl }) => {
+  return (
+    <tr key={product._id}>
+      <tr>
+        <div className="d-flex align-items-center gap-2">
+          {product.thumbnail && (
+            <img
+              src={getImageUrl(product.thumbnail)}
+              alt={product.productName}
+              width="40"
+              height="40"
+              loading="lazy"
+              style={{ objectFit: 'cover', borderRadius: '8px' }}
+            />
+          )}
+          <div>
+            <div className="fw-bold">{product.productName}</div>
+            <small>{product.brand}</small>
+          </div>
+        </div>
+      </tr>
+      <td>{product.brand}</td>
+      <td>{product.mainCategory}</td>
+      <td>
+        {product.avgRating > 0 ? (
+          <div>
+            <div className="stars">{'⭐'.repeat(Math.floor(product.avgRating))}</div>
+            <small>{product.avgRating}/5 ({product.reviewCount} reviews)</small>
+          </div>
+        ) : (
+          '—'
+        )}
+      </td>
+      <td>₹{product.unitPrice}</td>
+      <td>{product.discount > 0 ? `${product.discount}%` : '—'}</td>
+      <td>
+        <button className="btn-icon info" onClick={() => onInfo(product)} title="View Details">
+          <i className="bi bi-info-circle"></i>
+        </button>
+      </td>
+      <td>
+        <label className="switch">
+          <input type="checkbox" checked={product.published || false} onChange={() => onTogglePublished(product._id, product.published)} />
+          <span className="slider round"></span>
+        </label>
+      </td>
+      <td>
+        <label className="switch">
+          <input type="checkbox" checked={product.featured || false} onChange={() => onToggleFeatured(product._id, product.featured)} />
+          <span className="slider round"></span>
+        </label>
+      </td>
+      <td>
+        <label className="switch">
+          <input type="checkbox" checked={product.todaysDeal || false} onChange={() => onToggleTodayDeal(product._id, product.todaysDeal)} />
+          <span className="slider round"></span>
+        </label>
+      </td>
+      <td>
+        <button className="btn-icon edit" onClick={() => onEdit(product._id)}><i className="bi bi-pencil"></i></button>
+        <button className="btn-icon delete" onClick={() => onDelete(product._id)}><i className="bi bi-trash"></i></button>
+      </td>
+    </tr>
+  );
+});
+ProductRow.displayName = 'ProductRow';
 
 export default function AllProductsPage() {
   const pathname = usePathname();
@@ -28,12 +106,31 @@ export default function AllProductsPage() {
   const [filterOption, setFilterOption] = useState('');
   const [sortOption, setSortOption] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+
   // Side modal state
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
-  const fetchProducts = async () => {
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const getImageUrl = useCallback((filename) => {
+    if (!filename) return null;
+    return `${SERVERURL}/imgUploads/${filename}`;
+  }, []);
+
+  const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
       const [productsRes, reviewsRes] = await Promise.all([
@@ -42,7 +139,7 @@ export default function AllProductsPage() {
       ]);
 
       if (!productsRes.success) throw new Error(productsRes.message || 'Failed to load products');
-      
+
       const productsData = productsRes.data;
       const allReviews = reviewsRes.success ? reviewsRes.data : [];
 
@@ -72,22 +169,17 @@ export default function AllProductsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchProducts();
-  }, []);
-
-  const getImageUrl = (filename) => {
-    if (!filename) return null;
-    return `${SERVERURL}/imgUploads/${filename}`;
-  };
+  }, [fetchProducts]);
 
   const filteredProducts = useMemo(() => {
     let result = [...products];
-    if (searchTerm) {
-      result = result.filter(p => p.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                  p.brand?.toLowerCase().includes(searchTerm.toLowerCase()));
+    if (debouncedSearchTerm) {
+      result = result.filter(p => p.productName?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                                  p.brand?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()));
     }
     if (filterOption === 'published') result = result.filter(p => p.published === true);
     if (filterOption === 'featured') result = result.filter(p => p.featured === true);
@@ -98,9 +190,9 @@ export default function AllProductsPage() {
     if (sortOption === 'rating-desc') result.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
     if (sortOption === 'name-asc') result.sort((a, b) => (a.productName || '').localeCompare(b.productName || ''));
     return result;
-  }, [products, searchTerm, filterOption, sortOption]);
+  }, [products, debouncedSearchTerm, filterOption, sortOption]);
 
-  const togglePublished = async (id, currentStatus) => {
+  const togglePublished = useCallback(async (id, currentStatus) => {
     try {
       const response = await updateProductAPI(id, { published: !currentStatus });
       if (response.success) {
@@ -112,9 +204,9 @@ export default function AllProductsPage() {
     } catch (error) {
       toast.error('Server error');
     }
-  };
+  }, [fetchProducts]);
 
-  const toggleFeatured = async (id, currentStatus) => {
+  const toggleFeatured = useCallback(async (id, currentStatus) => {
     try {
       const response = await updateProductAPI(id, { featured: !currentStatus });
       if (response.success) {
@@ -126,9 +218,9 @@ export default function AllProductsPage() {
     } catch (error) {
       toast.error('Server error');
     }
-  };
+  }, [fetchProducts]);
 
-  const toggleTodayDeal = async (id, currentStatus) => {
+  const toggleTodayDeal = useCallback(async (id, currentStatus) => {
     try {
       const response = await updateProductAPI(id, { todaysDeal: !currentStatus });
       if (response.success) {
@@ -140,9 +232,9 @@ export default function AllProductsPage() {
     } catch (error) {
       toast.error('Server error');
     }
-  };
+  }, [fetchProducts]);
 
-  const handleDelete = async (id) => {
+  const handleDelete = useCallback(async (id) => {
     if (!window.confirm('Delete this product permanently?')) return;
     try {
       const response = await deleteProductAPI(id);
@@ -155,19 +247,24 @@ export default function AllProductsPage() {
     } catch (error) {
       toast.error('Server error');
     }
-  };
+  }, [fetchProducts]);
 
-  const handleEdit = (id) => {
+  const handleEdit = useCallback((id) => {
     router.push(`/super-admin/product-managment/edit-product/${id}`);
-  };
+  }, [router]);
 
-  const openInfoModal = (product) => {
+  const openInfoModal = useCallback((product) => {
     setSelectedProduct(product);
     setShowInfoModal(true);
-  };
+  }, []);
 
-  const toggleDropdown = () => setDropdownOpen(!dropdownOpen);
-  const closeDropdown = () => setDropdownOpen(false);
+  const toggleDropdown = useCallback(() => setDropdownOpen(prev => !prev), []);
+  const closeDropdown = useCallback(() => setDropdownOpen(false), []);
+  const resetFilters = useCallback(() => {
+    setSearchTerm('');
+    setFilterOption('');
+    setSortOption('');
+  }, []);
 
   return (
     <div className="all-products-container">
@@ -184,7 +281,7 @@ export default function AllProductsPage() {
 
       <div className="header-actions">
         <h4 className="page-title">All Products</h4>
-        <div className="transparent-dropdown">
+        <div className="transparent-dropdown" ref={dropdownRef}>
           <button className="transparent-add-btn" onClick={toggleDropdown}>
             <i className="bi bi-plus-circle"></i> Add New
           </button>
@@ -218,7 +315,13 @@ export default function AllProductsPage() {
       <div className="filter-bar">
         <div className="row g-2 align-items-end">
           <div className="col-md-4">
-            <input type="text" className="form-control" placeholder="Search products..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
           <div className="col-md-3">
             <select className="form-select" value={filterOption} onChange={(e) => setFilterOption(e.target.value)}>
@@ -239,7 +342,7 @@ export default function AllProductsPage() {
             </select>
           </div>
           <div className="col-md-2">
-            <button className="btn btn-outline-secondary w-100" onClick={() => { setSearchTerm(''); setFilterOption(''); setSortOption(''); }}>Reset</button>
+            <button className="btn btn-outline-secondary w-100" onClick={resetFilters}>Reset</button>
           </div>
         </div>
       </div>
@@ -266,63 +369,20 @@ export default function AllProductsPage() {
             </thead>
             <tbody>
               {filteredProducts.map(product => (
-                <tr key={product._id}>
-                  <td>
-                    <div className="d-flex align-items-center gap-2">
-                      {product.thumbnail && (
-                        <img src={getImageUrl(product.thumbnail)} alt={product.productName} width="40" height="40" style={{ objectFit: 'cover', borderRadius: '8px' }} />
-                      )}
-                      <div>
-                        <div className="fw-bold">{product.productName}</div>
-                        <small>{product.brand}</small>
-                      </div>
-                    </div>
-                  </td>
-                  <td>{product.brand}</td>
-                  <td>{product.mainCategory}</td>
-                  <td>
-                    {product.avgRating > 0 ? (
-                      <div>
-                        <div className="stars">{'⭐'.repeat(Math.floor(product.avgRating))}</div>
-                        <small>{product.avgRating}/5 ({product.reviewCount} reviews)</small>
-                      </div>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td>₹{product.unitPrice}</td>
-                  <td>{product.discount > 0 ? `${product.discount}%` : '—'}</td>
-                  <td>
-                    <button className="btn-icon info" onClick={() => openInfoModal(product)} title="View Details">
-                      <i className="bi bi-info-circle"></i>
-                    </button>
-                  </td>
-                  <td>
-                    <label className="switch">
-                      <input type="checkbox" checked={product.published || false} onChange={() => togglePublished(product._id, product.published)} />
-                      <span className="slider round"></span>
-                    </label>
-                  </td>
-                  <td>
-                    <label className="switch">
-                      <input type="checkbox" checked={product.featured || false} onChange={() => toggleFeatured(product._id, product.featured)} />
-                      <span className="slider round"></span>
-                    </label>
-                  </td>
-                  <td>
-                    <label className="switch">
-                      <input type="checkbox" checked={product.todaysDeal || false} onChange={() => toggleTodayDeal(product._id, product.todaysDeal)} />
-                      <span className="slider round"></span>
-                    </label>
-                  </td>
-                  <td>
-                    <button className="btn-icon edit" onClick={() => handleEdit(product._id)}><i className="bi bi-pencil"></i></button>
-                    <button className="btn-icon delete" onClick={() => handleDelete(product._id)}><i className="bi bi-trash"></i></button>
-                  </td>
-                </tr>
+                <ProductRow
+                  key={product._id}
+                  product={product}
+                  onTogglePublished={togglePublished}
+                  onToggleFeatured={toggleFeatured}
+                  onToggleTodayDeal={toggleTodayDeal}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onInfo={openInfoModal}
+                  getImageUrl={getImageUrl}
+                />
               ))}
               {filteredProducts.length === 0 && (
-                <tr><td colSpan="11" className="text-center py-4">No products found.</td></tr>
+                <tr><td colSpan={11} className="text-center py-4">No products found.</td></tr>
               )}
             </tbody>
           </table>
@@ -348,11 +408,12 @@ export default function AllProductsPage() {
                 <div className="product-detail-card">
                   {selectedProduct.thumbnail && (
                     <div className="text-center mb-3">
-                      <img 
-                        src={getImageUrl(selectedProduct.thumbnail)} 
-                        alt={selectedProduct.productName} 
+                      <img
+                        src={getImageUrl(selectedProduct.thumbnail)}
+                        alt={selectedProduct.productName}
                         className="product-detail-image"
                         style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '1rem' }}
+                        loading="lazy"
                       />
                     </div>
                   )}
@@ -381,7 +442,7 @@ export default function AllProductsPage() {
                       <strong>Gallery Images:</strong>
                       <div className="d-flex flex-wrap gap-2 mt-2">
                         {selectedProduct.galleryImages.map((img, idx) => (
-                          <img key={idx} src={getImageUrl(img)} alt="gallery" width="60" height="60" style={{ objectFit: 'cover', borderRadius: '8px' }} />
+                          <img key={idx} src={getImageUrl(img)} alt="gallery" width="60" height="60" loading="lazy" style={{ objectFit: 'cover', borderRadius: '8px' }} />
                         ))}
                       </div>
                     </div>
