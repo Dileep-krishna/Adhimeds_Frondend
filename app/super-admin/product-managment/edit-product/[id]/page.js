@@ -15,6 +15,9 @@ import { getCategoriesAPI } from '../../../../services/categoryAPI';
 import { getWarrantiesAPI } from '../../../../services/warrentyAPI';
 import { getColorsAPI } from '../../../../services/colorAPI';
 import { getAttributesAPI } from '../../../../services/attributeAPI';
+export const runtime = 'nodejs'; // optional, but ensures Node.js runtime
+export const dynamic = 'force-dynamic';
+export const dynamicParams = true;
 
 export default function EditProductPage() {
   const { id } = useParams();
