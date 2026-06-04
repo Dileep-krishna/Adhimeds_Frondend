@@ -89,7 +89,7 @@ const ProductRow = memo(({ product, onTogglePublished, onToggleFeatured, onToggl
   );
 });
 ProductRow.displayName = 'ProductRow';
-
+export const dynamic = "force-dynamic";
 export default function AllProductsPage() {
   const pathname = usePathname();
   const router = useRouter();
@@ -249,9 +249,10 @@ export default function AllProductsPage() {
     }
   }, [fetchProducts]);
 
-  const handleEdit = useCallback((id) => {
-    router.push(`/super-admin/product-managment/edit-product/${id}`);
-  }, [router]);
+const handleEdit = useCallback((id) => {
+  console.log('Editing product with id:', id);
+  router.push(`/super-admin/product-managment/edit-product/${id}`);
+}, [router]);
 
   const openInfoModal = useCallback((product) => {
     setSelectedProduct(product);
