@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
+import toast, { Toaster } from "react-hot-toast";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./categories.css";
 import SERVERURL from "../../../../services/serverURL";
@@ -33,50 +34,57 @@ export default function CategoriesPage() {
 
   const BASE_URL = `${SERVERURL}/category`;
 
-  const getImageUrl = (filename) => {
+  const getImageUrl = useCallback((filename) => {
     if (!filename) return null;
     return `${SERVERURL}/imgUploads/${filename}`;
-  };
+  }, []);
 
-  const getParentName = (cat) => {
+  const getParentName = useCallback((cat) => {
     if (!cat.parent) return "No Parent";
     if (typeof cat.parent === "string") {
       const found = categories.find(c => c._id === cat.parent);
       return found ? found.name : "Unknown";
     }
     return cat.parent.name || "No Parent";
-  };
+  }, [categories]);
 
-  const getParentId = (cat) => {
+  const getParentId = useCallback((cat) => {
     if (!cat.parent) return "";
     if (typeof cat.parent === "string") return cat.parent;
     return cat.parent._id || "";
-  };
+  }, []);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     setLoading(true);
     try {
       const res = await axios.get(`${BASE_URL}?limit=100`);
       setCategories(res.data.data);
     } catch (err) {
       console.error(err);
-      alert("Failed to load categories");
+      toast.error("Failed to load categories");
     } finally {
       setLoading(false);
     }
-  };
+  }, [BASE_URL]);
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [fetchCategories]);
 
+  // cleanup preview URLs
   useEffect(() => {
     return () => {
-      [bannerPreview, iconPreview, coverPreview].forEach(url => {
-        if (url) URL.revokeObjectURL(url);
-      });
+      if (bannerPreview) URL.revokeObjectURL(bannerPreview);
+      if (iconPreview) URL.revokeObjectURL(iconPreview);
+      if (coverPreview) URL.revokeObjectURL(coverPreview);
     };
   }, [bannerPreview, iconPreview, coverPreview]);
+
+  const filteredCategories = useMemo(() => {
+    if (!searchTerm) return categories;
+    const term = searchTerm.toLowerCase();
+    return categories.filter(cat => cat.name.toLowerCase().includes(term));
+  }, [categories, searchTerm]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -94,6 +102,27 @@ export default function CategoriesPage() {
     }
   };
 
+  const resetModal = () => {
+    setFormData({
+      name: "",
+      parent: "",
+      order: 0,
+      metaTitle: "",
+      metaDescription: "",
+    });
+    setBannerFile(null);
+    setIconFile(null);
+    setCoverFile(null);
+    if (bannerPreview) URL.revokeObjectURL(bannerPreview);
+    if (iconPreview) URL.revokeObjectURL(iconPreview);
+    if (coverPreview) URL.revokeObjectURL(coverPreview);
+    setBannerPreview(null);
+    setIconPreview(null);
+    setCoverPreview(null);
+    setIsEdit(false);
+    setSelectedCategory(null);
+  };
+
   const handleAdd = async () => {
     try {
       const data = new FormData();
@@ -107,12 +136,13 @@ export default function CategoriesPage() {
       if (coverFile) data.append("coverImage", coverFile);
 
       await axios.post(BASE_URL, data);
+      toast.success("Category added successfully");
       fetchCategories();
       setShowModal(false);
       resetModal();
     } catch (err) {
       console.error(err);
-      alert("Add failed");
+      toast.error(err.response?.data?.message || "Add failed");
     }
   };
 
@@ -123,18 +153,25 @@ export default function CategoriesPage() {
       data.append("order", Number(formData.order));
       data.append("metaTitle", formData.metaTitle);
       data.append("metaDescription", formData.metaDescription);
-      if (formData.parent) data.append("parent", formData.parent);
+
+      if (formData.parent === "") {
+        data.append("parent", "null");
+      } else if (formData.parent) {
+        data.append("parent", formData.parent);
+      }
+
       if (bannerFile) data.append("banner", bannerFile);
       if (iconFile) data.append("icon", iconFile);
       if (coverFile) data.append("coverImage", coverFile);
 
       await axios.put(`${BASE_URL}/${selectedCategory._id}`, data);
+      toast.success("Category updated successfully");
       fetchCategories();
       setShowModal(false);
       resetModal();
     } catch (err) {
       console.error(err);
-      alert("Update failed");
+      toast.error(err.response?.data?.message || "Update failed");
     }
   };
 
@@ -142,32 +179,12 @@ export default function CategoriesPage() {
     if (!window.confirm("Delete this category permanently?")) return;
     try {
       await axios.delete(`${BASE_URL}/${id}`);
+      toast.success("Category deleted");
       fetchCategories();
     } catch (err) {
       console.error(err);
-      alert("Delete failed");
+      toast.error("Delete failed");
     }
-  };
-
-  const resetModal = () => {
-    setFormData({
-      name: "",
-      parent: "",
-      order: 0,
-      metaTitle: "",
-      metaDescription: "",
-    });
-    setBannerFile(null);
-    setIconFile(null);
-    setCoverFile(null);
-    [bannerPreview, iconPreview, coverPreview].forEach(url => {
-      if (url) URL.revokeObjectURL(url);
-    });
-    setBannerPreview(null);
-    setIconPreview(null);
-    setCoverPreview(null);
-    setIsEdit(false);
-    setSelectedCategory(null);
   };
 
   const openAddModal = () => {
@@ -196,21 +213,24 @@ export default function CategoriesPage() {
     setShowView(true);
   };
 
-  const filteredCategories = categories.filter(cat => {
-    if (searchTerm && !cat.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    return true;
-  });
-
   return (
     <div className="categories-container">
+      <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
+
       <div className="header-actions">
         <h4 className="page-title">📂 Category Management</h4>
         <button className="btn-add" onClick={openAddModal}>+ Add Category</button>
       </div>
 
-      {/* Filter Bar (search only) */}
+      {/* Large search bar */}
       <div className="filter-bar">
-        <input type="text" className="search-input" placeholder="🔍 Search by name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        <input
+          type="text"
+          className="search-input-large"
+          placeholder="🔍 Search categories by name..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
       {loading ? (
@@ -235,8 +255,8 @@ export default function CategoriesPage() {
                     {cat.icon ? (
                       <img src={getImageUrl(cat.icon)} className="rounded-circle" width="40" height="40" style={{ objectFit: "cover" }} alt="icon" />
                     ) : (
-                      <div className="bg-secondary bg-opacity-25 rounded-circle d-inline-flex align-items-center justify-content-center" style={{ width: "40px", height: "40px" }}>
-                        <i className="bi bi-image text-secondary"></i>
+                      <div className="no-icon-placeholder">
+                        <i className="bi bi-image"></i>
                       </div>
                     )}
                   </td>
@@ -257,92 +277,104 @@ export default function CategoriesPage() {
                 </tr>
               ))}
               {filteredCategories.length === 0 && (
-                <tr><td colSpan="6" className="text-center">No categories found.</td></tr>
+                <tr><td colSpan="6" className="text-center py-5">No categories found.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* ADD/EDIT MODAL */}
-      {showModal && (
-        <div className="modal-overlay">
-          <div className="modal-container">
-            <div className="modal-header">
-              <h5>{isEdit ? "Edit Category" : "Add Category"}</h5>
-              <button className="close-modal" onClick={() => setShowModal(false)}>&times;</button>
-            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label>Name *</label>
-                <input name="name" value={formData.name} onChange={handleChange} required />
+      {/* ADD/EDIT MODAL with animation */}
+      <AnimatePresence>
+        {showModal && (
+          <motion.div
+            className="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowModal(false)}
+          >
+            <motion.div
+              className="modal-container"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="modal-header">
+                <h5>{isEdit ? "Edit Category" : "Add Category"}</h5>
+                <button className="close-modal" onClick={() => setShowModal(false)}>&times;</button>
               </div>
-              <div className="form-group">
-                <label>Parent Category</label>
-                <select name="parent" value={formData.parent} onChange={handleChange}>
-                  <option value="">No Parent</option>
-                  {categories.filter(c => !isEdit || c._id !== selectedCategory?._id).map(cat => (
-                    <option key={cat._id} value={cat._id}>{cat.name}</option>
-                  ))}
-                </select>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Name *</label>
+                  <input name="name" value={formData.name} onChange={handleChange} required />
+                </div>
+                <div className="form-group">
+                  <label>Parent Category</label>
+                  <select name="parent" value={formData.parent} onChange={handleChange}>
+                    <option value="">No Parent</option>
+                    {categories.filter(c => !isEdit || c._id !== selectedCategory?._id).map(cat => (
+                      <option key={cat._id} value={cat._id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Ordering Number</label>
+                  <input type="number" name="order" value={formData.order} onChange={handleChange} />
+                  <small>Higher number = higher priority</small>
+                </div>
+                <div className="form-group">
+                  <label>Banner</label>
+                  <input type="file" accept="image/*" onChange={handleFileChange(setBannerFile, setBannerPreview)} />
+                  {bannerPreview && <img src={bannerPreview} className="preview-img" alt="banner" />}
+                </div>
+                <div className="form-group">
+                  <label>Icon</label>
+                  <input type="file" accept="image/*" onChange={handleFileChange(setIconFile, setIconPreview)} />
+                  {iconPreview && <img src={iconPreview} className="preview-icon" alt="icon" />}
+                </div>
+                <div className="form-group">
+                  <label>Cover Image</label>
+                  <input type="file" accept="image/*" onChange={handleFileChange(setCoverFile, setCoverPreview)} />
+                  {coverPreview && <img src={coverPreview} className="preview-img" alt="cover" />}
+                </div>
+                <div className="form-group">
+                  <label>Meta Title</label>
+                  <input name="metaTitle" value={formData.metaTitle} onChange={handleChange} />
+                </div>
+                <div className="form-group">
+                  <label>Meta Description</label>
+                  <textarea name="metaDescription" value={formData.metaDescription} onChange={handleChange} rows="3" />
+                </div>
               </div>
-              <div className="form-group">
-                <label>Ordering Number</label>
-                <input type="number" name="order" value={formData.order} onChange={handleChange} />
-                <small>Higher number = higher priority</small>
+              <div className="modal-footer">
+                <button className="btn-cancel" onClick={() => setShowModal(false)}>Cancel</button>
+                <button className="btn-save" onClick={isEdit ? handleUpdate : handleAdd}>{isEdit ? "Update" : "Save"}</button>
               </div>
-              <div className="form-group">
-                <label>Banner</label>
-                <input type="file" accept="image/*" onChange={handleFileChange(setBannerFile, setBannerPreview)} />
-                <small>Recommended size: 150x150px</small>
-                {bannerPreview && <img src={bannerPreview} className="preview-img" alt="banner" />}
-              </div>
-              <div className="form-group">
-                <label>Icon</label>
-                <input type="file" accept="image/*" onChange={handleFileChange(setIconFile, setIconPreview)} />
-                <small>Recommended size: 16x16px</small>
-                {iconPreview && <img src={iconPreview} className="preview-icon" alt="icon" />}
-              </div>
-              <div className="form-group">
-                <label>Cover Image</label>
-                <input type="file" accept="image/*" onChange={handleFileChange(setCoverFile, setCoverPreview)} />
-                <small>Recommended size: 260x260px</small>
-                {coverPreview && <img src={coverPreview} className="preview-img" alt="cover" />}
-              </div>
-              <div className="form-group">
-                <label>Meta Title</label>
-                <input name="metaTitle" value={formData.metaTitle} onChange={handleChange} />
-              </div>
-              <div className="form-group">
-                <label>Meta Description</label>
-                <textarea name="metaDescription" value={formData.metaDescription} onChange={handleChange} rows="3" />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn-cancel" onClick={() => setShowModal(false)}>Cancel</button>
-              <button className="btn-save" onClick={isEdit ? handleUpdate : handleAdd}>{isEdit ? "Update" : "Save"}</button>
-            </div>
-          </div>
-        </div>
-      )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* ATTRACTIVE SIDE VIEW DRAWER */}
+      {/* SIDE VIEW DRAWER with animation */}
       <AnimatePresence>
         {showView && selectedCategory && (
           <>
             <motion.div
+              className="sidebar-backdrop"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="sidebar-backdrop"
               onClick={() => setShowView(false)}
             />
             <motion.div
+              className="view-sidebar"
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "tween", duration: 0.3, ease: "easeOut" }}
-              className="view-sidebar"
             >
               <div className="sidebar-header">
                 <h4>{selectedCategory.name}</h4>
@@ -350,36 +382,29 @@ export default function CategoriesPage() {
               </div>
               <div className="sidebar-body">
                 <ul className="list-group">
-                  <li className="list-group-item"><strong>Parent Category</strong> <span>{getParentName(selectedCategory)}</span></li>
-                  <li className="list-group-item"><strong>Order Priority</strong> <span>{selectedCategory.order}</span></li>
-                  <li className="list-group-item"><strong>Meta Title</strong> <span>{selectedCategory.metaTitle || "—"}</span></li>
-                  <li className="list-group-item"><strong>Meta Description</strong> <span>{selectedCategory.metaDescription || "—"}</span></li>
+                  <li><strong>Parent Category</strong> <span>{getParentName(selectedCategory)}</span></li>
+                  <li><strong>Order Priority</strong> <span>{selectedCategory.order}</span></li>
+                  <li><strong>Meta Title</strong> <span>{selectedCategory.metaTitle || "—"}</span></li>
+                  <li><strong>Meta Description</strong> <span>{selectedCategory.metaDescription || "—"}</span></li>
                 </ul>
-
                 <div className="image-section">
                   <div className="image-card">
-                    <div className="image-label">🏞️ Banner Image</div>
+                    <div className="image-label">🏞️ Banner</div>
                     {selectedCategory.banner ? (
                       <img src={getImageUrl(selectedCategory.banner)} alt="banner" />
-                    ) : (
-                      <div className="placeholder-icon">No banner uploaded</div>
-                    )}
+                    ) : <div className="placeholder-icon">No banner</div>}
                   </div>
                   <div className="image-card">
                     <div className="image-label">🔘 Icon</div>
                     {selectedCategory.icon ? (
-                      <img src={getImageUrl(selectedCategory.icon)} alt="icon" style={{ width: "80px", height: "80px", margin: "0 auto", display: "block" }} />
-                    ) : (
-                      <div className="placeholder-icon">No icon uploaded</div>
-                    )}
+                      <img src={getImageUrl(selectedCategory.icon)} alt="icon" style={{ width: "80px", margin: "0 auto" }} />
+                    ) : <div className="placeholder-icon">No icon</div>}
                   </div>
                   <div className="image-card">
-                    <div className="image-label">📷 Cover Image</div>
+                    <div className="image-label">📷 Cover</div>
                     {selectedCategory.coverImage ? (
                       <img src={getImageUrl(selectedCategory.coverImage)} alt="cover" />
-                    ) : (
-                      <div className="placeholder-icon">No cover image uploaded</div>
-                    )}
+                    ) : <div className="placeholder-icon">No cover</div>}
                   </div>
                 </div>
               </div>

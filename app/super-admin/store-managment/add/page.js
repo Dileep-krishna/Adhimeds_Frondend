@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { GoogleMap, LoadScript, Marker, Autocomplete } from '@react-google-maps/api';
 import toast, { Toaster } from 'react-hot-toast';
 import { createStoreAPI } from '../../../services/storeManagementAPI';
 import '../medical-stores.css';
+import './storeAdd.css'; // separate CSS for additional styles
 
 const mapContainerStyle = { width: '100%', height: '300px', borderRadius: '8px' };
 const defaultCenter = { lat: 9.9312, lng: 76.2673 };
@@ -40,20 +41,21 @@ export default function AddStorePage() {
   const [saving, setSaving] = useState(false);
   const searchBoxRef = useRef(null);
 
-  const updatePosition = (lat, lng) => {
+  // Memoized coordinate update to avoid recreations
+  const updatePosition = useCallback((lat, lng) => {
     setFormData(prev => ({ ...prev, latitude: lat, longitude: lng }));
     if (map) map.panTo({ lat, lng });
-  };
+  }, [map]);
 
   const onMapClick = useCallback((event) => {
     updatePosition(event.latLng.lat(), event.latLng.lng());
-  }, []);
+  }, [updatePosition]);
 
   const onMarkerDragEnd = useCallback((event) => {
     updatePosition(event.latLng.lat(), event.latLng.lng());
-  }, []);
+  }, [updatePosition]);
 
-  const onLoadAutocomplete = (autocompleteInstance) => {
+  const onLoadAutocomplete = useCallback((autocompleteInstance) => {
     setAutocomplete(autocompleteInstance);
     autocompleteInstance.setComponentRestrictions({ country: 'in' });
     const ernakulamBounds = new window.google.maps.LatLngBounds(
@@ -61,9 +63,9 @@ export default function AddStorePage() {
       { lat: 10.05, lng: 76.45 }
     );
     autocompleteInstance.setBounds(ernakulamBounds);
-  };
+  }, []);
 
-  const onPlaceChanged = () => {
+  const onPlaceChanged = useCallback(() => {
     if (autocomplete !== null) {
       const place = autocomplete.getPlace();
       if (place.geometry && place.geometry.location) {
@@ -86,46 +88,75 @@ export default function AddStorePage() {
         toast.error('Could not find coordinates for that place. Try a more specific location.');
       }
     }
-  };
+  }, [autocomplete, map]);
 
-  const handleThumbnailChange = (e) => {
+  const handleThumbnailChange = useCallback((e) => {
     const files = Array.from(e.target.files);
+    if (files.length > 5) {
+      toast.error('Maximum 5 thumbnails allowed');
+      return;
+    }
     setThumbnailFiles(files);
     const previews = files.map(file => URL.createObjectURL(file));
+    // Cleanup old previews
+    thumbnailPreviews.forEach(url => URL.revokeObjectURL(url));
     setThumbnailPreviews(previews);
-  };
+  }, [thumbnailPreviews]);
 
-  const saveStore = async () => {
-    // Only store name and coordinates are required
-    if (!formData.storeName.trim()) {
-      toast.error('Store name required');
-      return;
+  // --- Mandatory field validation (all fields) ---
+  const validateForm = useCallback(() => {
+    const requiredFields = [
+      'storeName', 'vendorCategory', 'pincode', 'emailAddress',
+      'password', 'drugLicenseNumber', 'gstNumber', 'contactNumber',
+      'pharmacistName', 'address', 'searchLocation'
+    ];
+    for (let field of requiredFields) {
+      if (!formData[field]?.trim()) {
+        toast.error(`${field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())} is required`);
+        return false;
+      }
+    }
+    // Additional validations
+    if (!/^\d{6}$/.test(formData.pincode)) {
+      toast.error('Pincode must be exactly 6 digits');
+      return false;
+    }
+    if (!/^\d{10}$/.test(formData.contactNumber)) {
+      toast.error('Contact number must be 10 digits');
+      return false;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.emailAddress)) {
+      toast.error('Valid email address is required');
+      return false;
+    }
+    if (formData.password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return false;
     }
     if (formData.latitude < -90 || formData.latitude > 90 || formData.longitude < -180 || formData.longitude > 180) {
-      toast.error('Invalid latitude/longitude');
-      return;
+      toast.error('Invalid latitude/longitude coordinates');
+      return false;
     }
+    if (thumbnailFiles.length === 0) {
+      toast.error('At least one thumbnail image is required');
+      return false;
+    }
+    return true;
+  }, [formData, thumbnailFiles]);
+
+  const saveStore = useCallback(async () => {
+    if (!validateForm()) return;
 
     setSaving(true);
     try {
       const payload = new FormData();
-      payload.append('storeName', formData.storeName);
-      payload.append('latitude', formData.latitude);
-      payload.append('longitude', formData.longitude);
-      
-      // Append optional fields only if they have values
-      if (formData.searchLocation) payload.append('searchLocation', formData.searchLocation);
-      if (formData.address) payload.append('address', formData.address);
-      if (formData.status) payload.append('status', formData.status);
-      if (formData.vendorCategory) payload.append('vendorCategory', formData.vendorCategory);
-      if (formData.pincode) payload.append('pincode', formData.pincode);
-      if (formData.emailAddress) payload.append('emailAddress', formData.emailAddress);
-      if (formData.password) payload.append('password', formData.password);
-      if (formData.drugLicenseNumber) payload.append('drugLicenseNumber', formData.drugLicenseNumber);
-      if (formData.gstNumber) payload.append('gstNumber', formData.gstNumber);
-      if (formData.contactNumber) payload.append('contactNumber', formData.contactNumber);
-      if (formData.pharmacistName) payload.append('pharmacistName', formData.pharmacistName);
-      
+      // Append all fields (now all mandatory)
+      Object.keys(formData).forEach(key => {
+        if (formData[key] !== undefined && formData[key] !== null) {
+          payload.append(key, formData[key]);
+        }
+      });
       thumbnailFiles.forEach(file => {
         payload.append('thumbnailImages', file);
       });
@@ -133,7 +164,7 @@ export default function AddStorePage() {
       const response = await createStoreAPI(payload);
       if (response.success) {
         toast.success('Store added successfully');
-        router.push('/super-admin/store-management');
+        router.push('/super-admin/store-managment');
       } else {
         toast.error(response.message || 'Creation failed');
       }
@@ -143,7 +174,14 @@ export default function AddStorePage() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [formData, thumbnailFiles, validateForm, router]);
+
+  // Cleanup object URLs on unmount
+  React.useEffect(() => {
+    return () => {
+      thumbnailPreviews.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [thumbnailPreviews]);
 
   if (!googleMapsApiKey) {
     return <div className="medical-stores-container"><div className="alert alert-warning">Missing API key</div></div>;
@@ -156,7 +194,7 @@ export default function AddStorePage() {
         <div className="stores-hero">
           <div>
             <h1 className="stores-title">Add New Medical Store</h1>
-            <p className="stores-subtitle">Fill in the details (only store name and location are required)</p>
+            <p className="stores-subtitle">All fields are mandatory</p>
           </div>
           <button className="btn-secondary" onClick={() => router.back()}>
             <i className="bi bi-arrow-left"></i> Back
@@ -165,7 +203,7 @@ export default function AddStorePage() {
 
         <div className="store-form-card">
           <div className="form-section">
-            {/* Required fields */}
+            {/* Store Name */}
             <div className="form-group">
               <label>Store Name *</label>
               <input
@@ -176,8 +214,9 @@ export default function AddStorePage() {
               />
             </div>
 
+            {/* Search Location (now mandatory) */}
             <div className="form-group">
-              <label>Search for location (optional)</label>
+              <label>Search for location *</label>
               <Autocomplete onLoad={onLoadAutocomplete} onPlaceChanged={onPlaceChanged}>
                 <input
                   type="text"
@@ -190,6 +229,7 @@ export default function AddStorePage() {
               </Autocomplete>
             </div>
 
+            {/* Map */}
             <div className="form-group">
               <label>Exact Location * (click or drag marker)</label>
               <GoogleMap
@@ -208,6 +248,7 @@ export default function AddStorePage() {
               </GoogleMap>
             </div>
 
+            {/* Lat/Lng inputs */}
             <div className="latlng-inputs">
               <div className="lat-input">
                 <label>Latitude *</label>
@@ -229,9 +270,9 @@ export default function AddStorePage() {
               </div>
             </div>
 
-            {/* Optional fields */}
+            {/* Address (mandatory) */}
             <div className="form-group">
-              <label>Address (optional)</label>
+              <label>Address *</label>
               <input
                 type="text"
                 value={formData.address}
@@ -240,8 +281,9 @@ export default function AddStorePage() {
               />
             </div>
 
+            {/* Vendor Category */}
             <div className="form-group">
-              <label>Vendor Category (optional)</label>
+              <label>Vendor Category *</label>
               <select
                 value={formData.vendorCategory}
                 onChange={(e) => setFormData({ ...formData, vendorCategory: e.target.value })}
@@ -253,8 +295,9 @@ export default function AddStorePage() {
               </select>
             </div>
 
+            {/* Pincode */}
             <div className="form-group">
-              <label>Pincode (optional)</label>
+              <label>Pincode *</label>
               <input
                 type="text"
                 value={formData.pincode}
@@ -264,8 +307,9 @@ export default function AddStorePage() {
               />
             </div>
 
+            {/* Email */}
             <div className="form-group">
-              <label>Email Address (optional)</label>
+              <label>Email Address *</label>
               <input
                 type="email"
                 value={formData.emailAddress}
@@ -274,18 +318,20 @@ export default function AddStorePage() {
               />
             </div>
 
+            {/* Password */}
             <div className="form-group">
-              <label>Password (optional, at least 6 characters if provided)</label>
+              <label>Password * (at least 6 characters)</label>
               <input
                 type="password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="Leave blank if not needed"
+                placeholder="Minimum 6 characters"
               />
             </div>
 
+            {/* Drug License */}
             <div className="form-group">
-              <label>Drug License Number (optional)</label>
+              <label>Drug License Number *</label>
               <input
                 type="text"
                 value={formData.drugLicenseNumber}
@@ -294,8 +340,9 @@ export default function AddStorePage() {
               />
             </div>
 
+            {/* GST */}
             <div className="form-group">
-              <label>GST Number (optional)</label>
+              <label>GST Number *</label>
               <input
                 type="text"
                 value={formData.gstNumber}
@@ -304,8 +351,9 @@ export default function AddStorePage() {
               />
             </div>
 
+            {/* Contact */}
             <div className="form-group">
-              <label>Contact Number (optional, 10 digits)</label>
+              <label>Contact Number * (10 digits)</label>
               <input
                 type="tel"
                 value={formData.contactNumber}
@@ -315,8 +363,9 @@ export default function AddStorePage() {
               />
             </div>
 
+            {/* Pharmacist */}
             <div className="form-group">
-              <label>Pharmacist Name (optional)</label>
+              <label>Pharmacist Name *</label>
               <input
                 type="text"
                 value={formData.pharmacistName}
@@ -325,8 +374,9 @@ export default function AddStorePage() {
               />
             </div>
 
+            {/* Thumbnails (mandatory) */}
             <div className="form-group">
-              <label>Thumbnail Images (optional, max 10)</label>
+              <label>Thumbnail Images * (max 5)</label>
               <input
                 type="file"
                 accept="image/*"
@@ -334,16 +384,17 @@ export default function AddStorePage() {
                 onChange={handleThumbnailChange}
               />
               {thumbnailPreviews.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                <div className="thumbnail-preview-grid">
                   {thumbnailPreviews.map((src, idx) => (
-                    <img key={idx} src={src} alt={`preview-${idx}`} style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                    <img key={idx} src={src} alt={`preview-${idx}`} className="thumbnail-preview-img" />
                   ))}
                 </div>
               )}
             </div>
 
+            {/* Status */}
             <div className="form-group">
-              <label>Status (optional, defaults to pending)</label>
+              <label>Status *</label>
               <select
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}

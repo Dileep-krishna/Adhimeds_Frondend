@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, memo, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,20 +22,48 @@ function useDebounce(value, delay) {
   return debouncedValue;
 }
 
+// Simple pagination hook to manage page state
+function usePagination(totalItems, itemsPerPage = 10) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  
+  // Reset to first page when total items changes significantly
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
+  
+  const goToPage = (page) => {
+    const pageNumber = Math.max(1, Math.min(page, totalPages));
+    setCurrentPage(pageNumber);
+  };
+  
+  const nextPage = () => goToPage(currentPage + 1);
+  const prevPage = () => goToPage(currentPage - 1);
+  
+  return { currentPage, totalPages, goToPage, nextPage, prevPage, setCurrentPage };
+}
+
 // Memoized product row component
 const ProductRow = memo(({ product, onTogglePublished, onToggleFeatured, onToggleTodayDeal, onEdit, onDelete, onInfo, getImageUrl }) => {
+  // Optimize image rendering with decoding="async"
+  const thumbnailUrl = getImageUrl(product.thumbnail);
+  
   return (
     <tr key={product._id}>
-      <tr>
+      <td>
         <div className="d-flex align-items-center gap-2">
-          {product.thumbnail && (
+          {thumbnailUrl && (
             <img
-              src={getImageUrl(product.thumbnail)}
+              src={thumbnailUrl}
               alt={product.productName}
               width="40"
               height="40"
               loading="lazy"
+              decoding="async"
               style={{ objectFit: 'cover', borderRadius: '8px' }}
+              onError={(e) => { e.target.style.display = 'none'; }}
             />
           )}
           <div>
@@ -43,7 +71,7 @@ const ProductRow = memo(({ product, onTogglePublished, onToggleFeatured, onToggl
             <small>{product.brand}</small>
           </div>
         </div>
-      </tr>
+      </td>
       <td>{product.brand}</td>
       <td>{product.mainCategory}</td>
       <td>
@@ -89,7 +117,27 @@ const ProductRow = memo(({ product, onTogglePublished, onToggleFeatured, onToggl
   );
 });
 ProductRow.displayName = 'ProductRow';
+
+// Skeleton loader row for better perceived performance
+const SkeletonRow = memo(() => (
+  <tr className="skeleton-row">
+    <td><div className="skeleton" style={{ width: '120px', height: '40px' }}></div></td>
+    <td><div className="skeleton" style={{ width: '80px', height: '20px' }}></div></td>
+    <td><div className="skeleton" style={{ width: '100px', height: '20px' }}></div></td>
+    <td><div className="skeleton" style={{ width: '80px', height: '20px' }}></div></td>
+    <td><div className="skeleton" style={{ width: '60px', height: '20px' }}></div></td>
+    <td><div className="skeleton" style={{ width: '50px', height: '20px' }}></div></td>
+    <td><div className="skeleton" style={{ width: '30px', height: '30px', borderRadius: '50%' }}></div></td>
+    <td><div className="skeleton" style={{ width: '40px', height: '20px' }}></div></td>
+    <td><div className="skeleton" style={{ width: '40px', height: '20px' }}></div></td>
+    <td><div className="skeleton" style={{ width: '40px', height: '20px' }}></div></td>
+    <td><div className="skeleton" style={{ width: '70px', height: '30px' }}></div></td>
+  </tr>
+));
+SkeletonRow.displayName = 'SkeletonRow';
+
 export const dynamic = "force-dynamic";
+
 export default function AllProductsPage() {
   const pathname = usePathname();
   const router = useRouter();
@@ -106,7 +154,10 @@ export default function AllProductsPage() {
   const [filterOption, setFilterOption] = useState('');
   const [sortOption, setSortOption] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const [isPending, startTransition] = useTransition();
 
   // Side modal state
   const [showInfoModal, setShowInfoModal] = useState(false);
@@ -175,22 +226,62 @@ export default function AllProductsPage() {
     fetchProducts();
   }, [fetchProducts]);
 
-  const filteredProducts = useMemo(() => {
+  // Filter and sort products (memoized for performance)
+  const filteredAndSortedProducts = useMemo(() => {
     let result = [...products];
+    
     if (debouncedSearchTerm) {
-      result = result.filter(p => p.productName?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-                                  p.brand?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()));
+      const searchLower = debouncedSearchTerm.toLowerCase();
+      result = result.filter(p => 
+        p.productName?.toLowerCase().includes(searchLower) ||
+        p.brand?.toLowerCase().includes(searchLower)
+      );
     }
+    
     if (filterOption === 'published') result = result.filter(p => p.published === true);
     if (filterOption === 'featured') result = result.filter(p => p.featured === true);
     if (filterOption === 'todayDeal') result = result.filter(p => p.todaysDeal === true);
     if (filterOption === 'discount') result = result.filter(p => p.discount > 0);
+    
     if (sortOption === 'price-asc') result.sort((a, b) => (a.unitPrice || 0) - (b.unitPrice || 0));
     if (sortOption === 'price-desc') result.sort((a, b) => (b.unitPrice || 0) - (a.unitPrice || 0));
     if (sortOption === 'rating-desc') result.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
     if (sortOption === 'name-asc') result.sort((a, b) => (a.productName || '').localeCompare(b.productName || ''));
+    
     return result;
   }, [products, debouncedSearchTerm, filterOption, sortOption]);
+
+  // Pagination logic
+  const { currentPage, totalPages, goToPage, nextPage, prevPage, setCurrentPage } = usePagination(filteredAndSortedProducts.length, itemsPerPage);
+  
+  // Reset to page 1 when filters or search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, filterOption, sortOption, setCurrentPage]);
+
+  // Get current page items
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredAndSortedProducts.slice(startIndex, endIndex);
+  }, [filteredAndSortedProducts, currentPage, itemsPerPage]);
+
+  // Generate page numbers for pagination
+  const pageNumbers = useMemo(() => {
+    const pages = [];
+    const maxVisible = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+    
+    if (endPage - startPage + 1 < maxVisible) {
+      startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+    return pages;
+  }, [currentPage, totalPages]);
 
   const togglePublished = useCallback(async (id, currentStatus) => {
     try {
@@ -249,10 +340,9 @@ export default function AllProductsPage() {
     }
   }, [fetchProducts]);
 
-const handleEdit = useCallback((id) => {
-  console.log('Editing product with id:', id);
-  router.push(`/super-admin/product-managment/edit-product/${id}`);
-}, [router]);
+  const handleEdit = useCallback((id) => {
+    router.push(`/super-admin/product-managment/products/edit-product/${id}`);
+  }, [router]);
 
   const openInfoModal = useCallback((product) => {
     setSelectedProduct(product);
@@ -261,11 +351,32 @@ const handleEdit = useCallback((id) => {
 
   const toggleDropdown = useCallback(() => setDropdownOpen(prev => !prev), []);
   const closeDropdown = useCallback(() => setDropdownOpen(false), []);
+  
   const resetFilters = useCallback(() => {
     setSearchTerm('');
     setFilterOption('');
     setSortOption('');
+    setCurrentPage(1);
+  }, [setCurrentPage]);
+
+  // Handle items per page change
+  const handleItemsPerPageChange = useCallback((e) => {
+    const newValue = parseInt(e.target.value, 10);
+    setItemsPerPage(newValue);
+    setCurrentPage(1);
+  }, [setCurrentPage]);
+
+  // Handle search with transition for smoother UI
+  const handleSearchChange = useCallback((e) => {
+    const value = e.target.value;
+    startTransition(() => {
+      setSearchTerm(value);
+    });
   }, []);
+
+  // Calculate range display
+  const startItem = filteredAndSortedProducts.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+  const endItem = Math.min(currentPage * itemsPerPage, filteredAndSortedProducts.length);
 
   return (
     <div className="all-products-container">
@@ -321,7 +432,7 @@ const handleEdit = useCallback((id) => {
               className="form-control"
               placeholder="Search products..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearchChange}
             />
           </div>
           <div className="col-md-3">
@@ -350,8 +461,6 @@ const handleEdit = useCallback((id) => {
 
       <div className="table-responsive">
         {loading ? (
-          <div className="text-center py-5">Loading products...</div>
-        ) : (
           <table className="med-table">
             <thead>
               <tr>
@@ -369,24 +478,93 @@ const handleEdit = useCallback((id) => {
               </tr>
             </thead>
             <tbody>
-              {filteredProducts.map(product => (
-                <ProductRow
-                  key={product._id}
-                  product={product}
-                  onTogglePublished={togglePublished}
-                  onToggleFeatured={toggleFeatured}
-                  onToggleTodayDeal={toggleTodayDeal}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onInfo={openInfoModal}
-                  getImageUrl={getImageUrl}
-                />
+              {Array(itemsPerPage).fill(null).map((_, idx) => (
+                <SkeletonRow key={idx} />
               ))}
-              {filteredProducts.length === 0 && (
-                <tr><td colSpan={11} className="text-center py-4">No products found.</td></tr>
-              )}
             </tbody>
           </table>
+        ) : (
+          <>
+            <table className="med-table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Brand</th>
+                  <th>Category</th>
+                  <th>Rating</th>
+                  <th>Price (₹)</th>
+                  <th>Discount</th>
+                  <th>Info</th>
+                  <th>Published</th>
+                  <th>Featured</th>
+                  <th>Today's Deal</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedProducts.map(product => (
+                  <ProductRow
+                    key={product._id}
+                    product={product}
+                    onTogglePublished={togglePublished}
+                    onToggleFeatured={toggleFeatured}
+                    onToggleTodayDeal={toggleTodayDeal}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onInfo={openInfoModal}
+                    getImageUrl={getImageUrl}
+                  />
+                ))}
+                {paginatedProducts.length === 0 && (
+                  <tr><td colSpan={11} className="text-center py-4">No products found.</td></tr>
+                )}
+              </tbody>
+            </table>
+            
+            {/* Pagination Controls */}
+            {filteredAndSortedProducts.length > 0 && (
+              <div className="pagination-controls">
+                <div className="pagination-info">
+                  Showing {startItem} to {endItem} of {filteredAndSortedProducts.length} products
+                </div>
+                <div className="pagination-actions">
+                  <select 
+                    className="form-select per-page-select" 
+                    value={itemsPerPage} 
+                    onChange={handleItemsPerPageChange}
+                    aria-label="Items per page"
+                  >
+                    <option value={10}>10 per page</option>
+                    <option value={25}>25 per page</option>
+                    <option value={50}>50 per page</option>
+                    <option value={100}>100 per page</option>
+                  </select>
+                  
+                  <nav aria-label="Page navigation">
+                    <ul className="pagination mb-0">
+                      <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                        <button className="page-link" onClick={prevPage} disabled={currentPage === 1}>
+                          <i className="bi bi-chevron-left"></i>
+                        </button>
+                      </li>
+                      {pageNumbers.map(pageNum => (
+                        <li key={pageNum} className={`page-item ${currentPage === pageNum ? 'active' : ''}`}>
+                          <button className="page-link" onClick={() => goToPage(pageNum)}>
+                            {pageNum}
+                          </button>
+                        </li>
+                      ))}
+                      <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                        <button className="page-link" onClick={nextPage} disabled={currentPage === totalPages}>
+                          <i className="bi bi-chevron-right"></i>
+                        </button>
+                      </li>
+                    </ul>
+                  </nav>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -415,6 +593,7 @@ const handleEdit = useCallback((id) => {
                         className="product-detail-image"
                         style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '1rem' }}
                         loading="lazy"
+                        decoding="async"
                       />
                     </div>
                   )}
@@ -443,7 +622,16 @@ const handleEdit = useCallback((id) => {
                       <strong>Gallery Images:</strong>
                       <div className="d-flex flex-wrap gap-2 mt-2">
                         {selectedProduct.galleryImages.map((img, idx) => (
-                          <img key={idx} src={getImageUrl(img)} alt="gallery" width="60" height="60" loading="lazy" style={{ objectFit: 'cover', borderRadius: '8px' }} />
+                          <img 
+                            key={idx} 
+                            src={getImageUrl(img)} 
+                            alt="gallery" 
+                            width="60" 
+                            height="60" 
+                            loading="lazy" 
+                            decoding="async"
+                            style={{ objectFit: 'cover', borderRadius: '8px' }} 
+                          />
                         ))}
                       </div>
                     </div>
@@ -455,6 +643,8 @@ const handleEdit = useCallback((id) => {
           </>
         )}
       </AnimatePresence>
+
+     
     </div>
   );
 }

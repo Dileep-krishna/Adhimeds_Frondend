@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { GoogleMap, LoadScript, Marker, Autocomplete } from '@react-google-maps/api';
 import toast, { Toaster } from 'react-hot-toast';
 import { getStoreByIdAPI, updateStoreAPI } from '../../../../services/storeManagementAPI';
-import SERVERURL from '../../../../services/serverURL'; // adjust path as needed
+import SERVERURL from '../../../../services/serverURL';
 import '@/app/super-admin/store-managment/medical-stores.css';
 
 const mapContainerStyle = { width: '100%', height: '300px', borderRadius: '8px' };
@@ -20,6 +20,44 @@ const getImageUrl = (path) => {
   const normalized = path.startsWith('/') ? path : `/${path}`;
   return `${SERVERURL}${normalized}`;
 };
+
+// Skeleton loader component
+const SkeletonLoader = () => (
+  <div className="medical-stores-container">
+    <div className="stores-hero">
+      <div>
+        <div className="skeleton-title" style={{ width: '200px', height: '32px', marginBottom: '8px' }} />
+        <div className="skeleton-subtitle" style={{ width: '300px', height: '20px' }} />
+      </div>
+      <div className="skeleton-button" style={{ width: '120px', height: '40px', borderRadius: '24px' }} />
+    </div>
+    <div className="store-form-card">
+      <div className="form-section">
+        {Array(12).fill().map((_, i) => (
+          <div key={i} className="form-group">
+            <div className="skeleton-label" style={{ width: '120px', height: '16px', marginBottom: '8px' }} />
+            <div className="skeleton-input" style={{ width: '100%', height: '40px', borderRadius: '8px' }} />
+          </div>
+        ))}
+      </div>
+    </div>
+    <style jsx>{`
+      .skeleton-title, .skeleton-subtitle, .skeleton-button, .skeleton-label, .skeleton-input {
+        background: linear-gradient(90deg, #e5e7eb 25%, #f9fafb 50%, #e5e7eb 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.2s infinite;
+        border-radius: 4px;
+      }
+      .skeleton-button {
+        background: linear-gradient(90deg, #d1d5db 25%, #e5e7eb 50%, #d1d5db 75%);
+      }
+      @keyframes shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+    `}</style>
+  </div>
+);
 
 export default function EditStorePage() {
   const router = useRouter();
@@ -36,57 +74,65 @@ export default function EditStorePage() {
   const [existingThumbnails, setExistingThumbnails] = useState([]);
   const [thumbnailPreviews, setThumbnailPreviews] = useState([]);
 
+  // Cleanup previews on unmount
   useEffect(() => {
-    const fetchStore = async () => {
-      try {
-        const response = await getStoreByIdAPI(id);
-        if (response.success) {
-          const store = response.data;
-          setFormData({
-            storeName: store.storeName || '',
-            searchLocation: store.searchLocation || '',
-            address: store.address || '',
-            latitude: store.latitude,
-            longitude: store.longitude,
-            status: store.status || 'pending',
-            vendorCategory: store.vendorCategory || '',
-            pincode: store.pincode || '',
-            emailAddress: store.emailAddress || '',
-            drugLicenseNumber: store.drugLicenseNumber || '',
-            gstNumber: store.gstNumber || '',
-            contactNumber: store.contactNumber || '',
-            pharmacistName: store.pharmacistName || '',
-          });
-          if (store.thumbnailImages && store.thumbnailImages.length) {
-            setExistingThumbnails(store.thumbnailImages);
-          }
-        } else {
-          toast.error('Store not found');
-          router.push('/super-admin/store-management');
-        }
-      } catch (error) {
-        toast.error('Error loading store');
-      } finally {
-        setLoading(false);
-      }
+    return () => {
+      thumbnailPreviews.forEach(url => URL.revokeObjectURL(url));
     };
-    fetchStore();
+  }, [thumbnailPreviews]);
+
+  const fetchStore = useCallback(async () => {
+    try {
+      const response = await getStoreByIdAPI(id);
+      if (response.success) {
+        const store = response.data;
+        setFormData({
+          storeName: store.storeName || '',
+          searchLocation: store.searchLocation || '',
+          address: store.address || '',
+          latitude: store.latitude,
+          longitude: store.longitude,
+          status: store.status || 'pending',
+          vendorCategory: store.vendorCategory || '',
+          pincode: store.pincode || '',
+          emailAddress: store.emailAddress || '',
+          drugLicenseNumber: store.drugLicenseNumber || '',
+          gstNumber: store.gstNumber || '',
+          contactNumber: store.contactNumber || '',
+          pharmacistName: store.pharmacistName || '',
+        });
+        if (store.thumbnailImages && store.thumbnailImages.length) {
+          setExistingThumbnails(store.thumbnailImages);
+        }
+      } else {
+        toast.error('Store not found');
+        router.push('/super-admin/store-management');
+      }
+    } catch (error) {
+      toast.error('Error loading store');
+    } finally {
+      setLoading(false);
+    }
   }, [id, router]);
 
-  const updatePosition = (lat, lng) => {
+  useEffect(() => {
+    fetchStore();
+  }, [fetchStore]);
+
+  const updatePosition = useCallback((lat, lng) => {
     setFormData(prev => ({ ...prev, latitude: lat, longitude: lng }));
     if (map) map.panTo({ lat, lng });
-  };
+  }, [map]);
 
   const onMapClick = useCallback((event) => {
     updatePosition(event.latLng.lat(), event.latLng.lng());
-  }, []);
+  }, [updatePosition]);
 
   const onMarkerDragEnd = useCallback((event) => {
     updatePosition(event.latLng.lat(), event.latLng.lng());
-  }, []);
+  }, [updatePosition]);
 
-  const onLoadAutocomplete = (autocompleteInstance) => {
+  const onLoadAutocomplete = useCallback((autocompleteInstance) => {
     setAutocomplete(autocompleteInstance);
     autocompleteInstance.setComponentRestrictions({ country: 'in' });
     const ernakulamBounds = new window.google.maps.LatLngBounds(
@@ -94,9 +140,9 @@ export default function EditStorePage() {
       { lat: 10.05, lng: 76.45 }
     );
     autocompleteInstance.setBounds(ernakulamBounds);
-  };
+  }, []);
 
-  const onPlaceChanged = () => {
+  const onPlaceChanged = useCallback(() => {
     if (autocomplete !== null) {
       const place = autocomplete.getPlace();
       if (place.geometry && place.geometry.location) {
@@ -119,16 +165,18 @@ export default function EditStorePage() {
         toast.error('Could not find coordinates for that place.');
       }
     }
-  };
+  }, [autocomplete, map]);
 
-  const handleThumbnailChange = (e) => {
+  const handleThumbnailChange = useCallback((e) => {
     const files = Array.from(e.target.files);
     setThumbnailFiles(files);
     const previews = files.map(file => URL.createObjectURL(file));
+    // Cleanup old previews
+    thumbnailPreviews.forEach(url => URL.revokeObjectURL(url));
     setThumbnailPreviews(previews);
-  };
+  }, [thumbnailPreviews]);
 
-  const updateStore = async () => {
+  const updateStore = useCallback(async () => {
     if (!formData.storeName.trim()) {
       toast.error('Store name required');
       return;
@@ -168,7 +216,7 @@ export default function EditStorePage() {
       const response = await updateStoreAPI(id, payload);
       if (response.success) {
         toast.success('Store updated successfully');
-        router.push('/super-admin/store-management');
+        router.push('/super-admin/store-managment');
       } else {
         toast.error(response.message || 'Update failed');
       }
@@ -178,13 +226,34 @@ export default function EditStorePage() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [formData, thumbnailFiles, id, router]);
+
+  // Memoize existing thumbnails display
+  const existingThumbnailsDisplay = useMemo(() => {
+    if (existingThumbnails.length === 0) return null;
+    return (
+      <div style={{ marginBottom: '12px' }}>
+        <label>Current thumbnails:</label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+          {existingThumbnails.map((url, idx) => (
+            <img
+              key={idx}
+              src={getImageUrl(url)}
+              alt="thumbnail"
+              style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }, [existingThumbnails]);
 
   if (!googleMapsApiKey) {
     return <div className="medical-stores-container"><div className="alert alert-warning">Missing API key</div></div>;
   }
 
-  if (loading) return <div className="medical-stores-container"><div className="loading-spinner">Loading store...</div></div>;
+  if (loading) return <SkeletonLoader />;
   if (!formData) return null;
 
   return (
@@ -352,25 +421,9 @@ export default function EditStorePage() {
               />
             </div>
 
-            {/* Thumbnail Images Section with absolute URLs */}
             <div className="form-group">
               <label>Thumbnail Images</label>
-              {existingThumbnails.length > 0 && (
-                <div style={{ marginBottom: '12px' }}>
-                  <label>Current thumbnails:</label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-                    {existingThumbnails.map((url, idx) => (
-                      <img
-                        key={idx}
-                        src={getImageUrl(url)}
-                        alt="thumbnail"
-                        style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
-                        onError={(e) => { e.target.style.display = 'none'; }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
+              {existingThumbnailsDisplay}
               <input
                 type="file"
                 accept="image/*"

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import toast, { Toaster } from "react-hot-toast";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./attribute.css";
 import { createAttributeAPI, deleteAttributeAPI, getAttributesAPI, updateAttributeAPI } from "../../../../services/attributeAPI";
-// adjust path as needed
 
 export default function AttributesPage() {
   const [attributes, setAttributes] = useState([]);
@@ -14,10 +14,11 @@ export default function AttributesPage() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editId, setEditId] = useState(null);
   const [attributeName, setAttributeName] = useState("");
-  const [attributeValues, setAttributeValues] = useState([""]);
+  const [attributeValueItems, setAttributeValueItems] = useState([
+    { value: "", packSizesString: "" }
+  ]);
 
-  // Fetch attributes from API
-  const fetchAttributes = async () => {
+  const fetchAttributes = useCallback(async () => {
     setLoading(true);
     try {
       const response = await getAttributesAPI();
@@ -33,65 +34,100 @@ export default function AttributesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchAttributes();
-  }, []);
+  }, [fetchAttributes]);
 
-  // Open modal for adding
+  // ✅ Updated: packSizesStringToArray now keeps ALL non‑empty strings (letters, numbers, etc.)
+  const packSizesArrayToString = (arr) => arr.join(", ");
+  const packSizesStringToArray = (str) => {
+    if (!str.trim()) return [];
+    return str.split(",").map(s => s.trim()).filter(s => s !== "");
+  };
+
   const openAddModal = () => {
     setIsEditMode(false);
     setEditId(null);
     setAttributeName("");
-    setAttributeValues([""]);
+    setAttributeValueItems([{ value: "", packSizesString: "" }]);
     setShowModal(true);
   };
 
-  // Open modal for editing
   const openEditModal = (attribute) => {
     setIsEditMode(true);
     setEditId(attribute._id);
     setAttributeName(attribute.name);
-    setAttributeValues([...attribute.values]);
+    let items = [];
+    if (attribute.values && Array.isArray(attribute.values)) {
+      items = attribute.values.map(v => {
+        if (typeof v === "string") {
+          return { value: v, packSizesString: "" };
+        } else if (typeof v === "object" && v.value !== undefined) {
+          const packString = packSizesArrayToString(v.packSizes || []);
+          return { value: v.value, packSizesString: packString };
+        }
+        return { value: "", packSizesString: "" };
+      });
+    }
+    setAttributeValueItems(items.length ? items : [{ value: "", packSizesString: "" }]);
     setShowModal(true);
   };
 
   const closeModal = () => {
     setShowModal(false);
     setAttributeName("");
-    setAttributeValues([""]);
+    setAttributeValueItems([{ value: "", packSizesString: "" }]);
     setIsEditMode(false);
     setEditId(null);
   };
 
   const handleNameChange = (e) => setAttributeName(e.target.value);
   const handleValueChange = (idx, newValue) => {
-    const updated = [...attributeValues];
-    updated[idx] = newValue;
-    setAttributeValues(updated);
+    const updated = [...attributeValueItems];
+    updated[idx].value = newValue;
+    setAttributeValueItems(updated);
   };
-  const addMoreValue = () => setAttributeValues([...attributeValues, ""]);
+  const handlePackSizesStringChange = (idx, newString) => {
+    const updated = [...attributeValueItems];
+    updated[idx].packSizesString = newString;
+    setAttributeValueItems(updated);
+  };
+  const addMoreValue = () => {
+    setAttributeValueItems([...attributeValueItems, { value: "", packSizesString: "" }]);
+  };
   const removeValue = (idx) => {
-    const updated = attributeValues.filter((_, i) => i !== idx);
-    setAttributeValues(updated);
+    if (attributeValueItems.length === 1) {
+      toast.error("At least one attribute value is required");
+      return;
+    }
+    const updated = attributeValueItems.filter((_, i) => i !== idx);
+    setAttributeValueItems(updated);
   };
 
-  // Save attribute (create or update)
+  const preparePackSizes = (items) => {
+    return items.map(item => ({
+      value: item.value.trim(),
+      packSizes: packSizesStringToArray(item.packSizesString)
+    }));
+  };
+
   const saveAttribute = async () => {
     if (!attributeName.trim()) {
-      alert("Attribute name is required");
+      toast.error("Attribute name is required");
       return;
     }
-    const filteredValues = attributeValues.filter(v => v.trim() !== "");
-    if (filteredValues.length === 0) {
-      alert("At least one attribute value is required");
+    const filteredItems = attributeValueItems.filter(item => item.value.trim() !== "");
+    if (filteredItems.length === 0) {
+      toast.error("At least one attribute value is required");
       return;
     }
 
+    const preparedValues = preparePackSizes(filteredItems);
     const payload = {
       name: attributeName.trim(),
-      values: filteredValues,
+      values: preparedValues
     };
 
     try {
@@ -101,34 +137,55 @@ export default function AttributesPage() {
       } else {
         response = await createAttributeAPI(payload);
       }
-
       if (response.success) {
-        fetchAttributes(); // refresh list
+        toast.success(`Attribute ${isEditMode ? "updated" : "created"} successfully`);
+        fetchAttributes();
         closeModal();
       } else {
-        alert(response.message || "Operation failed");
+        toast.error(response.message || "Operation failed");
       }
     } catch (err) {
       console.error(err);
-      alert("Server error. Please try again.");
+      toast.error("Server error. Please try again.");
     }
   };
 
-  // Delete attribute
   const deleteAttribute = async (id, name) => {
     if (window.confirm(`Delete attribute "${name}" permanently?`)) {
       try {
         const response = await deleteAttributeAPI(id);
         if (response.success) {
+          toast.success("Attribute deleted");
           fetchAttributes();
         } else {
-          alert(response.message || "Delete failed");
+          toast.error(response.message || "Delete failed");
         }
       } catch (err) {
         console.error(err);
-        alert("Server error. Could not delete.");
+        toast.error("Server error. Could not delete.");
       }
     }
+  };
+
+  const renderValueChips = (values) => {
+    if (!values || !values.length) return "—";
+    return values.map((v, idx) => {
+      let valueText = "";
+      let packString = "";
+      if (typeof v === "string") {
+        valueText = v;
+      } else if (typeof v === "object") {
+        valueText = v.value || "";
+        if (v.packSizes && v.packSizes.length) {
+          packString = ` (${v.packSizes.join(", ")})`;
+        }
+      }
+      return (
+        <span key={idx} className="value-chip">
+          {valueText}{packString}
+        </span>
+      );
+    });
   };
 
   if (loading) {
@@ -152,103 +209,122 @@ export default function AttributesPage() {
   }
 
   return (
-    <div className="attributes-container">
-      <div className="header-actions">
-        <h4 className="page-title">Medical Attributes</h4>
-        <button className="btn-add" onClick={openAddModal}>
-          + Add New Attribute
-        </button>
-      </div>
+    <>
+      <Toaster position="top-right" />
+      <div className="attributes-container">
+        <div className="header-actions">
+          <h4 className="page-title">Medical Attributes</h4>
+          <button className="btn-add" onClick={openAddModal}>
+            + Add New Attribute
+          </button>
+        </div>
 
-      <div className="table-responsive">
-        <table className="med-table">
-          <thead>
-            <tr>
-              <th>Attribute Name</th>
-              <th>Possible Values</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {attributes.map((attr) => (
-              <tr key={attr._id}>
-                <td><strong>{attr.name}</strong></td>
-                <td>
-                  <div className="value-chips">
-                    {attr.values.map((val, i) => (
-                      <span key={i} className="value-chip">{val}</span>
-                    ))}
-                  </div>
-                </td>
-                <td>
-                  <button className="btn-icon edit" onClick={() => openEditModal(attr)}>
-                    <i className="bi bi-pencil"></i>
-                  </button>
-                  <button className="btn-icon delete" onClick={() => deleteAttribute(attr._id, attr.name)}>
-                    <i className="bi bi-trash"></i>
-                  </button>
-                </td>
+        <div className="table-responsive">
+          <table className="med-table">
+            <thead>
+              <tr>
+                <th>Attribute Name</th>
+                <th>Possible Values (with Pack Sizes)</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {attributes.map((attr) => (
+                <tr key={attr._id}>
+                  <td><strong>{attr.name}</strong></td>
+                  <td>
+                    <div className="value-chips">
+                      {renderValueChips(attr.values)}
+                    </div>
+                  </td>
+                  <td>
+                    <button className="btn-icon edit" onClick={() => openEditModal(attr)}>
+                      <i className="bi bi-pencil"></i>
+                    </button>
+                    <button className="btn-icon delete" onClick={() => deleteAttribute(attr._id, attr.name)}>
+                      <i className="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {attributes.length === 0 && (
+                <tr>
+                  <td colSpan="3" className="text-center py-4">No attributes found. Click "Add New Attribute" to start.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
-      {/* Modal (unchanged UI, only uses backend IDs now) */}
-      {showModal && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h5>{isEditMode ? "Edit Attribute" : "Attribute Information"}</h5>
-              <button className="close-modal" onClick={closeModal}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label>Attribute Name</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={attributeName}
-                  onChange={handleNameChange}
-                  placeholder="e.g., Dosage Form"
-                />
+        {showModal && (
+          <div className="modal-overlay" onClick={closeModal}>
+            <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h5>{isEditMode ? "Edit Attribute" : "Attribute Information"}</h5>
+                <button className="close-modal" onClick={closeModal}>×</button>
               </div>
-              <div className="form-group">
-                <label>Attribute Values</label>
-                {attributeValues.map((val, idx) => (
-                  <div key={idx} className="value-input-group">
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={val}
-                      onChange={(e) => handleValueChange(idx, e.target.value)}
-                      placeholder="Enter Attribute Value"
-                    />
-                    {attributeValues.length > 1 && (
-                      <button
-                        type="button"
-                        className="btn-remove-value"
-                        onClick={() => removeValue(idx)}
-                      >
-                        <i className="bi bi-x-circle"></i>
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <button className="btn-add-more" onClick={addMoreValue}>
-                  + Add More
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Attribute Name</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={attributeName}
+                    onChange={handleNameChange}
+                    placeholder="e.g., Size, Color, Dosage Form"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Attribute Values & Pack Sizes (optional)</label>
+                  {attributeValueItems.map((item, idx) => (
+                    <div key={idx} className="value-pack-group">
+                      <div className="value-input-row">
+                        <input
+                          type="text"
+                          className="form-control value-input"
+                          value={item.value}
+                          onChange={(e) => handleValueChange(idx, e.target.value)}
+                          placeholder="e.g., M"
+                        />
+                        <input
+                          type="text"
+                          className="form-control pack-input"
+                          value={item.packSizesString}
+                          onChange={(e) => handlePackSizesStringChange(idx, e.target.value)}
+                          placeholder="e.g., 32, XL, Small, 5ml"
+                        />
+                        {attributeValueItems.length > 1 && (
+                          <button
+                            type="button"
+                            className="btn-remove-value"
+                            onClick={() => removeValue(idx)}
+                            title="Remove this value"
+                          >
+                            <i className="bi bi-x-circle"></i>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <button className="btn-add-more" onClick={addMoreValue}>
+                    + Add More Value
+                  </button>
+                  <small className="text-muted d-block mt-2">
+                    Pack sizes are optional; separate multiple with commas (e.g., 32, XL, Small). Any text is allowed.
+                  </small>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn-cancel" onClick={closeModal}>Cancel</button>
+                <button className="btn-save" onClick={saveAttribute}>
+                  {isEditMode ? "Update" : "Save"}
                 </button>
               </div>
             </div>
-            <div className="modal-footer">
-              <button className="btn-cancel" onClick={closeModal}>Cancel</button>
-              <button className="btn-save" onClick={saveAttribute}>
-                {isEditMode ? "Update" : "Save"}
-              </button>
-            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 }

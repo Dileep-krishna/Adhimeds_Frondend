@@ -1,22 +1,124 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, useTransition, useDeferredValue } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { getStoresAPI, deleteStoreAPI, getStoreByIdAPI } from '../../services/storeManagementAPI';
-import SERVERURL from '../../services/serverURL'; // adjust path as needed
+import SERVERURL from '../../services/serverURL';
 import './medical-stores.css';
+
+// Helper: debounce hook
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
 
 // Helper: convert relative image path to absolute backend URL
 const getImageUrl = (path) => {
   if (!path) return null;
-  // Already absolute
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  // Normalise leading slash
   const normalized = path.startsWith('/') ? path : `/${path}`;
   return `${SERVERURL}${normalized}`;
 };
+
+// Memoized stats row
+const StatsRow = React.memo(({ activeCount, inactiveCount, pendingCount }) => (
+  <div className="stats-row">
+    <div className="stat-card active">
+      <div className="stat-icon">🏪</div>
+      <div className="stat-info">
+        <h3>{activeCount}</h3>
+        <p>Active Stores</p>
+      </div>
+    </div>
+    <div className="stat-card inactive">
+      <div className="stat-icon">⏸️</div>
+      <div className="stat-info">
+        <h3>{inactiveCount}</h3>
+        <p>Inactive Stores</p>
+      </div>
+    </div>
+    <div className="stat-card pending">
+      <div className="stat-icon">⏳</div>
+      <div className="stat-info">
+        <h3>{pendingCount}</h3>
+        <p>Pending Stores</p>
+      </div>
+    </div>
+  </div>
+));
+StatsRow.displayName = 'StatsRow';
+
+// Memoized store row component
+const StoreRow = React.memo(({ store, onView, onDelete, getThumbnail }) => {
+  const thumbnail = useMemo(() => getThumbnail(store), [store, getThumbnail]);
+  return (
+    <tr>
+      <td>
+        <div className="store-info">
+          <div className="store-avatar">
+            {thumbnail ? (
+              <img
+                src={thumbnail}
+                alt={store.storeName}
+                className="store-thumbnail"
+                loading="lazy"
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+            ) : (
+              <i className="bi bi-building"></i>
+            )}
+          </div>
+          <div>
+            <strong>{store.storeName}</strong>
+            {store.address && <div className="store-address">{store.address}</div>}
+          </div>
+        </div>
+      </td>
+      <td><span className="vendor-badge">{store.vendorCategory || '—'}</span></td>
+      <td>{store.emailAddress || '—'}</td>
+      <td>
+        <span className={`status-badge ${store.status}`}>
+          {store.status.charAt(0).toUpperCase() + store.status.slice(1)}
+        </span>
+      </td>
+      <td>
+        {store.createdAt
+          ? new Date(store.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+          : 'N/A'}
+      </td>
+      <td className="actions-cell">
+        <button className="action-icon view" onClick={() => onView(store._id)} title="View Details">
+          <i className="bi bi-eye"></i>
+        </button>
+        <Link href={`/super-admin/store-managment/edit/${store._id}`} className="action-icon edit" title="Edit">
+          <i className="bi bi-pencil-square"></i>
+        </Link>
+        <button className="action-icon delete" onClick={() => onDelete(store._id)} title="Delete">
+          <i className="bi bi-trash3"></i>
+        </button>
+      </td>
+    </tr>
+  );
+});
+StoreRow.displayName = 'StoreRow';
+
+// Skeleton loader row (fixed – no JSX syntax errors)
+const SkeletonRow = () => (
+  <tr className="skeleton-row">
+    <td><div className="skeleton" style={{ width: '200px', height: '50px' }} /></td>
+    <td><div className="skeleton" style={{ width: '100px' }} /></td>
+    <td><div className="skeleton" style={{ width: '150px' }} /></td>
+    <td><div className="skeleton" style={{ width: '80px' }} /></td>
+    <td><div className="skeleton" style={{ width: '90px' }} /></td>
+    <td><div className="skeleton" style={{ width: '120px' }} /></td>
+  </tr>
+);
 
 export default function MedicalStoreManagement() {
   const [stores, setStores] = useState([]);
@@ -27,8 +129,14 @@ export default function MedicalStoreManagement() {
   const [deleting, setDeleting] = useState(false);
   const [viewStore, setViewStore] = useState(null);
   const [viewLoading, setViewLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  const fetchStores = async () => {
+  const [isPending, startTransition] = useTransition();
+  const deferredSearch = useDeferredValue(searchTerm);
+  const debouncedSearch = useDebounce(deferredSearch, 300);
+
+  const fetchStores = useCallback(async () => {
     setLoading(true);
     try {
       const response = await getStoresAPI();
@@ -39,26 +147,43 @@ export default function MedicalStoreManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchStores();
-  }, []);
+  }, [fetchStores]);
 
-  const activeCount = stores.filter(s => s.status === 'active').length;
-  const inactiveCount = stores.filter(s => s.status === 'inactive').length;
-  const pendingCount = stores.filter(s => s.status === 'pending').length;
+  useEffect(() => {
+    startTransition(() => setCurrentPage(1));
+  }, [debouncedSearch, statusFilter]);
 
-  const filteredStores = stores.filter(store => {
-    const matchesSearch = store.storeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (store.address && store.address.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesStatus = statusFilter === 'all' || store.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const activeCount = useMemo(() => stores.filter(s => s.status === 'active').length, [stores]);
+  const inactiveCount = useMemo(() => stores.filter(s => s.status === 'inactive').length, [stores]);
+  const pendingCount = useMemo(() => stores.filter(s => s.status === 'pending').length, [stores]);
 
-  const confirmDelete = (id) => setDeleteConfirm(id);
+  const filteredStores = useMemo(() => {
+    let result = stores;
+    if (debouncedSearch) {
+      const term = debouncedSearch.toLowerCase();
+      result = result.filter(store =>
+        store.storeName?.toLowerCase().includes(term) ||
+        store.address?.toLowerCase().includes(term)
+      );
+    }
+    if (statusFilter !== 'all') {
+      result = result.filter(store => store.status === statusFilter);
+    }
+    return result;
+  }, [stores, debouncedSearch, statusFilter]);
 
-  const deleteStore = async () => {
+  const totalPages = Math.ceil(filteredStores.length / itemsPerPage);
+  const paginatedStores = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredStores.slice(start, start + itemsPerPage);
+  }, [filteredStores, currentPage, itemsPerPage]);
+
+  const confirmDelete = useCallback((id) => setDeleteConfirm(id), []);
+  const deleteStore = useCallback(async () => {
     setDeleting(true);
     try {
       const response = await deleteStoreAPI(deleteConfirm);
@@ -74,9 +199,9 @@ export default function MedicalStoreManagement() {
       setDeleting(false);
       setDeleteConfirm(null);
     }
-  };
+  }, [deleteConfirm, fetchStores]);
 
-  const handleViewStore = async (id) => {
+  const handleViewStore = useCallback(async (id) => {
     setViewLoading(true);
     try {
       const response = await getStoreByIdAPI(id);
@@ -90,24 +215,27 @@ export default function MedicalStoreManagement() {
     } finally {
       setViewLoading(false);
     }
-  };
+  }, []);
 
-  const formatDate = (dateString) => {
+  const formatDate = useCallback((dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
-  };
+  }, []);
 
-  // Get first thumbnail URL (absolute) or fallback icon
-  const getThumbnail = (store) => {
+  const getThumbnail = useCallback((store) => {
     if (store.thumbnailImages && store.thumbnailImages.length > 0) {
       return getImageUrl(store.thumbnailImages[0]);
     }
     return null;
-  };
+  }, []);
+
+  const handleSearchChange = useCallback((e) => {
+    setSearchTerm(e.target.value);
+  }, []);
 
   return (
     <>
@@ -123,29 +251,7 @@ export default function MedicalStoreManagement() {
           </Link>
         </div>
 
-        <div className="stats-row">
-          <div className="stat-card active">
-            <div className="stat-icon">🏪</div>
-            <div className="stat-info">
-              <h3>{activeCount}</h3>
-              <p>Active Stores</p>
-            </div>
-          </div>
-          <div className="stat-card inactive">
-            <div className="stat-icon">⏸️</div>
-            <div className="stat-info">
-              <h3>{inactiveCount}</h3>
-              <p>Inactive Stores</p>
-            </div>
-          </div>
-          <div className="stat-card pending">
-            <div className="stat-icon">⏳</div>
-            <div className="stat-info">
-              <h3>{pendingCount}</h3>
-              <p>Pending Stores</p>
-            </div>
-          </div>
-        </div>
+        <StatsRow activeCount={activeCount} inactiveCount={inactiveCount} pendingCount={pendingCount} />
 
         <div className="filter-bar">
           <div className="filter-buttons">
@@ -164,101 +270,77 @@ export default function MedicalStoreManagement() {
             className="search-input"
             placeholder="Search by name or address..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={handleSearchChange}
           />
         </div>
 
         <div className="stores-table-container">
           {loading ? (
-            <div className="loading-spinner">Loading stores...</div>
-          ) : (
             <table className="stores-table">
               <thead>
-                <tr>
-                  <th>Store</th>
-                  <th>Vendor Category</th>
-                  <th>Email</th>
-                  <th>Status</th>
-                  <th>Added Date</th>
-                  <th>Actions</th>
-                </tr>
+                <tr><th>Store</th><th>Vendor Category</th><th>Email</th><th>Status</th><th>Added Date</th><th>Actions</th></tr>
               </thead>
               <tbody>
-                {filteredStores.map(store => {
-                  const thumbnail = getThumbnail(store);
-                  return (
-                    <tr key={store._id}>
-                      <td>
-                        <div className="store-info">
-                          <div className="store-avatar">
-                            {thumbnail ? (
-                              <img
-                                src={thumbnail}
-                                alt={store.storeName}
-                                className="store-thumbnail"
-                                onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling?.style?.removeProperty('display'); }}
-                              />
-                            ) : null}
-                            {!thumbnail && <i className="bi bi-building"></i>}
-                          </div>
-                          <div>
-                            <strong>{store.storeName}</strong>
-                            {store.address && <div className="store-address">{store.address}</div>}
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="vendor-badge">
-                          {store.vendorCategory || '—'}
-                        </span>
-                      </td>
-                      <td>{store.emailAddress || '—'}</td>
-                      <td>
-                        <span className={`status-badge ${store.status}`}>
-                          {store.status.charAt(0).toUpperCase() + store.status.slice(1)}
-                        </span>
-                      </td>
-                      <td>
-                        {store.createdAt
-                          ? new Date(store.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-                          : 'N/A'}
-                      </td>
-                      <td className="actions-cell">
-                        <button
-                          className="action-icon view"
-                          onClick={() => handleViewStore(store._id)}
-                          title="View Details"
-                        >
-                          <i className="bi bi-eye"></i>
-                        </button>
-                        <Link
-                          href={`/super-admin/store-managment/edit/${store._id}`}
-                          className="action-icon edit"
-                          title="Edit"
-                        >
-                          <i className="bi bi-pencil-square"></i>
-                        </Link>
-                        <button
-                          className="action-icon delete"
-                          onClick={() => confirmDelete(store._id)}
-                          title="Delete"
-                        >
-                          <i className="bi bi-trash3"></i>
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {filteredStores.length === 0 && (
-                  <tr>
-                    <td colSpan="6" className="empty-state">
-                      <i className="bi bi-inbox"></i>
-                      <p>No medical stores found</p>
-                    </td>
-                  </tr>
-                )}
+                {Array(itemsPerPage).fill().map((_, i) => <SkeletonRow key={i} />)}
               </tbody>
             </table>
+          ) : (
+            <>
+              <table className="stores-table">
+                <thead>
+                  <tr>
+                    <th>Store</th>
+                    <th>Vendor Category</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th>Added Date</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedStores.map(store => (
+                    <StoreRow
+                      key={store._id}
+                      store={store}
+                      onView={handleViewStore}
+                      onDelete={confirmDelete}
+                      getThumbnail={getThumbnail}
+                    />
+                  ))}
+                  {paginatedStores.length === 0 && (
+                    <tr>
+                      <td colSpan="6" className="empty-state">
+                        <i className="bi bi-inbox"></i>
+                        <p>No medical stores found</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+
+              {filteredStores.length > 0 && (
+                <div className="pagination-controls">
+                  <div className="pagination-info">
+                    Showing {Math.min(filteredStores.length, (currentPage-1)*itemsPerPage+1)} to {Math.min(currentPage*itemsPerPage, filteredStores.length)} of {filteredStores.length} stores
+                  </div>
+                  <div className="pagination-buttons">
+                    <button className="pagination-btn" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p-1)}>
+                      Previous
+                    </button>
+                    <span className="page-indicator">Page {currentPage} of {totalPages}</span>
+                    <button className="pagination-btn" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p+1)}>
+                      Next
+                    </button>
+                    <select className="per-page-select" value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}>
+                      <option value={10}>10 per page</option>
+                      <option value={25}>25 per page</option>
+                      <option value={50}>50 per page</option>
+                      <option value={100}>100 per page</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -283,7 +365,7 @@ export default function MedicalStoreManagement() {
           </div>
         )}
 
-        {/* View Details Side Drawer with Thumbnail Gallery */}
+        {/* View Details Side Drawer */}
         <AnimatePresence>
           {viewStore && (
             <>
@@ -304,7 +386,6 @@ export default function MedicalStoreManagement() {
                     <div className="loading-spinner">Loading details...</div>
                   ) : (
                     <>
-                      {/* Thumbnail gallery */}
                       {viewStore.thumbnailImages?.length > 0 && (
                         <div className="drawer-image-gallery">
                           {viewStore.thumbnailImages.map((img, idx) => (
@@ -313,64 +394,36 @@ export default function MedicalStoreManagement() {
                               src={getImageUrl(img)}
                               alt={`thumb-${idx}`}
                               className="drawer-thumb"
+                              loading="lazy"
                               onError={(e) => { e.target.style.display = 'none'; }}
                             />
                           ))}
                         </div>
                       )}
-
-                      <div className="detail-row">
-                        <strong>Store Name:</strong> {viewStore.storeName}
-                      </div>
-                      <div className="detail-row">
-                        <strong>Vendor Category:</strong> {viewStore.vendorCategory || '—'}
-                      </div>
-                      <div className="detail-row">
-                        <strong>Email:</strong> {viewStore.emailAddress || '—'}
-                      </div>
-                      <div className="detail-row">
-                        <strong>Contact Number:</strong> {viewStore.contactNumber || '—'}
-                      </div>
-                      <div className="detail-row">
-                        <strong>Pharmacist Name:</strong> {viewStore.pharmacistName || '—'}
-                      </div>
-                      <div className="detail-row">
-                        <strong>Address:</strong> {viewStore.address || '—'}
-                      </div>
-                      <div className="detail-row">
-                        <strong>Pincode:</strong> {viewStore.pincode || '—'}
-                      </div>
-                      <div className="detail-row">
-                        <strong>Coordinates:</strong> {viewStore.latitude}, {viewStore.longitude}
-                      </div>
-                      <div className="detail-row">
-                        <strong>Drug License Number:</strong> {viewStore.drugLicenseNumber || '—'}
-                      </div>
-                      <div className="detail-row">
-                        <strong>GST Number:</strong> {viewStore.gstNumber || '—'}
-                      </div>
+                      <div className="detail-row"><strong>Store Name:</strong> {viewStore.storeName}</div>
+                      <div className="detail-row"><strong>Vendor Category:</strong> {viewStore.vendorCategory || '—'}</div>
+                      <div className="detail-row"><strong>Email:</strong> {viewStore.emailAddress || '—'}</div>
+                      <div className="detail-row"><strong>Contact Number:</strong> {viewStore.contactNumber || '—'}</div>
+                      <div className="detail-row"><strong>Pharmacist Name:</strong> {viewStore.pharmacistName || '—'}</div>
+                      <div className="detail-row"><strong>Address:</strong> {viewStore.address || '—'}</div>
+                      <div className="detail-row"><strong>Pincode:</strong> {viewStore.pincode || '—'}</div>
+                      <div className="detail-row"><strong>Coordinates:</strong> {viewStore.latitude}, {viewStore.longitude}</div>
+                      <div className="detail-row"><strong>Drug License Number:</strong> {viewStore.drugLicenseNumber || '—'}</div>
+                      <div className="detail-row"><strong>GST Number:</strong> {viewStore.gstNumber || '—'}</div>
                       <div className="detail-row">
                         <strong>Status:</strong>{' '}
                         <span className={`status-badge ${viewStore.status}`}>
                           {viewStore.status?.toUpperCase()}
                         </span>
                       </div>
-                      <div className="detail-row">
-                        <strong>Added on:</strong> {formatDate(viewStore.createdAt)}
-                      </div>
-                      <div className="detail-row">
-                        <strong>Last updated:</strong> {formatDate(viewStore.updatedAt)}
-                      </div>
+                      <div className="detail-row"><strong>Added on:</strong> {formatDate(viewStore.createdAt)}</div>
+                      <div className="detail-row"><strong>Last updated:</strong> {formatDate(viewStore.updatedAt)}</div>
                     </>
                   )}
                 </div>
                 <div className="drawer-footer">
                   <button className="btn-secondary" onClick={() => setViewStore(null)}>Close</button>
-                  <Link
-                    href={`/super-admin/store-managment/edit/${viewStore?._id}`}
-                    className="btn-primary"
-                    onClick={() => setViewStore(null)}
-                  >
+                  <Link href={`/super-admin/store-managment/edit/${viewStore?._id}`} className="btn-primary" onClick={() => setViewStore(null)}>
                     Edit Store
                   </Link>
                 </div>
@@ -379,6 +432,8 @@ export default function MedicalStoreManagement() {
           )}
         </AnimatePresence>
       </div>
+
+ 
     </>
   );
 }

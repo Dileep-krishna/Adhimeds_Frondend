@@ -25,7 +25,8 @@ export default function AddProductPage() {
   const [attributeOptions, setAttributeOptions] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  // For attributes, store selected values per attribute (as array of strings)
+  // New: each attribute can have multiple selected values, each with its chosen pack sizes
+  // Structure: { [attributeId]: [{ value: string, packSizes: string[] }] }
   const [selectedAttributeValues, setSelectedAttributeValues] = useState({});
 
   const extractDataArray = (response) => {
@@ -60,7 +61,7 @@ export default function AddProductPage() {
         const attributes = extractDataArray(attrRes);
         setAttributeOptions(attributes);
 
-        // Initialize selected values for each attribute as an empty array
+        // Initialize selected values for each attribute as empty array
         const initialSelections = {};
         attributes.forEach(attr => {
           initialSelections[attr._id] = [];
@@ -169,18 +170,43 @@ export default function AddProductPage() {
     setFormData(prev => ({ ...prev, relatedCategories: selected }));
   };
 
-  // ========== ATTRIBUTE HANDLERS ==========
+  // ========== ATTRIBUTE HANDLERS (ENHANCED) ==========
   const handleAttributeSelectChange = (selectedOptions) => {
     const selectedIds = selectedOptions ? selectedOptions.map(opt => opt.value) : [];
+    // When removing an attribute, also remove its selected values from state
+    const newSelectedValues = { ...selectedAttributeValues };
+    Object.keys(newSelectedValues).forEach(attrId => {
+      if (!selectedIds.includes(attrId)) {
+        delete newSelectedValues[attrId];
+      }
+    });
+    setSelectedAttributeValues(newSelectedValues);
     setFormData(prev => ({ ...prev, selectedAttributes: selectedIds }));
   };
 
-  const handleAttributeValuesChange = (attrId, selectedOptions) => {
-    const selectedValues = selectedOptions ? selectedOptions.map(opt => opt.value) : [];
+  // Update selected values + pack sizes for a given attribute
+  const handleAttributeValueChange = (attrId, selectedOptions) => {
+    const selected = selectedOptions ? selectedOptions.map(opt => ({
+      value: opt.value,
+      packSizes: []   // initial empty; user will choose pack sizes later
+    })) : [];
     setSelectedAttributeValues(prev => ({
       ...prev,
-      [attrId]: selectedValues
+      [attrId]: selected
     }));
+  };
+
+  // Update pack sizes for a specific attribute value
+  const handlePackSizesChange = (attrId, value, selectedOptions) => {
+    const selectedPackSizes = selectedOptions ? selectedOptions.map(opt => opt.value) : [];
+    setSelectedAttributeValues(prev => {
+      const attrValues = [...(prev[attrId] || [])];
+      const index = attrValues.findIndex(v => v.value === value);
+      if (index !== -1) {
+        attrValues[index].packSizes = selectedPackSizes;
+      }
+      return { ...prev, [attrId]: attrValues };
+    });
   };
 
   const updateVariant = (idx, field, value) => {
@@ -251,16 +277,21 @@ export default function AddProductPage() {
     setFormData(prev => ({ ...prev, youtubeUrls: updated }));
   };
 
-  // ========== SAVE PRODUCT – FIXED WITH EXPLICIT APPENDS ==========
+  // ========== SAVE PRODUCT – UPDATED TO SEND PACK SIZES ==========
   const buildAttributesPayload = () => {
     const payload = [];
     formData.selectedAttributes.forEach(attrId => {
       const attr = attributeOptions.find(a => a._id === attrId);
-      const values = selectedAttributeValues[attrId] || [];
-      if (attr && values.length) {
+      const selectedItems = selectedAttributeValues[attrId] || [];
+      if (attr && selectedItems.length) {
+        // Convert to format expected by backend: array of objects with value and packSizes
+        const valuesWithPackSizes = selectedItems.map(item => ({
+          value: item.value,
+          packSizes: item.packSizes
+        }));
         payload.push({
           name: attr.name,
-          values: values
+          values: valuesWithPackSizes
         });
       }
     });
@@ -593,7 +624,7 @@ export default function AddProductPage() {
             </div>
           </div>
 
-          {/* ========== ATTRIBUTES SECTION ========== */}
+          {/* ========== ATTRIBUTES SECTION – ENHANCED WITH PACK SIZES ========== */}
           <div className="form-card">
             <div className="card-header">Attributes</div>
             <div className="card-body">
@@ -613,20 +644,53 @@ export default function AddProductPage() {
               {formData.selectedAttributes.map(attrId => {
                 const attr = attributeOptions.find(a => a._id === attrId);
                 if (!attr) return null;
-                const valueOptions = (attr.values || []).map(val => ({ value: val, label: val }));
-                const selectedValueOptions = (selectedAttributeValues[attrId] || []).map(val => ({ value: val, label: val }));
+                
+                // Prepare options for attribute values (each value is an object with value and packSizes)
+                const valueOptions = (attr.values || []).map(val => {
+                  const valueText = typeof val === 'string' ? val : val.value;
+                  return { value: valueText, label: valueText };
+                });
+                
+                const selectedItems = selectedAttributeValues[attrId] || [];
+                const selectedValueOptions = selectedItems.map(item => ({ value: item.value, label: item.value }));
+                
                 return (
-                  <div key={attrId} className="mb-3 border p-2 rounded">
+                  <div key={attrId} className="mb-3 border p-3 rounded">
                     <label className="form-label fw-bold">{attr.name}</label>
                     <Select
                       isMulti
                       options={valueOptions}
                       value={selectedValueOptions}
-                      onChange={(selected) => handleAttributeValuesChange(attrId, selected)}
+                      onChange={(selected) => handleAttributeValueChange(attrId, selected)}
                       placeholder={`Select ${attr.name} values...`}
                       classNamePrefix="react-select"
                     />
-                    <small className="text-muted">Choose one or more values for this attribute</small>
+                    
+                    {/* For each selected value, show pack sizes multi-select */}
+                    {selectedItems.map((item, idx) => {
+                      // Find the original attribute value object to get its packSizes list
+                      const originalVal = attr.values.find(v => (typeof v === 'string' ? v : v.value) === item.value);
+                      const availablePackSizes = originalVal && typeof originalVal === 'object' && originalVal.packSizes 
+                        ? originalVal.packSizes 
+                        : [];
+                      const packOptions = availablePackSizes.map(p => ({ value: p, label: p }));
+                      const selectedPackOptions = (item.packSizes || []).map(p => ({ value: p, label: p }));
+                      
+                      return (
+                        <div key={idx} className="mt-3 pt-2 border-top">
+                          <label className="form-label">Pack sizes for <strong>{item.value}</strong></label>
+                          <Select
+                            isMulti
+                            options={packOptions}
+                            value={selectedPackOptions}
+                            onChange={(selected) => handlePackSizesChange(attrId, item.value, selected)}
+                            placeholder={`Select pack sizes for ${item.value}...`}
+                            classNamePrefix="react-select"
+                          />
+                          <small className="text-muted">Choose one or more pack sizes (if any)</small>
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })}
