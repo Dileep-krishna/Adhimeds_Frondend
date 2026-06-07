@@ -434,6 +434,39 @@ input:checked + .slider:before {
   cursor: pointer;
   transition: 0.2s;
 }
+/* Attractive Store Access Button */
+.store-access-btn {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: none;
+  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  color: #0284c7;
+  font-size: 1.2rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.store-access-btn:hover {
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  color: #0369a1;
+}
+
+.store-access-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.store-access-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #0284c7;
+}
 
 .btn-icon.info:hover {
   background: #3b82f6;

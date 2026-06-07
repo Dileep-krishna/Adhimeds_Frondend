@@ -167,8 +167,8 @@ export default function StoreManagementLayout({ children }) {
 
           {/* Orders */}
           <Link
-            href="/store-management/orders"
-            className={`nav-item ${isActive("/store-management/orders") ? "active" : ""}`}
+            href="/All-store-management/Orders"
+            className={`nav-item ${isActive("/All-store-management/Orders") ? "active" : ""}`}
             onClick={handleNav}
           >
             <i className="bi bi-cart-check"></i>

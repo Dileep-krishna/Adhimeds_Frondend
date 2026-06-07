@@ -12,7 +12,6 @@ import SERVERURL from '../../services/serverURL';
 import { getProductsAPI } from '../../services/productService';
 import { getAllCustomReviewsAPI } from '../../services/customReviewService';
 
-// Custom debounce hook
 function useDebounce(value, delay) {
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
@@ -22,30 +21,20 @@ function useDebounce(value, delay) {
   return debouncedValue;
 }
 
-// Pagination hook
 function usePagination(totalItems, itemsPerPage = 10) {
   const [currentPage, setCurrentPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-  
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(1);
   }, [totalPages, currentPage]);
-  
-  const goToPage = (page) => {
-    const pageNumber = Math.max(1, Math.min(page, totalPages));
-    setCurrentPage(pageNumber);
-  };
-  
+  const goToPage = (page) => setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   const nextPage = () => goToPage(currentPage + 1);
   const prevPage = () => goToPage(currentPage - 1);
-  
   return { currentPage, totalPages, goToPage, nextPage, prevPage, setCurrentPage };
 }
 
-// Memoized product row – includes View, Store Access, and Pin buttons
 const ProductRow = memo(({ product, onViewProduct, onToggleStoreAccess, onTogglePin, isPinned, getImageUrl }) => {
   const thumbnailUrl = getImageUrl(product.thumbnail);
-  
   return (
     <tr key={product._id}>
       <td>
@@ -81,12 +70,7 @@ const ProductRow = memo(({ product, onViewProduct, onToggleStoreAccess, onToggle
       <td>₹{product.unitPrice}</td>
       <td>{product.discount > 0 ? `${product.discount}%` : '—'}</td>
       <td>
-        <button 
-          className="btn-icon view-btn" 
-          onClick={() => onViewProduct(product)}
-          title="View Details"
-          style={{ background: 'none', border: 'none', color: '#0a2f2a', fontSize: '1.2rem', cursor: 'pointer' }}
-        >
+        <button className="btn-icon view-btn" onClick={() => onViewProduct(product)} title="View Details">
           <i className="bi bi-eye"></i>
         </button>
       </td>
@@ -115,7 +99,6 @@ const ProductRow = memo(({ product, onViewProduct, onToggleStoreAccess, onToggle
 });
 ProductRow.displayName = 'ProductRow';
 
-// Skeleton loader row (9 columns – added Pin column)
 const SkeletonRow = memo(() => (
   <tr className="skeleton-row">
     <td><div className="skeleton" style={{ width: '120px', height: '40px' }}></div></td>
@@ -140,18 +123,45 @@ export default function AllProductsPage() {
   const [filterOption, setFilterOption] = useState('');
   const [sortOption, setSortOption] = useState('');
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [pinnedProductIds, setPinnedProductIds] = useState([]);
-  
-  // Product detail modal
   const [showModal, setShowModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
-  
-  // Store access modal – email will be pre‑filled from sessionStorage
   const [showStoreModal, setShowStoreModal] = useState(false);
   const [currentProductForStore, setCurrentProductForStore] = useState(null);
   const [storeEmail, setStoreEmail] = useState('');
   const [enableForStore, setEnableForStore] = useState(true);
   const [updatingStoreAccess, setUpdatingStoreAccess] = useState(false);
+  
+  // ✅ Load pins synchronously from localStorage using current email (if any)
+  const getCurrentEmail = () => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('storeEmail') || localStorage.getItem('storeEmail') || '';
+    }
+    return '';
+  };
+  
+  const getPinnedStorageKey = (email) => {
+    if (email && email !== 'null' && email !== 'undefined') {
+      return `pinnedProductIds_${email}`;
+    }
+    return 'pinnedProductIds';
+  };
+  
+  const initialEmail = getCurrentEmail();
+  const initialKey = getPinnedStorageKey(initialEmail);
+  const initialPins = (() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(initialKey);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {}
+      }
+    }
+    return [];
+  })();
+  
+  const [pinnedProductIds, setPinnedProductIds] = useState(initialPins);
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [isPending, startTransition] = useTransition();
@@ -161,6 +171,34 @@ export default function AllProductsPage() {
     return `${SERVERURL}/imgUploads/${filename}`;
   }, []);
 
+  // Update storeEmail from storage when component mounts (for later use in modal)
+  useEffect(() => {
+    const email = getCurrentEmail();
+    if (email) setStoreEmail(email);
+  }, []);
+
+  // Whenever storeEmail changes (e.g., login/logout), reload pins from correct key
+  useEffect(() => {
+    const key = getPinnedStorageKey(storeEmail);
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setPinnedProductIds(parsed);
+      } catch (e) {}
+    } else {
+      // No saved pins for this store → reset to empty
+      setPinnedProductIds([]);
+    }
+  }, [storeEmail]);
+
+  // Save pins to localStorage whenever they change, using current email
+  useEffect(() => {
+    const email = storeEmail || getCurrentEmail();
+    const key = getPinnedStorageKey(email);
+    localStorage.setItem(key, JSON.stringify(pinnedProductIds));
+  }, [pinnedProductIds, storeEmail]);
+
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
@@ -168,28 +206,22 @@ export default function AllProductsPage() {
         getProductsAPI(),
         getAllCustomReviewsAPI(),
       ]);
-
       if (!productsRes.success) throw new Error(productsRes.message || 'Failed to load products');
-
       const productsData = productsRes.data;
       const allReviews = reviewsRes.success ? reviewsRes.data : [];
-
       const reviewsByProduct = {};
       allReviews.forEach(review => {
         const pid = review.productId?._id || review.productId;
         if (!reviewsByProduct[pid]) reviewsByProduct[pid] = [];
         reviewsByProduct[pid].push(review);
       });
-
       const productsWithRating = productsData.map(product => {
         const productReviews = reviewsByProduct[product._id] || [];
         const totalRating = productReviews.reduce((sum, r) => sum + r.rating, 0);
         const avgRating = productReviews.length ? parseFloat((totalRating / productReviews.length).toFixed(1)) : 0;
         return { ...product, avgRating, reviewCount: productReviews.length };
       });
-
       setProducts(productsWithRating);
-      setPinnedProductIds([]);
     } catch (error) {
       console.error('Error fetching products:', error);
       toast.error('Server error while loading products');
@@ -202,32 +234,25 @@ export default function AllProductsPage() {
     fetchProducts();
   }, [fetchProducts]);
 
-  // Filter and sort – then apply pinning (pinned items go to the top)
   const filteredAndSortedProducts = useMemo(() => {
     let result = [...products];
     if (debouncedSearchTerm) {
       const searchLower = debouncedSearchTerm.toLowerCase();
-      result = result.filter(p => 
-        p.productName?.toLowerCase().includes(searchLower) ||
-        p.brand?.toLowerCase().includes(searchLower)
-      );
+      result = result.filter(p => p.productName?.toLowerCase().includes(searchLower) || p.brand?.toLowerCase().includes(searchLower));
     }
     if (filterOption === 'published') result = result.filter(p => p.published === true);
     if (filterOption === 'featured') result = result.filter(p => p.featured === true);
     if (filterOption === 'todayDeal') result = result.filter(p => p.todaysDeal === true);
     if (filterOption === 'discount') result = result.filter(p => p.discount > 0);
-    
     if (sortOption === 'price-asc') result.sort((a, b) => (a.unitPrice || 0) - (b.unitPrice || 0));
     if (sortOption === 'price-desc') result.sort((a, b) => (b.unitPrice || 0) - (a.unitPrice || 0));
     if (sortOption === 'rating-desc') result.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
     if (sortOption === 'name-asc') result.sort((a, b) => (a.productName || '').localeCompare(b.productName || ''));
-    
     const pinnedItems = result.filter(p => pinnedProductIds.includes(p._id));
     const unpinnedItems = result.filter(p => !pinnedProductIds.includes(p._id));
     return [...pinnedItems, ...unpinnedItems];
   }, [products, debouncedSearchTerm, filterOption, sortOption, pinnedProductIds]);
 
-  // Pagination
   const { currentPage, totalPages, goToPage, nextPage, prevPage, setCurrentPage } = usePagination(filteredAndSortedProducts.length, itemsPerPage);
   useEffect(() => setCurrentPage(1), [debouncedSearchTerm, filterOption, sortOption, pinnedProductIds, setCurrentPage]);
 
@@ -257,17 +282,11 @@ export default function AllProductsPage() {
   }, []);
 
   const handleTogglePin = useCallback((productId) => {
-    setPinnedProductIds(prev => 
-      prev.includes(productId) 
-        ? prev.filter(id => id !== productId)
-        : [...prev, productId]
-    );
+    setPinnedProductIds(prev => prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]);
   }, []);
 
-  // Store access handler – pre‑fill email from sessionStorage (or localStorage)
   const handleToggleStoreAccess = useCallback((product) => {
     setCurrentProductForStore(product);
-    // Try to get stored email from sessionStorage first, then localStorage
     const storedEmail = sessionStorage.getItem('storeEmail') || localStorage.getItem('storeEmail') || '';
     setStoreEmail(storedEmail);
     setEnableForStore(true);
@@ -330,14 +349,18 @@ export default function AllProductsPage() {
   const startItem = filteredAndSortedProducts.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, filteredAndSortedProducts.length);
 
+  const modalVariants = {
+    initial: { x: '100%', opacity: 0, scale: 0.95 },
+    animate: { x: 0, opacity: 1, scale: 1, transition: { type: 'tween', duration: 0.3, ease: 'easeOut' } },
+    exit: { x: '100%', opacity: 0, scale: 0.95, transition: { type: 'tween', duration: 0.25, ease: 'easeIn' } }
+  };
+
   return (
     <div className="all-products-container">
       <Toaster position="top-right" />
-
       <div className="header-actions">
         <h4 className="page-title">All Products</h4>
       </div>
-
       <div className="filter-bar">
         <div className="row g-2 align-items-end">
           <div className="col-md-4">
@@ -366,7 +389,6 @@ export default function AllProductsPage() {
           </div>
         </div>
       </div>
-
       <div className="table-responsive">
         {loading ? (
           <table className="med-table">
@@ -384,7 +406,9 @@ export default function AllProductsPage() {
               </tr>
             </thead>
             <tbody>
-              {Array(itemsPerPage).fill(null).map((_, idx) => <SkeletonRow key={idx} />)}
+              {Array(itemsPerPage).fill(null).map((_, idx) => (
+                <SkeletonRow key={idx} />
+              ))}
             </tbody>
           </table>
         ) : (
@@ -404,26 +428,24 @@ export default function AllProductsPage() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedProducts.map(product => {
-                  const isPinned = pinnedProductIds.includes(product._id);
-                  return (
-                    <ProductRow
-                      key={product._id}
-                      product={product}
-                      onViewProduct={handleViewProduct}
-                      onToggleStoreAccess={handleToggleStoreAccess}
-                      onTogglePin={handleTogglePin}
-                      isPinned={isPinned}
-                      getImageUrl={getImageUrl}
-                    />
-                  );
-                })}
+                {paginatedProducts.map(product => (
+                  <ProductRow
+                    key={product._id}
+                    product={product}
+                    onViewProduct={handleViewProduct}
+                    onToggleStoreAccess={handleToggleStoreAccess}
+                    onTogglePin={handleTogglePin}
+                    isPinned={pinnedProductIds.includes(product._id)}
+                    getImageUrl={getImageUrl}
+                  />
+                ))}
                 {paginatedProducts.length === 0 && (
-                  <tr><td colSpan={9} className="text-center py-4">No products found.您知道吗?</td></tr>
+                  <tr>
+                    <td colSpan={9} className="text-center py-4">No products found.</td>
+                  </tr>
                 )}
               </tbody>
             </table>
-
             {filteredAndSortedProducts.length > 0 && (
               <div className="pagination-controls">
                 <div className="pagination-info">Showing {startItem} to {endItem} of {filteredAndSortedProducts.length} products</div>
@@ -460,7 +482,6 @@ export default function AllProductsPage() {
         )}
       </div>
 
-      {/* Product Details Modal (unchanged) */}
       <AnimatePresence>
         {showModal && selectedProduct && (
           <>
@@ -479,14 +500,7 @@ export default function AllProductsPage() {
                 <div className="product-detail-card">
                   {selectedProduct.thumbnail && (
                     <div className="text-center mb-3">
-                      <img
-                        src={getImageUrl(selectedProduct.thumbnail)}
-                        alt={selectedProduct.productName}
-                        className="product-detail-image"
-                        style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '1rem' }}
-                        loading="lazy"
-                        decoding="async"
-                      />
+                      <img src={getImageUrl(selectedProduct.thumbnail)} alt={selectedProduct.productName} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '1rem' }} />
                     </div>
                   )}
                   <h4>{selectedProduct.productName}</h4>
@@ -494,24 +508,21 @@ export default function AllProductsPage() {
                   <p><strong>Category:</strong> {selectedProduct.mainCategory}</p>
                   <p><strong>Unit:</strong> {selectedProduct.unit || 'N/A'}</p>
                   <p><strong>Weight:</strong> {selectedProduct.weight} kg</p>
-                  <p><strong>Minimum Qty:</strong> {selectedProduct.minPurchaseQty}</p>
+                  <p><strong>Min Qty:</strong> {selectedProduct.minPurchaseQty}</p>
                   <p><strong>Price:</strong> ₹{selectedProduct.unitPrice}</p>
                   <p><strong>Discount:</strong> {selectedProduct.discount > 0 ? `${selectedProduct.discount}%` : 'None'}</p>
                   <p><strong>Stock:</strong> {selectedProduct.stock}</p>
                   <p><strong>SKU:</strong> {selectedProduct.sku || 'N/A'}</p>
                   <p><strong>Barcode:</strong> {selectedProduct.barcode || 'N/A'}</p>
-                  <p><strong>HSN Code:</strong> {selectedProduct.hsnCode || 'N/A'}</p>
-                  <p><strong>GST Rate:</strong> {selectedProduct.gstRate || 0}%</p>
-                  <p><strong>Rating:</strong> {selectedProduct.avgRating > 0 ? `${selectedProduct.avgRating}/5 (${selectedProduct.reviewCount} reviews)` : 'No reviews yet'}</p>
-                  {selectedProduct.description && (
-                    <div className="mt-3"><strong>Description:</strong><p className="mt-1">{selectedProduct.description}</p></div>
-                  )}
+                  <p><strong>HSN:</strong> {selectedProduct.hsnCode || 'N/A'}</p>
+                  <p><strong>GST:</strong> {selectedProduct.gstRate || 0}%</p>
+                  <p><strong>Rating:</strong> {selectedProduct.avgRating > 0 ? `${selectedProduct.avgRating}/5 (${selectedProduct.reviewCount} reviews)` : 'No reviews'}</p>
+                  {selectedProduct.description && <div><strong>Description:</strong><p>{selectedProduct.description}</p></div>}
                   {selectedProduct.galleryImages?.length > 0 && (
-                    <div className="mt-3"><strong>Gallery Images:</strong>
+                    <div>
+                      <strong>Gallery:</strong>
                       <div className="d-flex flex-wrap gap-2 mt-2">
-                        {selectedProduct.galleryImages.map((img, idx) => (
-                          <img key={idx} src={getImageUrl(img)} alt="gallery" width="60" height="60" style={{ objectFit: 'cover', borderRadius: '8px' }} loading="lazy" />
-                        ))}
+                        {selectedProduct.galleryImages.map((img, idx) => <img key={idx} src={getImageUrl(img)} width="60" height="60" style={{ objectFit: 'cover', borderRadius: '8px' }} />)}
                       </div>
                     </div>
                   )}
@@ -523,15 +534,14 @@ export default function AllProductsPage() {
         )}
       </AnimatePresence>
 
-      {/* Store Access Modal – email pre‑filled from sessionStorage */}
       <AnimatePresence>
         {showStoreModal && currentProductForStore && (
           <>
             <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'tween', duration: 0.3 }}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              variants={modalVariants}
               className="side-modal store-access-modal"
               style={{ width: '400px' }}
             >
@@ -542,14 +552,8 @@ export default function AllProductsPage() {
               <div className="side-modal-body">
                 <div className="form-group mb-3">
                   <label className="form-label">Store Email Address</label>
-                  <input
-                    type="email"
-                    className="form-control"
-                    placeholder="e.g., store@example.com"
-                    value={storeEmail}
-                    onChange={(e) => setStoreEmail(e.target.value)}
-                  />
-                  <small className="text-muted">Enter the store&#39;s registered email address. (Pre‑filled with logged‑in store email)</small>
+                  <input type="email" className="form-control" placeholder="e.g., store@example.com" value={storeEmail} onChange={(e) => setStoreEmail(e.target.value)} />
+                  <small className="text-muted">Enter the store's registered email address. (Pre-filled with logged-in store email)</small>
                 </div>
                 <div className="form-group mb-3">
                   <label className="form-label">Action</label>
@@ -572,7 +576,15 @@ export default function AllProductsPage() {
                 </div>
               </div>
             </motion.div>
-            <div className="side-overlay" onClick={() => setShowStoreModal(false)} />
+            <motion.div
+              className="side-overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setShowStoreModal(false)}
+              style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+            />
           </>
         )}
       </AnimatePresence>
