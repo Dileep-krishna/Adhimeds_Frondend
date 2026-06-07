@@ -123,3 +123,68 @@ export const deleteProductAPI = async (id) => {
     throw error;
   }
 };
+
+// ================= STORE PRODUCT OVERRIDE APIS (store users only) =================
+// These functions require a storeId and use the new /store/products/ endpoints.
+// They do not affect the master product collection.
+
+// ✅ GET product with store overrides merged (store user)
+export const getStoreProductAPI = async (productId, storeId) => {
+  if (!productId) throw new Error('Product ID is required');
+  if (!storeId) throw new Error('Store ID is required');
+  const url = `${SERVERURL}/store/products/${productId}?storeId=${storeId}`;
+  console.log(`🔍 GET (store) ${url}`);
+  try {
+    const res = await fetch(url);
+    return await handleResponse(res, `GET /store/products/${productId}`);
+  } catch (error) {
+    console.error(`❌ Network error in getStoreProductAPI:`, error.message);
+    throw error;
+  }
+};
+
+// ✅ UPDATE store‑specific fields (only allowed fields) – store user
+export const updateStoreProductAPI = async (productId, storeId, data) => {
+  if (!productId) throw new Error('Product ID is required');
+  if (!storeId) throw new Error('Store ID is required');
+  const url = `${SERVERURL}/store/products/${productId}?storeId=${storeId}`;
+  console.log(`🔄 PUT (store) ${url}`);
+  const isFormData = data instanceof FormData;
+  const headers = isFormData ? {} : { "Content-Type": "application/json" };
+  const body = isFormData ? data : JSON.stringify(data);
+  try {
+    const res = await fetch(url, { method: 'PUT', headers, body });
+    return await handleResponse(res, `PUT /store/products/${productId}`);
+  } catch (error) {
+    console.error(`❌ Network error in updateStoreProductAPI:`, error.message);
+    throw error;
+  }
+};
+
+// ✅ DELETE store overrides – revert to master product (store user)
+export const deleteStoreOverrideAPI = async (productId, storeId) => {
+  if (!productId) throw new Error('Product ID is required');
+  if (!storeId) throw new Error('Store ID is required');
+  const url = `${SERVERURL}/store/products/${productId}/override?storeId=${storeId}`;
+  console.log(`🗑️ DELETE (store) ${url}`);
+  try {
+    const res = await fetch(url, { method: 'DELETE' });
+    return await handleResponse(res, `DELETE /store/products/${productId}/override`);
+  } catch (error) {
+    console.error(`❌ Network error in deleteStoreOverrideAPI:`, error.message);
+    throw error;
+  }
+};
+// ✅ GET all products for a store (merged with overrides)
+export const getAllStoreProductsAPI = async (storeId) => {
+  if (!storeId) throw new Error('Store ID is required');
+  const url = `${SERVERURL}/store/products?storeId=${storeId}`;
+  console.log(`🔍 GET (store list) ${url}`);
+  try {
+    const res = await fetch(url);
+    return await handleResponse(res, 'GET /store/products');
+  } catch (error) {
+    console.error(`❌ Network error in getAllStoreProductsAPI:`, error.message);
+    throw error;
+  }
+};

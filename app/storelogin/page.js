@@ -2,15 +2,57 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import toast, { Toaster } from "react-hot-toast";
 import "./storelogin.css";
+import SERVERURL from "../services/serverURL";
 
 export default function StoreLoginPage() {
   const router = useRouter();
 
-  // Dummy UI – no real authentication, but inputs are enabled
-  const handleDummySubmit = (e) => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    alert("This is a design-only store login page. No authentication is implemented.");
+
+    if (!email || !password) {
+      toast.error("Please enter both email and password");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${SERVERURL}/store/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emailAddress: email, password }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Choose storage based on "Remember me"
+        const storage = rememberMe ? localStorage : sessionStorage;
+        storage.setItem("token", data.token);
+        storage.setItem("storeId", data.storeId);
+        storage.setItem("storeName", data.storeName);
+        storage.setItem("storeEmail", email); // ✅ Store the email address
+
+        toast.success("Login successful! Redirecting...");
+        setTimeout(() => {
+          router.push("/All-store-management/store-dashboard");
+        }, 1000);
+      } else {
+        toast.error(data.message || "Invalid credentials");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      toast.error("Server error. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const backgroundImageUrl =
@@ -18,6 +60,7 @@ export default function StoreLoginPage() {
 
   return (
     <div className="container-fluid vh-100 p-0 overflow-hidden">
+      <Toaster position="top-right" />
       <div className="row g-0 h-100">
         {/* LEFT SIDE – Medical Store Theme */}
         <div
@@ -51,7 +94,7 @@ export default function StoreLoginPage() {
           </div>
         </div>
 
-        {/* RIGHT SIDE – Store Login Form (design only, inputs enabled) */}
+        {/* RIGHT SIDE – Store Login Form */}
         <div className="col-12 col-lg-6 d-flex justify-content-center align-items-center bg-light p-4">
           <div
             className="card border-0 shadow-lg w-100 animate-zoom-in"
@@ -73,10 +116,7 @@ export default function StoreLoginPage() {
                 <p className="text-muted small">Secure login for registered medical stores</p>
               </div>
 
-              {/* Working form – inputs are enabled, no real submission */}
-              <form onSubmit={handleDummySubmit}>
-                
-
+              <form onSubmit={handleSubmit}>
                 <div className="mb-3 animate-fade-up delay-200">
                   <label className="form-label fw-semibold">Email Address</label>
                   <div className="input-group">
@@ -87,6 +127,9 @@ export default function StoreLoginPage() {
                       type="email"
                       className="form-control border-start-0 ps-0"
                       placeholder="store@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
                     />
                   </div>
                 </div>
@@ -101,6 +144,9 @@ export default function StoreLoginPage() {
                       type="password"
                       className="form-control border-start-0 ps-0"
                       placeholder="••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
                     />
                   </div>
                 </div>
@@ -111,6 +157,8 @@ export default function StoreLoginPage() {
                       type="checkbox"
                       className="form-check-input"
                       id="rememberStore"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
                     />
                     <label className="form-check-label text-secondary" htmlFor="rememberStore">
                       Keep me logged in
@@ -119,6 +167,7 @@ export default function StoreLoginPage() {
                   <button
                     type="button"
                     className="btn btn-link p-0 text-decoration-none text-primary"
+                    onClick={() => toast.info("Contact admin to reset password")}
                   >
                     Forgot password?
                   </button>
@@ -128,8 +177,9 @@ export default function StoreLoginPage() {
                   type="submit"
                   className="btn btn-dark w-100 py-2 rounded-pill fw-semibold animate-fade-up delay-500"
                   style={{ backgroundColor: "#0a2b4e", borderColor: "#0a2b4e" }}
+                  disabled={loading}
                 >
-                  Sign In to Store
+                  {loading ? "Signing in..." : "Sign In to Store"}
                 </button>
               </form>
 
