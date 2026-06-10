@@ -73,3 +73,29 @@ export const deleteStaffAPI = async (id) => {
   const res = await fetch(url, { method: "DELETE" });
   return handleResponse(res, `DELETE /staff/${id}`);
 };
+
+
+async function handleDistrictResponse(res, endpoint) {
+  console.log(`📡 ${endpoint} - Response status:`, res.status);
+  console.log(`📡 ${endpoint} - Content-Type:`, res.headers.get('content-type'));
+
+  const text = await res.text();
+  console.log(`📄 ${endpoint} - Response body preview (first 300 chars):`, text.substring(0, 300));
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error(`❌ ${endpoint} - Failed to parse JSON. Response is not valid JSON.`);
+    console.error(`   Full response:`, text);
+    throw new Error(`Server returned HTML instead of JSON. Check if backend route exists at ${SERVERURL}/districts`);
+  }
+}
+
+// ✅ GET ALL DISTRICTS
+export const getAllDistricts = async (queryParams = "") => {
+  const url = queryParams ? `${SERVERURL}/districts?${queryParams}` : `${SERVERURL}/districts`;
+  console.log(`🔍 GET ${url}`);
+
+  const res = await fetch(url);
+  return handleDistrictResponse(res, 'GET /districts');
+}

@@ -4,6 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import "./stafflogin.css";
 
+// List of all Kerala districts (matching backend)
+const KERALA_DISTRICTS = [
+  "Alappuzha", "Ernakulam", "Idukki", "Kannur", "Kasaragod",
+  "Kollam", "Kottayam", "Kozhikode", "Malappuram", "Palakkad",
+  "Pathanamthitta", "Thiruvananthapuram", "Thrissur", "Wayanad"
+];
+
 export default function StaffLoginPage() {
   const router = useRouter();
 
@@ -73,8 +80,7 @@ export default function StaffLoginPage() {
               </div>
 
               <form onSubmit={handleDummySubmit}>
-               
-
+                {/* Email */}
                 <div className="mb-3 animate-fade-up delay-200">
                   <label className="form-label fw-semibold">Email Address</label>
                   <div className="input-group">
@@ -89,6 +95,23 @@ export default function StaffLoginPage() {
                   </div>
                 </div>
 
+                {/* NEW: District Dropdown */}
+                <div className="mb-3 animate-fade-up delay-250">
+                  <label className="form-label fw-semibold">District</label>
+                  <div className="input-group">
+                    <span className="input-group-text bg-white border-end-0">
+                      <i className="bi bi-geo-alt"></i>
+                    </span>
+                    <select className="form-select border-start-0 ps-0">
+                      <option value="">Select your district</option>
+                      {KERALA_DISTRICTS.map(district => (
+                        <option key={district} value={district}>{district}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Password */}
                 <div className="mb-3 animate-fade-up delay-300">
                   <label className="form-label fw-semibold">Password</label>
                   <div className="input-group">

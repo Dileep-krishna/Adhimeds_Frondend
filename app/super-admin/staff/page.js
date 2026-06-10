@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
 
 import './staff.css';
-import { createStaffAPI, deleteStaffAPI, getStaffAPI, updateStaffAPI } from '../../services/staffService';
+import { createStaffAPI, deleteStaffAPI, getAllDistricts, getStaffAPI, updateStaffAPI } from '../../services/staffService';
 import { getAllRoles } from '../../services/permissionService';
+
 
 export default function StaffManagement() {
   const router = useRouter();
@@ -28,7 +29,11 @@ export default function StaffManagement() {
   const [roles, setRoles] = useState([]);
   const [loadingRoles, setLoadingRoles] = useState(true);
 
-  // Form data – only relevant fields
+  // Districts state
+  const [districts, setDistricts] = useState([]);
+  const [loadingDistricts, setLoadingDistricts] = useState(true);
+
+  // Form data – added district field
   const [formData, setFormData] = useState({
     name: '',
     role: '',
@@ -36,6 +41,7 @@ export default function StaffManagement() {
     confirmPassword: '',
     email: '',
     phone: '',
+    district: '',
     status: 'active',
     joinDate: new Date().toISOString().split('T')[0],
   });
@@ -62,6 +68,29 @@ export default function StaffManagement() {
       }
     };
     fetchRoles();
+  }, []);
+
+  // Fetch districts from API
+  useEffect(() => {
+    const fetchDistricts = async () => {
+      try {
+        const res = await getAllDistricts();
+        if (res.success && res.data) {
+          setDistricts(res.data);
+          if (res.data.length > 0) {
+            setFormData(prev => ({ ...prev, district: res.data[0] }));
+          }
+        } else {
+          toast.error('Failed to load districts');
+        }
+      } catch (error) {
+        console.error('Error fetching districts:', error);
+        toast.error('Server error while loading districts');
+      } finally {
+        setLoadingDistricts(false);
+      }
+    };
+    fetchDistricts();
   }, []);
 
   // Fetch staff
@@ -91,7 +120,8 @@ export default function StaffManagement() {
     const matchesSearch =
       member.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (member.role?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+      (member.role?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (member.district || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'all' || member.role?.name === roleFilter;
     const matchesStatus = statusFilter === 'all' || member.status === statusFilter;
     return matchesSearch && matchesRole && matchesStatus;
@@ -108,6 +138,7 @@ export default function StaffManagement() {
         confirmPassword: '',
         email: member.email,
         phone: member.phone,
+        district: member.district || (districts.length ? districts[0] : ''),
         status: member.status,
         joinDate: member.joiningDate
           ? new Date(member.joiningDate).toISOString().split('T')[0]
@@ -122,6 +153,7 @@ export default function StaffManagement() {
         confirmPassword: '',
         email: '',
         phone: '',
+        district: districts.length ? districts[0] : '',
         status: 'active',
         joinDate: new Date().toISOString().split('T')[0],
       });
@@ -131,8 +163,8 @@ export default function StaffManagement() {
 
   // Save staff (create or update)
   const saveStaff = async () => {
-    if (!formData.name || !formData.email || !formData.phone) {
-      toast.error('Name, email, and phone are required');
+    if (!formData.name || !formData.email || !formData.phone || !formData.district) {
+      toast.error('Name, email, phone, and district are required');
       return;
     }
     if (!editingStaff && !formData.password) {
@@ -151,6 +183,7 @@ export default function StaffManagement() {
         email: formData.email,
         phone: formData.phone,
         role: formData.role,
+        district: formData.district,
         status: formData.status,
         joiningDate: formData.joinDate,
       };
@@ -215,7 +248,7 @@ export default function StaffManagement() {
     }
   };
 
-  if (loadingRoles) return <div className="staff-page"><div className="loading-spinner">Loading roles...</div></div>;
+  if (loadingRoles || loadingDistricts) return <div className="staff-page"><div className="loading-spinner">Loading...</div></div>;
 
   return (
     <div className="staff-page">
@@ -236,22 +269,22 @@ export default function StaffManagement() {
         </div>
       </div>
 
-      {/* Stats Cards – removed district count */}
+      {/* Stats Cards */}
       <div className="staff-stats">
         <div className="stat-card"><i className="bi bi-person-badge"></i><div><span className="stat-number">{staff.length}</span><span>Total Staff</span></div></div>
         <div className="stat-card"><i className="bi bi-check-circle-fill"></i><div><span className="stat-number">{staff.filter(s => s.status === 'active').length}</span><span>Active</span></div></div>
         <div className="stat-card"><i className="bi bi-briefcase-fill"></i><div><span className="stat-number">{new Set(staff.map(s => s.role?.name)).size}</span><span>Roles</span></div></div>
-        {/* District stat removed */}
+        <div className="stat-card"><i className="bi bi-geo-alt-fill"></i><div><span className="stat-number">{new Set(staff.map(s => s.district).filter(Boolean)).size}</span><span>Districts</span></div></div>
       </div>
 
       {/* Filters */}
       <div className="filter-bar">
-        <div className="search-group"><i className="bi bi-search"></i><input type="text" placeholder="Search by name, email or role..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
+        <div className="search-group"><i className="bi bi-search"></i><input type="text" placeholder="Search by name, email, role or district..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
         <div className="filter-group"><label><i className="bi bi-briefcase"></i> Role</label><select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}><option value="all">All Roles</option>{roles.map(r => <option key={r} value={r}>{r}</option>)}</select></div>
         <div className="filter-group"><label><i className="bi bi-flag"></i> Status</label><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}><option value="all">All</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="pending">Pending</option></select></div>
       </div>
 
-      {/* Staff Grid – removed district line */}
+      {/* Staff Grid */}
       {loading ? (
         <div className="loading-spinner">Loading staff...</div>
       ) : (
@@ -267,6 +300,7 @@ export default function StaffManagement() {
               <div className="staff-details">
                 <p><i className="bi bi-envelope"></i> {member.email}</p>
                 <p><i className="bi bi-telephone"></i> {member.phone}</p>
+                <p><i className="bi bi-geo-alt"></i> {member.district || 'N/A'}</p>
                 <p><i className="bi bi-calendar"></i> Joined: {member.joiningDate ? new Date(member.joiningDate).toLocaleDateString() : 'N/A'}</p>
               </div>
               <div className="staff-actions">
@@ -288,7 +322,7 @@ export default function StaffManagement() {
         </div>
       )}
 
-      {/* Add/Edit Modal – unchanged (no district) */}
+      {/* Add/Edit Modal with district field */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -321,6 +355,22 @@ export default function StaffManagement() {
               </div>
               <div className="form-row">
                 <div className="form-group">
+                  <label>District</label>
+                  <select value={formData.district} onChange={e => setFormData({...formData, district: e.target.value})}>
+                    {districts.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Status</label>
+                  <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="pending">Pending</option>
+                  </select>
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
                   <label>Password {!editingStaff && <span className="required">*</span>}</label>
                   <input type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} placeholder={editingStaff ? 'Leave blank to keep current' : 'Enter password'} />
                 </div>
@@ -330,14 +380,6 @@ export default function StaffManagement() {
                 </div>
               </div>
               <div className="form-row">
-                <div className="form-group">
-                  <label>Status</label>
-                  <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="pending">Pending</option>
-                  </select>
-                </div>
                 <div className="form-group">
                   <label>Joining Date</label>
                   <input type="date" value={formData.joinDate} onChange={e => setFormData({...formData, joinDate: e.target.value})} />
@@ -354,7 +396,7 @@ export default function StaffManagement() {
         </div>
       )}
 
-      {/* View Modal – removed district row */}
+      {/* View Modal with district */}
       {viewingStaff && (
         <div className="modal-overlay" onClick={() => setViewingStaff(null)}>
           <div className="modal-content view-modal" onClick={e => e.stopPropagation()}>
@@ -364,7 +406,7 @@ export default function StaffManagement() {
               <div className="detail-row"><span>Role:</span><strong>{viewingStaff.role?.name}</strong></div>
               <div className="detail-row"><span>Email:</span><strong>{viewingStaff.email}</strong></div>
               <div className="detail-row"><span>Phone:</span><strong>{viewingStaff.phone}</strong></div>
-              {/* District row removed */}
+              <div className="detail-row"><span>District:</span><strong>{viewingStaff.district || 'N/A'}</strong></div>
               <div className="detail-row"><span>Status:</span><span className={`status-badge ${viewingStaff.status}`}>{viewingStaff.status}</span></div>
               <div className="detail-row"><span>Joined:</span><strong>{viewingStaff.joiningDate ? new Date(viewingStaff.joiningDate).toLocaleDateString() : 'N/A'}</strong></div>
             </div>
@@ -373,7 +415,7 @@ export default function StaffManagement() {
         </div>
       )}
 
-      {/* Delete Confirm (unchanged) */}
+      {/* Delete Confirm */}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="modal-content delete-modal" onClick={e => e.stopPropagation()}>
