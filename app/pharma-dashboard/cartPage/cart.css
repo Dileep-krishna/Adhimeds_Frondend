@@ -1,0 +1,50 @@
+/* MAIN */
+.cart-container {
+  background: #f4f5f9;
+  min-height: 100vh;
+}
+
+/* LEFT CARD */
+.cart-card {
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+/* HEADER */
+.cart-header {
+  font-size: 14px;
+  border-bottom: 1px dashed #ddd;
+  padding-bottom: 10px;
+}
+
+/* ROW */
+.cart-row {
+  padding: 15px 0;
+  border-bottom: 1px dashed #eee;
+}
+
+/* RIGHT CARD */
+.summary-card {
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+/* SUMMARY ITEMS */
+.summary-item {
+  font-size: 14px;
+}
+
+/* BUTTON */
+.checkout-btn {
+  background: linear-gradient(90deg, #5a3fff, #7a4dff);
+  color: white;
+  border: none;
+  padding: 10px;
+  font-weight: 500;
+}
+
+.checkout-btn:hover {
+  opacity: 0.9;
+}
