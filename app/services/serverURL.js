@@ -1,5 +1,5 @@
-const SERVERURL="http://localhost:5000"
+// const SERVERURL="http://localhost:5000"
 
-// const SERVERURL='https://adhimeds-backend-5.onrender.com'
+const SERVERURL='https://adhimeds-backend-6.onrender.com'
 
 export default SERVERURL
