@@ -12,6 +12,7 @@
   }
 }
 
+
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -302,4 +303,54 @@
 .hover-glow:hover {
   box-shadow: 0 0 15px rgba(59,130,246,0.5);
 }
+/* React Select Overrides - Fix dropdown visibility */
+.react-select-container {
+  width: 100%;
+  position: relative;
+  z-index: 100;
+}
 
+.react-select__control {
+  background-color: white !important;
+  border-radius: 0.375rem !important;
+}
+
+.react-select__menu {
+  z-index: 9999 !important;
+  position: absolute !important;
+  background-color: white !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  border-radius: 4px !important;
+}
+
+.react-select__menu-list {
+  max-height: 200px !important;
+  overflow-y: auto !important;
+}
+
+.react-select__option {
+  padding: 10px 12px !important;
+  cursor: pointer !important;
+}
+
+.react-select__option:hover {
+  background-color: #f0f0f0 !important;
+}
+
+.react-select__option--is-focused {
+  background-color: #f0f0f0 !important;
+}
+
+.react-select__option--is-selected {
+  background-color: #0a2b4e !important;
+  color: white !important;
+}
+
+/* Ensure dropdown appears above everything */
+.card-body {
+  overflow: visible !important;
+}
+
+.card {
+  overflow: visible !important;
+}

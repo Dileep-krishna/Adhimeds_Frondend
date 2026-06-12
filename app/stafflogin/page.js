@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import toast, { Toaster } from "react-hot-toast";
+import Select from "react-select";
 import "./stafflogin.css";
 import SERVERURL from "../services/serverURL";
 
@@ -10,63 +11,233 @@ export default function StaffLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [roles, setRoles] = useState([]);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
-  let redirectTimeout = useRef(null);
+  const [loadingRoles, setLoadingRoles] = useState(true);
+  const redirectTimeout = useRef(null);
+  const abortControllerRef = useRef(null);
 
+  // Role-based navigation mapping
+  const getDashboardRoute = useCallback((role) => {
+    const roleRoutes = {
+      'PHARMACIST': '/pharma-dashboard',
+      'DELIVERY BOY': '/Delivery-boy/dashboard',
+      'DELIVERY HEAD': '/Delivery-Head/dashboard',
+      'ADMIN': '/admin-dashboard'
+    };
+    return roleRoutes[role] || '/unauthorized';
+  }, []);
+
+  // Fetch roles with abort controller for cleanup
+  useEffect(() => {
+    abortControllerRef.current = new AbortController();
+    
+    const fetchRoles = async () => {
+      try {
+        setLoadingRoles(true);
+        
+        const response = await fetch(`${SERVERURL}/roles`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          signal: abortControllerRef.current.signal,
+          cache: 'force-cache'
+        });
+        
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        const data = await response.json();
+        
+        if (data.success && Array.isArray(data.data)) {
+          const roleOptions = data.data.map(role => ({
+            value: role.name,
+            label: role.name,
+            id: role._id
+          }));
+          setRoles(roleOptions);
+          sessionStorage.setItem('cachedRoles', JSON.stringify(roleOptions));
+        } else {
+          const cachedRoles = sessionStorage.getItem('cachedRoles');
+          if (cachedRoles) {
+            setRoles(JSON.parse(cachedRoles));
+            toast.success('Roles loaded from cache');
+          } else {
+            toast.error("No roles available");
+          }
+        }
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.error("Error fetching roles:", error);
+          const cachedRoles = sessionStorage.getItem('cachedRoles');
+          if (cachedRoles) {
+            setRoles(JSON.parse(cachedRoles));
+            toast.success('Using cached roles');
+          } else {
+            toast.error("Failed to load roles. Please refresh.");
+          }
+        }
+      } finally {
+        setLoadingRoles(false);
+      }
+    };
+
+    const cachedRoles = sessionStorage.getItem('cachedRoles');
+    if (cachedRoles) {
+      setRoles(JSON.parse(cachedRoles));
+      setLoadingRoles(false);
+    }
+    
+    fetchRoles();
+
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  // Clear timeout on unmount
   useEffect(() => {
     return () => {
       if (redirectTimeout.current) clearTimeout(redirectTimeout.current);
     };
   }, []);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
+    
+    if (loading) return;
 
-    if (!email || !password) {
-      toast.error("Please enter both email and password");
+    if (!email.trim()) {
+      toast.error("Please enter your email");
+      return;
+    }
+    
+    if (!password.trim()) {
+      toast.error("Please enter your password");
+      return;
+    }
+
+    if (!selectedRole) {
+      toast.error("Please select a role");
       return;
     }
 
     setLoading(true);
+    
     try {
+      // First, verify credentials and get user data
       const response = await fetch(`${SERVERURL}/staff/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ 
+          email: email.trim(), 
+          password: password.trim()
+        }),
       });
 
       const data = await response.json();
 
       if (data.success) {
+        // Check if the selected role matches the user's actual role from database
+        const userRole = data.data.role; // Role from database
+        const selectedRoleName = selectedRole.value;
+        
+        console.log("User role from DB:", userRole);
+        console.log("Selected role:", selectedRoleName);
+        
+        // Role matching validation (case-insensitive)
+        if (userRole.toUpperCase() !== selectedRoleName.toUpperCase()) {
+          toast.error(`Invalid role selection! You are logged in as ${userRole}. Please select the correct role.`);
+          setLoading(false);
+          return;
+        }
+        
+        // Role matches, proceed with login
         const storage = rememberMe ? localStorage : sessionStorage;
+        
         storage.setItem("staffToken", data.data.token);
         storage.setItem("staffRole", data.data.role);
         storage.setItem("staffName", data.data.fullName);
         storage.setItem("staffId", data.data._id);
-
-        toast.success(`Welcome, ${data.data.fullName}! Redirecting...`);
-
+        storage.setItem("userRole", userRole);
+        
+        // Get navigation route based on user's actual role
+        const dashboardRoute = getDashboardRoute(userRole);
+        
+        toast.success(`Welcome ${data.data.fullName}! Redirecting to ${userRole} dashboard...`);
+        
+        if (redirectTimeout.current) clearTimeout(redirectTimeout.current);
+        
         redirectTimeout.current = setTimeout(() => {
-          router.push("/pharma-dashboard");
-        }, 1000);
+          router.push(dashboardRoute);
+        }, 800);
       } else {
-        toast.error(data.message || "Invalid credentials");
+        toast.error(data.message || "Invalid email or password");
+        setLoading(false);
       }
     } catch (error) {
       console.error("Login error:", error);
       toast.error("Server error. Please try again later.");
-    } finally {
       setLoading(false);
     }
-  };
+  }, [email, password, selectedRole, rememberMe, loading, router, getDashboardRoute]);
 
-  const backgroundImageUrl =
-    "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?q=80&w=2053&auto=format";
+  const customSelectStyles = useMemo(() => ({
+    control: (base, state) => ({
+      ...base,
+      borderColor: state.isFocused ? '#0a2b4e' : '#dee2e6',
+      boxShadow: state.isFocused ? '0 0 0 0.2rem rgba(10, 43, 78, 0.25)' : 'none',
+      '&:hover': { borderColor: '#0a2b4e' },
+      minHeight: '42px',
+      backgroundColor: 'white',
+      cursor: 'pointer'
+    }),
+    option: (base, { isFocused, isSelected }) => ({
+      ...base,
+      backgroundColor: isSelected ? '#0a2b4e' : isFocused ? '#f0f0f0' : 'white',
+      color: isSelected ? 'white' : '#212529',
+      padding: '10px 12px',
+      cursor: 'pointer',
+      '&:active': {
+        backgroundColor: '#0a2b4e',
+        color: 'white'
+      }
+    }),
+    menu: (base) => ({
+      ...base,
+      zIndex: 9999,
+      backgroundColor: 'white',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      borderRadius: '4px',
+      marginTop: '4px'
+    }),
+    menuList: (base) => ({
+      ...base,
+      maxHeight: '200px',
+      overflowY: 'auto'
+    }),
+    placeholder: (base) => ({
+      ...base,
+      color: '#6c757d'
+    }),
+    dropdownIndicator: (base) => ({
+      ...base,
+      color: '#0a2b4e',
+      cursor: 'pointer'
+    }),
+    indicatorSeparator: (base) => ({
+      ...base,
+      backgroundColor: '#dee2e6'
+    })
+  }), []);
+
+  const backgroundImageUrl = "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?q=80&w=2053&auto=format";
 
   return (
     <div className="container-fluid vh-100 p-0 overflow-hidden">
-      <Toaster position="top-right" />
+      <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
       <div className="row g-0 h-100">
         {/* LEFT SIDE – Branding */}
         <div
@@ -100,11 +271,11 @@ export default function StaffLoginPage() {
           </div>
         </div>
 
-        {/* RIGHT SIDE – Staff Login Form (no district) */}
+        {/* RIGHT SIDE – Staff Login Form */}
         <div className="col-12 col-lg-6 d-flex justify-content-center align-items-center bg-light p-4">
           <div
             className="card border-0 shadow-lg w-100 animate-zoom-in"
-            style={{ maxWidth: "480px" }}
+            style={{ maxWidth: "480px", position: "relative", zIndex: 1 }}
           >
             <div className="card-body p-4 p-md-5">
               <div className="text-center mb-4 animate-fade-up">
@@ -123,6 +294,32 @@ export default function StaffLoginPage() {
               </div>
 
               <form onSubmit={handleSubmit}>
+                {/* Role Selection */}
+                <div className="mb-3 animate-fade-up delay-100" style={{ position: "relative", zIndex: 10 }}>
+                  <label className="form-label fw-semibold">
+                    Select Role <span className="text-danger">*</span>
+                  </label>
+                  <Select
+                    options={roles}
+                    value={selectedRole}
+                    onChange={setSelectedRole}
+                    isLoading={loadingRoles}
+                    isDisabled={loadingRoles}
+                    placeholder={loadingRoles ? "Loading roles..." : "Choose your role..."}
+                    noOptionsMessage={() => "No roles available"}
+                    styles={customSelectStyles}
+                    className="react-select-container"
+                    classNamePrefix="react-select"
+                    isSearchable={true}
+                    isClearable={false}
+                    menuPortalTarget={document.body}
+                    menuPosition="fixed"
+                  />
+                  <small className="text-muted d-block mt-1">
+                    Select the role assigned to you by admin
+                  </small>
+                </div>
+
                 {/* Email */}
                 <div className="mb-3 animate-fade-up delay-200">
                   <label className="form-label fw-semibold">Email Address</label>
@@ -136,6 +333,7 @@ export default function StaffLoginPage() {
                       placeholder="staff@company.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      autoComplete="email"
                       required
                     />
                   </div>
@@ -154,6 +352,7 @@ export default function StaffLoginPage() {
                       placeholder="••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="current-password"
                       required
                     />
                   </div>
@@ -185,12 +384,12 @@ export default function StaffLoginPage() {
                   type="submit"
                   className="btn btn-dark w-100 py-2 rounded-pill fw-semibold animate-fade-up delay-500"
                   style={{ backgroundColor: "#0a2b4e", borderColor: "#0a2b4e" }}
-                  disabled={loading}
+                  disabled={loading || loadingRoles}
                 >
                   {loading ? (
                     <>
                       <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                      Signing in...
+                      Verifying...
                     </>
                   ) : (
                     "Staff Sign In"
@@ -205,10 +404,6 @@ export default function StaffLoginPage() {
                 >
                   ← Back to previous page
                 </button>
-              </div>
-
-              <div className="mt-3 text-center small text-muted animate-fade-up delay-700">
-                Demo: staff@example.com / password123
               </div>
             </div>
           </div>

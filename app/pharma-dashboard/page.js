@@ -94,39 +94,50 @@ export default function Dashboard() {
         <div className="row mt-4">
           {/* LEFT COLUMN – Horizontal flex row of store cards */}
           {/* LEFT COLUMN – Clean Grid Store Cards */}
-<div className="col-lg-8">
-  {loadingShops ? (
-    <p>⏳ Loading stores...</p>
-  ) : stores.length === 0 ? (
-    <p>❌ No stores found.</p>
-  ) : (
-    <div className="row g-3">
-      {stores.map((store) => (
-        <div key={store.shopid} className="col-6 col-md-4 col-lg-3">
+          <div className="col-lg-8">
+            {loadingShops ? (
+              <p>⏳ Loading stores...</p>
+            ) : stores.length === 0 ? (
+              <p>❌ No stores found.</p>
+            ) : (
+              <div className="row g-3">
+                {stores.map((store) => (
+                  <div key={store.shopid} className="col-12 col-md-6 col-lg-4">
+  <div
+    className="store-card d-flex align-items-stretch bg-white border rounded"
+    style={{ cursor: "pointer" }}
+    onClick={() => fetchStock(store.shopid)}
+  >
+    {/* Left Logo Section */}
+    <div className="store-logo-box d-flex align-items-center justify-content-center">
+      {store.logo ? (
+        <img src={store.logo} alt="logo" />
+      ) : (
+        <span>{store.name?.charAt(0)}</span>
+      )}
+    </div>
 
-          <div
-            className="store-card text-center p-3 border rounded bg-white h-100"
-            style={{ cursor: "pointer" }}
-            onClick={() => fetchStock(store.shopid)}
-          >
-            <div className="fw-bold mb-2">{store.name}</div>
+    {/* Right Content Section */}
+    <div className="store-content flex-grow-1 p-2">
+      <div className="store-title p-2">
+        {store.name}
+      </div>
 
-            <div className="small text-muted">
-              Items : {stockData[store.shopid]?.length || 0}
-              <br />
-              Value : ₹0.00
-            </div>
+      <div className="store-footer d-flex justify-content-between p-2">
+        <span>Items : {stockData[store.shopid]?.length || 0}</span>
+        <span>Value : ₹0.00</span>
+      </div>
 
-            {loadingStock[store.shopid] && (
-              <div className="spinner-border spinner-border-sm text-primary mt-2"></div>
+      {loadingStock[store.shopid] && (
+        <div className="spinner-border spinner-border-sm text-primary m-2"></div>
+      )}
+    </div>
+  </div>
+</div>
+                ))}
+              </div>
             )}
           </div>
-
-        </div>
-      ))}
-    </div>
-  )}
-</div>
 
           {/* RIGHT COLUMN – Last Added Items (unchanged) */}
           <div className="col-lg-4">
