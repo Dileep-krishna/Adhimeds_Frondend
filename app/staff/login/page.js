@@ -20,7 +20,6 @@ export default function StaffLoginPage() {
     console.log("SERVERURL:", SERVERURL);
     console.log("Environment:", process.env.NODE_ENV);
     
-    // Validate SERVERURL format
     try {
       new URL(SERVERURL);
       console.log("✅ SERVERURL is valid URL");
@@ -28,7 +27,6 @@ export default function StaffLoginPage() {
       console.error("❌ SERVERURL is INVALID:", SERVERURL);
     }
     
-    // Check for existing token in sessionStorage only
     const existingToken = sessionStorage.getItem("staffToken");
     if (existingToken) {
       console.log("⚠️ Existing token found in sessionStorage");
@@ -111,7 +109,7 @@ export default function StaffLoginPage() {
           tokenPreview: data.data.token ? data.data.token.substring(0, 20) + "..." : "missing"
         });
         
-        // Always use sessionStorage (no "remember me")
+        // Store in sessionStorage
         console.log("Storing auth data in sessionStorage");
         try {
           sessionStorage.setItem("staffToken", data.data.token);
@@ -120,7 +118,6 @@ export default function StaffLoginPage() {
           sessionStorage.setItem("staffId", data.data._id);
           if (data.data.district) sessionStorage.setItem("staffDistrict", data.data.district);
           
-          // Verify storage
           const writtenToken = sessionStorage.getItem("staffToken");
           const writtenRole = sessionStorage.getItem("staffRole");
           console.log("Verification after write:");
@@ -140,14 +137,18 @@ export default function StaffLoginPage() {
           throw storageError;
         }
         
-        toast.success(`Welcome, ${data.data.fullName}! Redirecting...`);
+        toast.success(`Welcome, ${data.data.fullName}! Redirecting to Pharma Dashboard...`);
         
-        console.log("Setting redirect timeout for /staff-dashboard (1000ms)");
+        // ========== SIMPLE REDIRECT – always to pharma-dashboard ==========
+        const redirectPath = "/pharma-dashboard";
+        console.log(`🎯 Redirecting to ${redirectPath}`);
+        
         redirectTimeout.current = setTimeout(() => {
-          console.log("⏰ Redirect timeout triggered, calling router.push('/staff-dashboard')");
-          router.push("/staff-dashboard");
+          console.log(`⏰ Redirect timeout triggered, calling router.push('${redirectPath}')`);
+          router.push(redirectPath);
           console.log("Router push called");
         }, 1000);
+        // ================================================================
       } else {
         console.warn("❌ Login failed - server returned success: false");
         console.warn("Message:", data.message || "Invalid credentials");
@@ -291,8 +292,6 @@ export default function StaffLoginPage() {
                     />
                   </div>
                 </div>
-
-                {/* Removed "Remember Me" checkbox */}
 
                 <button
                   type="submit"
