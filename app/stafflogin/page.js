@@ -48,7 +48,7 @@ export default function StaffLoginPage() {
         toast.success(`Welcome, ${data.data.fullName}! Redirecting...`);
 
         redirectTimeout.current = setTimeout(() => {
-          router.push("/staff-dashboard");
+          router.push("/pharma-dashboard");
         }, 1000);
       } else {
         toast.error(data.message || "Invalid credentials");
