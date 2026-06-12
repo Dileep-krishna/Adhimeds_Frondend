@@ -10,7 +10,6 @@ export default function StaffLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   let redirectTimeout = useRef(null);
   let startTime = useRef(null);
@@ -29,13 +28,12 @@ export default function StaffLoginPage() {
       console.error("❌ SERVERURL is INVALID:", SERVERURL);
     }
     
-    // Check for existing token
-    const localToken = localStorage.getItem("staffToken");
-    const sessionToken = sessionStorage.getItem("staffToken");
-    if (localToken || sessionToken) {
-      console.log("⚠️ Existing token found - localStorage:", !!localToken, "sessionStorage:", !!sessionToken);
-      console.log("  - staffRole:", localStorage.getItem("staffRole") || sessionStorage.getItem("staffRole"));
-      console.log("  - staffName:", localStorage.getItem("staffName") || sessionStorage.getItem("staffName"));
+    // Check for existing token in sessionStorage only
+    const existingToken = sessionStorage.getItem("staffToken");
+    if (existingToken) {
+      console.log("⚠️ Existing token found in sessionStorage");
+      console.log("  - staffRole:", sessionStorage.getItem("staffRole"));
+      console.log("  - staffName:", sessionStorage.getItem("staffName"));
     } else {
       console.log("No existing token found");
     }
@@ -56,10 +54,8 @@ export default function StaffLoginPage() {
     console.group("🔐 [StaffLogin] Login Attempt");
     console.log("Timestamp:", new Date().toISOString());
     console.log("Email:", email);
-    console.log("Remember Me:", rememberMe);
     console.log("Password length:", password ? password.length : 0);
 
-    // Validation
     if (!email || !password) {
       console.warn("❌ Validation failed: missing email or password");
       toast.error("Please enter both email and password");
@@ -91,7 +87,6 @@ export default function StaffLoginPage() {
         console.log(`  ${key}: ${value}`);
       }
       
-      // Clone response to log raw text and also parse JSON
       const responseClone = response.clone();
       const rawText = await responseClone.text();
       console.log("Raw response body (first 500 chars):", rawText.substring(0, 500));
@@ -116,25 +111,23 @@ export default function StaffLoginPage() {
           tokenPreview: data.data.token ? data.data.token.substring(0, 20) + "..." : "missing"
         });
         
-        const storage = rememberMe ? localStorage : sessionStorage;
-        const storageType = rememberMe ? "localStorage" : "sessionStorage";
-        console.log(`Storing auth data in ${storageType}`);
-        
+        // Always use sessionStorage (no "remember me")
+        console.log("Storing auth data in sessionStorage");
         try {
-          storage.setItem("staffToken", data.data.token);
-          storage.setItem("staffRole", data.data.role);
-          storage.setItem("staffName", data.data.fullName);
-          storage.setItem("staffId", data.data._id);
-          if (data.data.district) storage.setItem("staffDistrict", data.data.district);
+          sessionStorage.setItem("staffToken", data.data.token);
+          sessionStorage.setItem("staffRole", data.data.role);
+          sessionStorage.setItem("staffName", data.data.fullName);
+          sessionStorage.setItem("staffId", data.data._id);
+          if (data.data.district) sessionStorage.setItem("staffDistrict", data.data.district);
           
           // Verify storage
-          const writtenToken = storage.getItem("staffToken");
-          const writtenRole = storage.getItem("staffRole");
+          const writtenToken = sessionStorage.getItem("staffToken");
+          const writtenRole = sessionStorage.getItem("staffRole");
           console.log("Verification after write:");
           console.log("  - staffToken written:", !!writtenToken, "length:", writtenToken?.length);
           console.log("  - staffRole written:", writtenRole);
-          console.log("  - staffName written:", storage.getItem("staffName"));
-          console.log("  - staffId written:", storage.getItem("staffId"));
+          console.log("  - staffName written:", sessionStorage.getItem("staffName"));
+          console.log("  - staffId written:", sessionStorage.getItem("staffId"));
           
           if (!writtenToken || writtenToken !== data.data.token) {
             console.error("❌ Token write verification FAILED!");
@@ -143,7 +136,7 @@ export default function StaffLoginPage() {
           }
         } catch (storageError) {
           console.error("❌ Storage write failed:", storageError);
-          toast.error("Could not save login data. Your browser may block local storage.");
+          toast.error("Could not save login data. Your browser may block session storage.");
           throw storageError;
         }
         
@@ -171,7 +164,6 @@ export default function StaffLoginPage() {
       if (error.message === "Failed to fetch") {
         console.error("Network error: Server unreachable or CORS issue");
         console.error("Check if backend is running at", SERVERURL);
-        console.error("Try accessing", `${SERVERURL}/staff/login`, "manually in browser");
         toast.error("Cannot connect to server. Please check network or contact admin.");
       } else if (error.message.includes("JSON")) {
         console.error("JSON parse error - backend likely returned HTML or error page");
@@ -300,33 +292,7 @@ export default function StaffLoginPage() {
                   </div>
                 </div>
 
-                <div className="d-flex justify-content-between align-items-center mb-4 animate-fade-up delay-400">
-                  <div className="form-check">
-                    <input
-                      type="checkbox"
-                      className="form-check-input"
-                      id="rememberStaff"
-                      checked={rememberMe}
-                      onChange={(e) => {
-                        console.log("[StaffLogin] Remember me checkbox changed to:", e.target.checked);
-                        setRememberMe(e.target.checked);
-                      }}
-                    />
-                    <label className="form-check-label text-secondary" htmlFor="rememberStaff">
-                      Keep me logged in
-                    </label>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-link p-0 text-decoration-none text-primary"
-                    onClick={() => {
-                      console.log("[StaffLogin] Forgot password clicked");
-                      toast.info("Contact admin to reset password");
-                    }}
-                  >
-                    Forgot password?
-                  </button>
-                </div>
+                {/* Removed "Remember Me" checkbox */}
 
                 <button
                   type="submit"
