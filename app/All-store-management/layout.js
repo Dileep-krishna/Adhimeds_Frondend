@@ -12,13 +12,27 @@ export default function StoreManagementLayout({ children }) {
   const [productsOpen, setProductsOpen] = useState(false);
   const [productsExpandOpen, setProductsExpandOpen] = useState(false); // for "products" expandable
   const pathname = usePathname();
-
+const [userClicked, setUserClicked] = useState(false);
   // Auto-close submenus on route change
-  useEffect(() => {
+useEffect(() => {
+  if (!userClicked) {
+    // On refresh → keep closed
     setProductsOpen(false);
     setProductsExpandOpen(false);
-  }, [pathname]);
+    return;
+  }
 
+  if (
+    pathname.startsWith("/All-store-management/All-Products") ||
+    pathname.startsWith("/All-store-management/Store-Product")
+  ) {
+    setProductsOpen(true);
+    setProductsExpandOpen(true);
+  } else {
+    setProductsOpen(false);
+    setProductsExpandOpen(false);
+  }
+}, [pathname]);
   // Responsive check
   useEffect(() => {
     const checkMobile = () => {
@@ -32,12 +46,16 @@ export default function StoreManagementLayout({ children }) {
   }, []);
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
-  const toggleProducts = () => {
-    setProductsOpen(!productsOpen);
-    if (productsOpen) setProductsExpandOpen(false);
-  };
-  const toggleProductsExpand = () => setProductsExpandOpen(!productsExpandOpen);
+const toggleProducts = () => {
+  setUserClicked(true); // 👈 important
+  setProductsOpen(!productsOpen);
+  if (productsOpen) setProductsExpandOpen(false);
+};
 
+const toggleProductsExpand = () => {
+  setUserClicked(true); // 👈 important
+  setProductsExpandOpen(!productsExpandOpen);
+};
   const handleNav = () => {
     if (isMobile) setSidebarOpen(false);
   };
@@ -148,7 +166,7 @@ export default function StoreManagementLayout({ children }) {
                   </div>
 
                   {/* Direct links */}
-                  <Link href="/store-management/brand" className="dropdown-item" onClick={handleNav}>
+                  {/* <Link href="/store-management/brand" className="dropdown-item" onClick={handleNav}>
                     Brand
                   </Link>
                   <Link href="/store-management/variant" className="dropdown-item" onClick={handleNav}>
@@ -159,7 +177,7 @@ export default function StoreManagementLayout({ children }) {
                   </Link>
                   <Link href="/store-management/product-reviews" className="dropdown-item" onClick={handleNav}>
                     Product-Review
-                  </Link>
+                  </Link> */}
                 </motion.div>
               )}
             </AnimatePresence>

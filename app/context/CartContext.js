@@ -7,34 +7,44 @@ const CartContext = createContext();
 export function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState([]);
 
-  // Load from localStorage on mount
+  // ✅ Load from sessionStorage
   useEffect(() => {
-    const savedCart = localStorage.getItem("cart");
-    if (savedCart) setCartItems(JSON.parse(savedCart));
+    if (typeof window !== "undefined") {
+      const savedCart = sessionStorage.getItem("cart");
+      if (savedCart) {
+        setCartItems(JSON.parse(savedCart));
+      }
+    }
   }, []);
 
-  // Save to localStorage whenever cart changes
+  // ✅ Save to sessionStorage
   useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(cartItems));
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("cart", JSON.stringify(cartItems));
+    }
   }, [cartItems]);
 
   const addItem = (newItem) => {
     setCartItems((prev) => {
       const existingIndex = prev.findIndex(
         (item) =>
-          item.productId === newItem.productId && item.storeName === newItem.storeName
+          item.productId === newItem.productId &&
+          item.storeName === newItem.storeName
       );
+
       if (existingIndex >= 0) {
         const updated = [...prev];
         updated[existingIndex].quantity += newItem.quantity;
         return updated;
       }
+
       return [...prev, { ...newItem, id: Date.now() }];
     });
   };
 
   const updateQuantity = (id, newQty) => {
     if (newQty < 1) return;
+
     setCartItems((prev) =>
       prev.map((item) =>
         item.id === id ? { ...item, quantity: newQty } : item
@@ -46,7 +56,10 @@ export function CartProvider({ children }) {
     setCartItems((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const clearCart = () => setCartItems([]);
+  const clearCart = () => {
+    setCartItems([]);
+    sessionStorage.removeItem("cart"); // optional cleanup
+  };
 
   return (
     <CartContext.Provider
