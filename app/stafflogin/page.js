@@ -16,8 +16,14 @@ export default function StaffLoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingRoles, setLoadingRoles] = useState(true);
+  const [mounted, setMounted] = useState(false); // Only added to fix build error
   const redirectTimeout = useRef(null);
   const abortControllerRef = useRef(null);
+
+  // Only added to fix build error - no functionality change
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Role-based navigation mapping
   const getDashboardRoute = useCallback((role) => {
@@ -127,7 +133,6 @@ export default function StaffLoginPage() {
     setLoading(true);
     
     try {
-      // First, verify credentials and get user data
       const response = await fetch(`${SERVERURL}/staff/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -140,21 +145,18 @@ export default function StaffLoginPage() {
       const data = await response.json();
 
       if (data.success) {
-        // Check if the selected role matches the user's actual role from database
-        const userRole = data.data.role; // Role from database
+        const userRole = data.data.role;
         const selectedRoleName = selectedRole.value;
         
         console.log("User role from DB:", userRole);
         console.log("Selected role:", selectedRoleName);
         
-        // Role matching validation (case-insensitive)
         if (userRole.toUpperCase() !== selectedRoleName.toUpperCase()) {
           toast.error(`Invalid role selection! You are logged in as ${userRole}. Please select the correct role.`);
           setLoading(false);
           return;
         }
         
-        // Role matches, proceed with login
         const storage = rememberMe ? localStorage : sessionStorage;
         
         storage.setItem("staffToken", data.data.token);
@@ -163,7 +165,6 @@ export default function StaffLoginPage() {
         storage.setItem("staffId", data.data._id);
         storage.setItem("userRole", userRole);
         
-        // Get navigation route based on user's actual role
         const dashboardRoute = getDashboardRoute(userRole);
         
         toast.success(`Welcome ${data.data.fullName}! Redirecting to ${userRole} dashboard...`);
@@ -312,7 +313,8 @@ export default function StaffLoginPage() {
                     classNamePrefix="react-select"
                     isSearchable={true}
                     isClearable={false}
-                    menuPortalTarget={document.body}
+                    // FIX: Only access document on client side
+                    menuPortalTarget={mounted ? document.body : undefined}
                     menuPosition="fixed"
                   />
                   <small className="text-muted d-block mt-1">
