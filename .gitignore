@@ -41,4 +41,4 @@ yarn-error.log*
 next-env.d.ts
 # Environment variables
 
-config/secrets.js
+# config/secrets.js
