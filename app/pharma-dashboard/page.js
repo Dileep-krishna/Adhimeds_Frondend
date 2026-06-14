@@ -4,15 +4,16 @@ import { useState, useEffect, useRef } from "react";
 import "./pharma-dashboard.css";
 import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
+import { useCart } from "@/context/CartContext"; // ✅ only addition
 
 export default function Dashboard() {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef();
   const [stores, setStores] = useState([]);
   const [loadingShops, setLoadingShops] = useState(true);
-  const [stockData, setStockData] = useState({});
-  const [loadingStock, setLoadingStock] = useState({});
   const router = useRouter();
+
+  const { cartItems } = useCart(); // ✅ get real cart items
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -24,16 +25,15 @@ export default function Dashboard() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Fetch stores
+  // Fetch stores from real Medisoft API (GET)
   useEffect(() => {
     async function fetchStores() {
       try {
-        const res = await fetch("/api/proxy-shops", { method: "POST" });
+        const res = await fetch("/api/medisoft/shops");
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
-        if (Array.isArray(data)) setStores(data);
-        else if (data?.status === 200 && Array.isArray(data.body)) setStores(data.body);
-        else setStores([]);
+        const shopsArray = Array.isArray(data) ? data : data?.body || [];
+        setStores(shopsArray);
       } catch (err) {
         console.error(err);
         setStores([]);
@@ -44,42 +44,12 @@ export default function Dashboard() {
     fetchStores();
   }, []);
 
-  // Fetch stock
-  const fetchStock = async (shopId) => {
-    if (stockData[shopId]) return;
-    setLoadingStock((prev) => ({ ...prev, [shopId]: true }));
-    try {
-      const res = await fetch("/api/proxy-stock", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: shopId }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      const products = Array.isArray(data) ? data : (data?.body && Array.isArray(data.body) ? data.body : []);
-      setStockData((prev) => ({ ...prev, [shopId]: products }));
-    } catch (err) {
-      console.error(err);
-      setStockData((prev) => ({ ...prev, [shopId]: [] }));
-    } finally {
-      setLoadingStock((prev) => ({ ...prev, [shopId]: false }));
-    }
-  };
+  // Dummy state to keep JSX intact (always empty)
+  const stockData = {};
+  const loadingStock = {};
 
-  // Last added items
-  const lastAddedItems = (() => {
-    const firstStockKey = Object.keys(stockData).find(key => stockData[key]?.length > 0);
-    if (firstStockKey) return stockData[firstStockKey].slice(0, 3);
-    return [];
-  })();
-
-  // Group stores by first letter
-  const groupedStores = stores.reduce((groups, store) => {
-    const firstChar = store.name.charAt(0).toUpperCase();
-    if (!groups[firstChar]) groups[firstChar] = [];
-    groups[firstChar].push(store);
-    return groups;
-  }, {});
+  // ✅ Real last added items from cart
+  const lastAddedItems = cartItems.slice(-3).reverse();
 
   return (
     <div className="dashboard-container">
@@ -92,8 +62,7 @@ export default function Dashboard() {
         </p>
 
         <div className="row mt-4">
-          {/* LEFT COLUMN – Horizontal flex row of store cards */}
-          {/* LEFT COLUMN – Clean Grid Store Cards */}
+          {/* LEFT COLUMN – Store Cards */}
           <div className="col-lg-8">
             {loadingShops ? (
               <p>⏳ Loading stores...</p>
@@ -103,43 +72,36 @@ export default function Dashboard() {
               <div className="row g-3">
                 {stores.map((store) => (
                   <div key={store.shopid} className="col-12 col-md-6 col-lg-4">
-  <div
-    className="store-card d-flex align-items-stretch bg-white border rounded"
-    style={{ cursor: "pointer" }}
-    onClick={() => fetchStock(store.shopid)}
-  >
-    {/* Left Logo Section */}
-    <div className="store-logo-box d-flex align-items-center justify-content-center">
-      {store.logo ? (
-        <img src={store.logo} alt="logo" />
-      ) : (
-        <span>{store.name?.charAt(0)}</span>
-      )}
-    </div>
+                    <div
+                      className="store-card d-flex align-items-stretch bg-white border rounded"
+                      style={{ cursor: "pointer" }}
+                      onClick={() => router.push(`/pharma-dashboard/cartPage?shopId=${store.shopid}`)}
+                    >
+                      {/* Left Logo Section */}
+                      <div className="store-logo-box d-flex align-items-center justify-content-center">
+                        {store.logo ? (
+                          <img src={store.logo} alt="logo" />
+                        ) : (
+                          <span>{store.name?.charAt(0)}</span>
+                        )}
+                      </div>
 
-    {/* Right Content Section */}
-    <div className="store-content flex-grow-1 p-2">
-      <div className="store-title p-2">
-        {store.name}
-      </div>
-
-      <div className="store-footer d-flex justify-content-between p-2">
-        <span>Items : {stockData[store.shopid]?.length || 0}</span>
-        <span>Value : ₹0.00</span>
-      </div>
-
-      {loadingStock[store.shopid] && (
-        <div className="spinner-border spinner-border-sm text-primary m-2"></div>
-      )}
-    </div>
-  </div>
-</div>
+                      {/* Right Content Section */}
+                      <div className="store-content flex-grow-1 p-2">
+                        <div className="store-title p-2">{store.name}</div>
+                        <div className="store-footer d-flex justify-content-between p-2">
+                          <span>Items : 0</span>
+                          <span>Value : ₹0.00</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* RIGHT COLUMN – Last Added Items (unchanged) */}
+          {/* RIGHT COLUMN – Last Added Items (now using real cart items) */}
           <div className="col-lg-4">
             <div className="last-added-card p-3 bg-white rounded shadow-sm">
               <h6 className="fw-bold mb-3">Last Added Items</h6>
@@ -147,8 +109,8 @@ export default function Dashboard() {
                 <ul className="list-unstyled small">
                   {lastAddedItems.map((item, idx) => (
                     <li key={idx} className="mb-2 pb-2 border-bottom">
-                      <strong>{item.productname || item.itemname}</strong><br />
-                      Qty: {item.quantity || 0}, Pack: {item.pack || 'N/A'}
+                      <strong>{item.productName || item.productname || item.itemname}</strong><br />
+                      Qty: {item.quantity || 0}, Pack: {item.pack || item.qtyPerBox || 'N/A'}
                     </li>
                   ))}
                 </ul>

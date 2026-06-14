@@ -322,6 +322,21 @@
   background: #ccc;
   border-radius: 10px;
 }
+
+.search-results-dropdown {
+  max-height: 400px;
+  overflow-y: auto;
+  border-radius: 10px;
+}
+
+.search-results-dropdown::-webkit-scrollbar {
+  width: 4px;
+}
+
+.search-results-dropdown::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 10px;
+}
 /* Responsive */
 @media (max-width: 992px) {
   .topbar {

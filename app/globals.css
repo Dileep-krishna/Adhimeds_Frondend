@@ -1,0 +1,133 @@
+/* ========== RESPONSIVE SIDEBAR STYLES ========== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #f8fafc;
+  overflow-x: hidden;
+}
+
+/* ---------- CSS GRID LAYOUT – NO SHIFT ---------- */
+.admin-layout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.main-content-wrapper {
+  background: #f8fafc;
+  overflow-x: auto;
+}
+
+/* ---------- SIDEBAR (WHITE MODERN) ---------- */
+.ps-sidebar-root {
+  background: #ffffff !important;
+  border-right: 1px solid #e2e8f0 !important;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.02), 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.ps-menu-button {
+  color: #334155 !important;
+  padding: 0.75rem 1rem !important;
+  border-radius: 8px !important;
+  margin: 4px 8px !important;
+  transition: all 0.2s ease !important;
+  font-weight: 500;
+}
+
+.ps-menu-button:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+.ps-active .ps-menu-button {
+  background: #eef2ff !important;
+  color: #4f46e5 !important;
+  font-weight: 600;
+}
+
+.ps-submenu-content {
+  background: #ffffff !important;
+  border-left: 1px solid #e2e8f0;
+  margin-left: 0.5rem;
+}
+
+.ps-submenu-content .ps-menu-button {
+  padding-left: 2rem !important;
+  font-size: 0.9rem;
+}
+
+.ps-submenu-expand-icon {
+  color: #94a3b8 !important;
+}
+
+/* ---------- MOBILE OVERLAY ---------- */
+@media (max-width: 992px) {
+  .admin-layout {
+    display: block;
+  }
+
+  /* Force sidebar to be hidden by default on mobile */
+  .ps-sidebar-root {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 1050;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    width: 280px !important;   /* fixed width for mobile */
+  }
+
+  /* When open, slide in */
+  .ps-sidebar-root.mobile-open {
+    transform: translateX(0) !important;
+  }
+
+  /* Main content takes full width, no margin */
+  .main-content-wrapper {
+    width: 100%;
+    margin-left: 0 !important;
+  }
+
+  /* Ensure backdrop covers everything */
+  .position-fixed {
+    z-index: 1040;
+  }
+}
+
+/* ---------- UTILITY ---------- */
+.cursor-pointer {
+  cursor: pointer;
+}
+.rotate-180 {
+  transform: rotate(180deg);
+}
+.transition-transform {
+  transition: transform 0.2s;
+}
+/* Dot marker for leaf menu items */
+.menu-item-with-dot {
+  position: relative;
+  padding-left: 1.25rem;
+}
+.menu-item-with-dot::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  background-color: #4f46e5;
+  border-radius: 50%;
+  opacity: 0.6;
+}
+.ps-active .menu-item-with-dot::before {
+  background-color: #4f46e5;
+  opacity: 1;
+}

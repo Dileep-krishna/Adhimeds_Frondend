@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Offcanvas, Button, InputGroup, FormControl } from "react-bootstrap";
-import { useCart } from "../../context/CartContext";
+import { useCart } from "@/context/CartContext";
 import "./CartSidebar.css";
 
 export default function CartSidebar({ show, onHide, selectedProduct, storeList }) {

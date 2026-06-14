@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import "./navbar.css";
-import { getProductsAPI } from "../services/productService";
 import CartSidebar from "../pharma-dashboard/components/CartSidebar";
-import SERVERURL from "../services/serverURL";
 
 export default function Navbar() {
   const router = useRouter();
@@ -14,112 +12,150 @@ export default function Navbar() {
 
   // Dropdown state
   const [open, setOpen] = useState(false);
-  
+
   // Search state
   const [searchTerm, setSearchTerm] = useState("");
-  const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [showResults, setShowResults] = useState(false);
   const [loading, setLoading] = useState(false);
-  
+  const [error, setError] = useState(null);
+
   // Sidebar state
   const [showCart, setShowCart] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [storeList, setStoreList] = useState([]);
 
-  // Helper to get full image URL
-  const getImageUrl = (filename) => {
-    if (!filename) return null;
-    return `${SERVERURL}/imgUploads/${filename}`;
-  };
+  const [loaded, setLoaded] = useState(false);
 
-  // Fetch products
+  // Fetch all shops and products in parallel
   useEffect(() => {
-    const fetchProducts = async () => {
+    if (loaded) return;
+    const abortController = new AbortController();
+
+    async function fetchAllProducts() {
       setLoading(true);
       try {
-        const response = await getProductsAPI();
-        if (response.success && Array.isArray(response.data)) {
-          setProducts(response.data);
+        const shopsRes = await fetch("/api/medisoft/shops", { signal: abortController.signal });
+        if (!shopsRes.ok) throw new Error("Failed to fetch shops");
+        const shopsData = await shopsRes.json();
+        const shops = Array.isArray(shopsData) ? shopsData : shopsData?.body || [];
+        if (shops.length === 0) {
+          setError("No stores found");
+          setLoading(false);
+          return;
         }
-      } catch (error) {
-        console.error("Failed to fetch products:", error);
+
+        const productPromises = shops.map(async (shop) => {
+          try {
+            const res = await fetch("/api/medisoft/products", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ shopId: shop.shopid }),
+              signal: abortController.signal,
+            });
+            if (!res.ok) return [];
+            const data = await res.json();
+            let products = [];
+            if (Array.isArray(data)) products = data;
+            else if (data?.products && Array.isArray(data.products)) products = data.products;
+            else if (data?.body && Array.isArray(data.body)) products = data.body;
+            else products = [];
+
+            return products.map(prod => ({
+              ...prod,
+              storeName: shop.name,
+              storeId: shop.shopid,
+            }));
+          } catch (err) {
+            console.error(`Error for shop ${shop.shopid}:`, err);
+            return [];
+          }
+        });
+
+        const allProductArrays = await Promise.all(productPromises);
+        const allItems = allProductArrays.flat();
+        setAllProducts(allItems);
+        setFilteredProducts(allItems.slice(0, 6));
+        setLoaded(true);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error(err);
+          setError(err.message);
+        }
       } finally {
         setLoading(false);
       }
-    };
-    fetchProducts();
-  }, []);
+    }
 
-  // Filter products
+    fetchAllProducts();
+    return () => abortController.abort();
+  }, [loaded]);
+
+  // Debounce search input
+  const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
   useEffect(() => {
-    if (searchTerm.trim() === "") {
-      setFilteredProducts([]);
+    const timer = setTimeout(() => setDebouncedTerm(searchTerm), 200);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Filter products based on debounced term
+  useEffect(() => {
+    if (allProducts.length === 0) return;
+    if (!debouncedTerm.trim()) {
+      setFilteredProducts(allProducts.slice(0, 6));
       setShowResults(false);
       return;
     }
-    const term = searchTerm.toLowerCase();
-    const filtered = products.filter(
-      (p) =>
-        p.productName?.toLowerCase().includes(term) ||
-        p.brand?.toLowerCase().includes(term) ||
-        p.mainCategory?.toLowerCase().includes(term)
+    const lower = debouncedTerm.toLowerCase();
+    const filtered = allProducts.filter(p =>
+      (p.productname || p.itemname || "").toLowerCase().includes(lower)
     );
-    setFilteredProducts(filtered.slice(0, 8));
+    setFilteredProducts(filtered.slice(0, 10));
     setShowResults(true);
-  }, [searchTerm, products]);
+  }, [debouncedTerm, allProducts]);
 
-  // Outside clicks
+  // Close dropdown on outside click
   useEffect(() => {
-    function handleClickOutside(e) {
+    const handler = (e) => {
       if (searchRef.current && !searchRef.current.contains(e.target)) {
         setShowResults(false);
       }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // Profile dropdown outside click
   useEffect(() => {
-    function handleClickOutside(e) {
+    const handler = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setOpen(false);
       }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Add button – opens sidebar with store selection
   const addToCart = (product, e) => {
     e.stopPropagation();
-    // Mock store list – replace with real API
-    const mockStores = [
-      {
-        storeName: "Oriental Medical & Equipment Co. (omeco)",
-        productName: product.productName,
-        pack: "15S",
-        rate: 0.0,
-        mrp: 0.0,
-        scheme: "",
-        stock: "Out of Stock",
-        content: "Unsure",
-        qtyPerBox: 0,
-      },
-      {
-        storeName: "Adhi Veda Pharmaceutical Pvt Ltd",
-        productName: product.productName,
-        pack: "15S",
-        rate: 0.0,
-        mrp: 0.0,
-        scheme: "",
-        stock: "Out of Stock",
-        content: "Unsure",
-        qtyPerBox: 0,
-      },
-    ];
+    const productName = product.productname || product.itemname;
+    const matchingStores = allProducts.filter(p =>
+      (p.productname || p.itemname) === productName
+    );
+    const storeItems = matchingStores.map(storeProduct => ({
+      storeName: storeProduct.storeName,
+      productName: storeProduct.productname || storeProduct.itemname,
+      pack: storeProduct.pack || "N/A",
+      rate: storeProduct.rate || 0,
+      mrp: storeProduct.mrp || 0,
+      scheme: storeProduct.scheme || "",
+      stock: (storeProduct.quantity > 0) ? "In Stock" : "Out of Stock",
+      content: storeProduct.content || "Available",
+      qtyPerBox: storeProduct.qtyPerBox || storeProduct.pack || 1,
+    }));
     setSelectedProduct(product);
-    setStoreList(mockStores);
+    setStoreList(storeItems);
     setShowCart(true);
   };
 
@@ -129,71 +165,123 @@ export default function Navbar() {
       <div className="topbar d-flex align-items-center justify-content-between px-3">
         <div className="logo">Live<span>Order</span></div>
 
-        {/* YOUTUBE‑STYLE SEARCH BOX */}
+        {/* SEARCH BOX */}
         <div className="search-box position-relative" ref={searchRef}>
-          <div className="youtube-search-wrapper">
-            <div className="search-input-container">
-              <i className="bi bi-search search-icon"></i>
-              <input
-                type="text"
-                className="youtube-search-input"
-                placeholder="Search products..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onFocus={() => searchTerm.trim() && setShowResults(true)}
-              />
-              {searchTerm && (
-                <i className="bi bi-x-lg clear-icon" onClick={() => setSearchTerm('')}></i>
-              )}
-            </div>
+          <div className="d-flex align-items-center border rounded px-2 py-1 bg-white">
+            <span className="me-2 small" style={{ color: "#000" }}>Product</span>
+            <input
+              type="text"
+              className="form-control border-0 shadow-none"
+              style={{ color: "#000", background: "transparent" }}
+              placeholder="Search medicines..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onFocus={() => allProducts.length && setShowResults(true)}
+            />
           </div>
 
-          {/* SEARCH RESULTS DROPDOWN */}
+          {/* DROPDOWN RESULTS */}
           {showResults && (
-            <div className="search-results-dropdown">
-              {loading ? (
-                <div className="text-center p-3">Loading products...</div>
-              ) : filteredProducts.length === 0 ? (
-                <div className="text-center p-3 text-muted">No products found</div>
-              ) : (
-                filteredProducts.map((product) => (
-                  <div key={product._id} className="search-result-item d-flex align-items-start p-2 border-bottom">
-                    <div className="result-img me-3">
-                      {product.thumbnail ? (
-                        <img
-                          src={getImageUrl(product.thumbnail)}
-                          alt={product.productName}
-                          width="50"
-                          height="50"
-                          className="rounded"
-                          style={{ objectFit: 'cover' }}
-                        />
-                      ) : (
-                        <div className="placeholder-img rounded bg-light d-flex align-items-center justify-content-center" style={{ width: 50, height: 50 }}>
-                          <i className="bi bi-capsule fs-4 text-secondary"></i>
-                        </div>
-                      )}
-                    </div>
-                    <div className="result-info flex-grow-1">
-                      <div className="fw-bold">{product.productName}</div>
-                      <div className="small text-muted">{product.brand || "Manufacturer"}</div>
-                      <div className="small text-muted">{product.mainCategory || "Category"}</div>
-                      <div className="small text-muted">Qty/Box: {product.minPurchaseQty || 1}</div>
-                    </div>
-                    <button
-                      className="btn btn-sm btn-outline-primary ms-2"
-                      onClick={(e) => addToCart(product, e)}
+            <div
+              className="search-results-dropdown"
+              style={{
+                position: "absolute",
+                top: "calc(100% + 5px)",
+                left: 0,
+                right: 0,
+                background: "#fff",
+                border: "1px solid #e0e0e0",
+                borderRadius: "8px",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                zIndex: 1000,
+                maxHeight: "400px",
+                overflowY: "auto",
+              }}
+            >
+              <div
+                className="d-flex justify-content-between align-items-center px-3 py-2"
+                style={{ background: "#f8f9fa", borderBottom: "1px solid #eee" }}
+              >
+                <span style={{ fontSize: "13px", fontWeight: "500", color: "#000" }}>
+                  {searchTerm ? "Search Results" : "Recent Search"}
+                </span>
+                <span
+                  style={{ fontSize: "12px", cursor: "pointer", color: "#0d6efd" }}
+                  onClick={() => {
+                    setSearchTerm("");
+                    setFilteredProducts(allProducts.slice(0, 6));
+                  }}
+                >
+                  Clear All 🗑
+                </span>
+              </div>
+
+              <div>
+                {loading ? (
+                  <div className="text-center p-3" style={{ color: "#000" }}>Loading products...</div>
+                ) : error ? (
+                  <div className="text-center p-3 text-danger">⚠️ {error}</div>
+                ) : filteredProducts.length === 0 ? (
+                  <div className="text-center p-3" style={{ color: "#6c757d" }}>No products found</div>
+                ) : (
+                  filteredProducts.map((product, idx) => (
+                    <div
+                      key={idx}
+                      className="d-flex align-items-center justify-content-between px-3 py-2"
+                      style={{ borderBottom: "1px solid #eee", background: "#fff" }}
                     >
-                      Add
-                    </button>
-                  </div>
-                ))
-              )}
+                      <div className="d-flex align-items-center gap-2">
+                        <div
+                          style={{
+                            width: "42px",
+                            height: "42px",
+                            background: "#f4f0ff",
+                            borderRadius: "10px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "20px",
+                          }}
+                        >
+                          💊
+                        </div>
+                        <div>
+                          <div style={{ fontSize: "14px", fontWeight: "500", color: "#000" }}>
+                            {product.productname || product.itemname}
+                          </div>
+                          <div style={{ fontSize: "12px", color: "#555" }}>
+                            {product.company || "Manufacturer"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-end">
+                        <div style={{ fontSize: "12px", color: "#555" }}>
+                          Qty/Box: {product.qtyPerBox || product.pack || 1}
+                        </div>
+                        <button
+                          className="btn btn-sm mt-1"
+                          style={{
+                            border: "1px solid #00b894",
+                            color: "#00b894",
+                            background: "#fff",
+                            borderRadius: "6px",
+                            padding: "3px 14px",
+                            fontSize: "12px",
+                          }}
+                          onClick={(e) => addToCart(product, e)}
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
         </div>
 
-        {/* RIGHT ICONS */}
+        {/* RIGHT ICONS (Heart, Bell, Cart, Profile) */}
         <div className="d-flex align-items-center position-relative" ref={dropdownRef}>
           <span className="icon me-3 position-relative">
             <i className="bi bi-heart"></i>
@@ -227,7 +315,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* MENU BAR (unchanged) */}
+      {/* MENU BAR */}
       <div className="menu-bar d-flex justify-content-between align-items-center px-3">
         <div className="menu-left d-flex align-items-center gap-4">
           <div className="menu-item">All Product <span className="arrow">⌄</span></div>
