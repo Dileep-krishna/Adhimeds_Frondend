@@ -1,205 +1,169 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
-import { AutoSizer, List } from "react-virtualized";
-import "react-virtualized/styles.css";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "../../components/Navbar";
 import { useCart } from "@/context/CartContext";
+import { useOrderNotifications } from "@/context/OrderNotificationContext";
+import { toast } from "sonner";
+import { placeOrder } from "../../services/orderAPI";
 import "./cart.css";
 
 export default function CartPage() {
-  const searchParams = useSearchParams();
-  const shopId = searchParams.get("shopId");
-  console.log("🔍 [CartPage] shopId from URL:", shopId);
+  const { cartItems, updateQuantity, removeItem, clearCart } = useCart();
+  const { triggerNewOrder } = useOrderNotifications();
+  const router = useRouter();
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
-  const { cartItems, updateQuantity, removeItem, addItem } = useCart();
-
-  const [storeProducts, setStoreProducts] = useState([]);
-  const [loadingProducts, setLoadingProducts] = useState(false);
-  const [shopName, setShopName] = useState("");
-
-  // Fetch products when shopId is present
-  useEffect(() => {
-    if (!shopId) {
-      setStoreProducts([]);
-      setShopName("");
+  const handleCheckout = async () => {
+    if (cartItems.length === 0) {
+      toast.error("Your cart is empty.");
       return;
     }
 
-    async function fetchProducts() {
-      setLoadingProducts(true);
-      try {
-        const res = await fetch("/api/medisoft/products", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ shopId }),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        let productList = [];
-        if (Array.isArray(data)) productList = data;
-        else if (data?.products && Array.isArray(data.products)) productList = data.products;
-        else if (data?.body && Array.isArray(data.body)) productList = data.body;
-        else productList = [];
-        setStoreProducts(productList);
+    const loadingToast = toast.loading("Placing your order...");
+    setIsCheckingOut(true);
 
-        // Fetch shop name (optional)
-        try {
-          const shopsRes = await fetch("/api/medisoft/shops");
-          if (shopsRes.ok) {
-            const shopsData = await shopsRes.json();
-            const shopsArray = Array.isArray(shopsData) ? shopsData : shopsData?.body || [];
-            const found = shopsArray.find(s => s.shopid === shopId);
-            if (found) setShopName(found.name);
-          }
-        } catch (e) {
-          console.warn("Could not fetch shop name", e);
+    try {
+      const response = await placeOrder(cartItems);
+
+      if (response.success) {
+        toast.success("✅ Order placed successfully!", { id: loadingToast });
+
+        // ✅ Try to get the order from the response
+        let order = response.order || response.data?.order;
+
+        // If no order object, build one from cart items
+        if (!order) {
+          console.warn("⚠️ No order data in response – building from cart items");
+          order = {
+            _id: response.orderId || `temp-${Date.now()}`,
+            items: cartItems.map(item => ({
+              _id: item.id,
+              productName: item.productName,
+              quantity: item.quantity,
+              status: "pending", // all new orders are pending
+            })),
+            createdAt: new Date().toISOString(),
+          };
         }
-      } catch (err) {
-        console.error("Products fetch error:", err);
-        setStoreProducts([]);
-      } finally {
-        setLoadingProducts(false);
+
+        // Ensure each item has `status: "pending"`
+        if (order.items) {
+          order.items = order.items.map(item => ({
+            ...item,
+            status: item.status || "pending",
+          }));
+        }
+
+        // Trigger the notification
+        triggerNewOrder(order);
+
+        clearCart();
+      } else {
+        toast.error(response.message || "Failed to place order.", {
+          id: loadingToast,
+        });
       }
+    } catch (error) {
+      toast.error("Network error. Please try again.", { id: loadingToast });
+    } finally {
+      setIsCheckingOut(false);
     }
-
-    fetchProducts();
-  }, [shopId]);
-
-  // Row renderer for react-virtualized (now used with AutoSizer)
-  const rowRenderer = ({ index, key, style }) => {
-    const item = storeProducts[index];
-    if (!item) return null;
-    return (
-      <div key={key} style={style} className="border-bottom p-2 d-flex justify-content-between align-items-center">
-        <div>
-          <strong>{item.productname || item.itemname || "Product"}</strong>
-          <br />
-          <small>
-            Qty: {item.quantity || 0} | Pack: {item.pack || "N/A"} | MRP: ₹{item.mrp || 0}
-          </small>
-        </div>
-        <button
-          className="btn btn-sm btn-primary"
-          onClick={() => {
-            addItem({
-              id: item.id || item.productId || Math.random().toString(),
-              productName: item.productname || item.itemname,
-              storeName: shopName || "Store",
-              mrp: item.mrp || 0,
-              quantity: 1,
-              rate: item.mrp || 0,
-              stock: item.quantity || 0,
-              qtyPerBox: 1,
-              company: "",
-              hsn: "",
-            });
-          }}
-        >
-          Add to Cart
-        </button>
-      </div>
-    );
   };
 
   return (
     <div className="cart-container container-fluid">
       <Navbar />
-
       <h5 className="mb-4">My Shopping Cart</h5>
-
-      {/* Show store products if a shop was selected */}
-      {shopId && (
-        <div className="row mb-4">
-          <div className="col-12">
-            <div className="cart-card p-3">
-              <h6 className="mb-3">
-                Products from {shopName || `Store ${shopId}`}
-              </h6>
-              {loadingProducts ? (
-                <p>Loading products...</p>
-              ) : storeProducts.length === 0 ? (
-                <p className="text-muted">No products found for this store.</p>
-              ) : (
-                // Fixed height container for AutoSizer
-                <div style={{ height: "500px", width: "100%" }}>
-                  <AutoSizer>
-                    {({ height, width }) => (
-                      <List
-                        height={height}
-                        rowCount={storeProducts.length}
-                        rowHeight={80}
-                        width={width}
-                        rowRenderer={rowRenderer}
-                      />
-                    )}
-                  </AutoSizer>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="row">
-        {/* LEFT SIDE – Existing Cart Items (unchanged) */}
+        {/* LEFT SIDE – Cart Items */}
         <div className="col-md-8">
           <div className="cart-card p-3">
             {cartItems.length === 0 ? (
               <p className="text-muted">Your cart is empty</p>
             ) : (
-              cartItems.map((item) => (
-                <div key={item.id} className="mb-4">
-                  <div className="product-header d-flex justify-content-between align-items-start mb-3">
-                    <div>
-                      <div className="fw-semibold">{item.productName}</div>
-                      <div className="text-muted small">{item.company || "Company Name"}</div>
-                      <div className="text-muted small">HSN Code: {item.hsn || "0000"}</div>
-                    </div>
-                    <div className="product-icon">💊</div>
-                  </div>
-
-                  <div className="seller-row d-flex justify-content-between align-items-center p-2">
-                    <div>
-                      <div className="fw-semibold">{item.storeName}</div>
-                      <div className="small text-muted mt-1">
-                        Rate: ₹{item.rate || 0} &nbsp; MRP: ₹{item.mrp || 0} &nbsp; Stock: {item.stock || 0}
+              cartItems.map((item) => {
+                const stock = item.stock ?? 0;
+                return (
+                  <div
+                    key={item.id}
+                    className="cart-item-card mb-4 p-3 border rounded shadow-sm bg-white"
+                  >
+                    <div className="product-header d-flex justify-content-between align-items-start mb-3">
+                      <div>
+                        <div className="fw-semibold fs-5">{item.productName}</div>
+                        <div className="text-muted small">
+                          {item.company || "Company Name"}
+                        </div>
+                        <div className="text-muted small">
+                          HSN Code: {item.hsn || "0000"}
+                        </div>
                       </div>
-                      <div className="small text-muted">Qty/Box: {item.qtyPerBox || 1}</div>
+                      <div className="product-icon" style={{ fontSize: "2rem" }}>
+                        💊
+                      </div>
                     </div>
 
-                    <div className="d-flex flex-column align-items-end">
-                      <div className="d-flex align-items-center">
-                        <input
-                          type="number"
-                          className="form-control form-control-sm me-2 qty-input"
-                          value={item.quantity}
-                          onChange={(e) => updateQuantity(item.id, Number(e.target.value))}
-                        />
-                        <button className="btn btn-danger btn-sm" onClick={() => removeItem(item.id)}>
-                          Remove
-                        </button>
+                    <div className="seller-row d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                      <div>
+                        <div className="fw-semibold">{item.storeName}</div>
+                        <div className="small text-muted mt-1">
+                          Rate: ₹{item.rate || 0} &nbsp; MRP: ₹{item.mrp || 0}{" "}
+                          &nbsp; Stock: {stock}
+                        </div>
+                        <div className="small text-muted">
+                          Qty/Box: {item.qtyPerBox || 1}
+                        </div>
+                        <div className="small mt-1">
+                          <span className={stock > 0 ? "text-success" : "text-danger"}>
+                            {stock > 0 ? "✅ Available" : "❌ Out of Stock"}
+                          </span>
+                        </div>
                       </div>
-                      <small className="text-danger mt-1">
-                        Qty should be multiple of {item.qtyPerBox || 1}
-                      </small>
+
+                      <div className="d-flex flex-column align-items-end">
+                        <div className="d-flex align-items-center">
+                          <input
+                            type="number"
+                            className="form-control form-control-sm me-2 qty-input"
+                            style={{ width: "70px" }}
+                            value={item.quantity}
+                            onChange={(e) =>
+                              updateQuantity(item.id, Number(e.target.value))
+                            }
+                          />
+                          <button
+                            className="btn btn-danger btn-sm"
+                            onClick={() => removeItem(item.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                        <small className="text-danger mt-1">
+                          Qty should be multiple of {item.qtyPerBox || 1}
+                        </small>
+                      </div>
                     </div>
                   </div>
-                  <hr />
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
 
-        {/* RIGHT SIDE – Cart Summary (unchanged) */}
+        {/* RIGHT SIDE – Cart Summary */}
         <div className="col-md-4">
-          <div className="summary-card p-3">
+          <div className="summary-card p-3 border rounded shadow-sm bg-white">
             <h6 className="mb-3">Cart Value Details</h6>
             {cartItems.map((item) => (
-              <div key={item.id} className="summary-item d-flex justify-content-between mb-2">
-                <span>{item.storeName}</span>
+              <div
+                key={item.id}
+                className="summary-item d-flex justify-content-between mb-2"
+              >
+                <span>
+                  {item.productName} – {item.storeName}
+                </span>
                 <span>₹{(item.mrp || 0) * item.quantity}</span>
               </div>
             ))}
@@ -212,10 +176,19 @@ export default function CartPage() {
               <span>Total Payable Amount</span>
               <span>
                 ₹
-                {cartItems.reduce((total, item) => total + (item.mrp || 0) * item.quantity, 0)}
+                {cartItems.reduce(
+                  (total, item) => total + (item.mrp || 0) * item.quantity,
+                  0
+                )}
               </span>
             </div>
-            <button className="btn checkout-btn w-100">Proceed To Checkout</button>
+            <button
+              className="btn checkout-btn w-100"
+              onClick={handleCheckout}
+              disabled={isCheckingOut || cartItems.length === 0}
+            >
+              {isCheckingOut ? "Processing..." : "Proceed To Checkout"}
+            </button>
           </div>
         </div>
       </div>

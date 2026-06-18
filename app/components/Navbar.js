@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Select from "react-select";
 import "./navbar.css";
 import CartSidebar from "../pharma-dashboard/components/CartSidebar";
 
@@ -21,12 +22,21 @@ export default function Navbar() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Store selection for search
+  const [selectedStore, setSelectedStore] = useState(null);
+  const [allStores, setAllStores] = useState([]);
+
   // Sidebar state
   const [showCart, setShowCart] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [storeList, setStoreList] = useState([]);
 
   const [loaded, setLoaded] = useState(false);
+
+  // ✅ Helper: get stock from product (supports multiple field names)
+  const getStock = (product) => {
+    return parseInt(product.stock ?? product.availableQty ?? product.quantity ?? 0);
+  };
 
   // Fetch all shops and products in parallel
   useEffect(() => {
@@ -44,6 +54,22 @@ export default function Navbar() {
           setError("No stores found");
           setLoading(false);
           return;
+        }
+
+        const targetStoreName = "AL-DAWAA PHARMA";
+        const storeOptions = shops.map((shop) => {
+          const isTarget = shop.name?.toUpperCase() === targetStoreName.toUpperCase();
+          return {
+            value: shop.shopid,
+            label: shop.name || shop.shopid,
+            isDisabled: !isTarget,
+          };
+        });
+        setAllStores(storeOptions);
+
+        const targetOption = storeOptions.find(opt => !opt.isDisabled);
+        if (targetOption) {
+          setSelectedStore(targetOption);
         }
 
         const productPromises = shops.map(async (shop) => {
@@ -66,6 +92,8 @@ export default function Navbar() {
               ...prod,
               storeName: shop.name,
               storeId: shop.shopid,
+              // Ensure we have a stock field (if missing, fallback to quantity)
+              stock: prod.stock ?? prod.quantity ?? 0,
             }));
           } catch (err) {
             console.error(`Error for shop ${shop.shopid}:`, err);
@@ -99,21 +127,27 @@ export default function Navbar() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Filter products based on debounced term
+  // Filter products based on debounced term AND selected store
   useEffect(() => {
     if (allProducts.length === 0) return;
+
+    let storeFiltered = allProducts;
+    if (selectedStore) {
+      storeFiltered = allProducts.filter(p => p.storeId === selectedStore.value);
+    }
+
     if (!debouncedTerm.trim()) {
-      setFilteredProducts(allProducts.slice(0, 6));
+      setFilteredProducts(storeFiltered.slice(0, 6));
       setShowResults(false);
       return;
     }
     const lower = debouncedTerm.toLowerCase();
-    const filtered = allProducts.filter(p =>
+    const filtered = storeFiltered.filter(p =>
       (p.productname || p.itemname || "").toLowerCase().includes(lower)
     );
     setFilteredProducts(filtered.slice(0, 10));
     setShowResults(true);
-  }, [debouncedTerm, allProducts]);
+  }, [debouncedTerm, allProducts, selectedStore]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -137,12 +171,17 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // ✅ FIXED: addToCart now uses getStock() correctly
   const addToCart = (product, e) => {
     e.stopPropagation();
     const productName = product.productname || product.itemname;
+
+    // Find all stores that sell this product
     const matchingStores = allProducts.filter(p =>
       (p.productname || p.itemname) === productName
     );
+
+    // Build store list with correct stock status
     const storeItems = matchingStores.map(storeProduct => ({
       storeName: storeProduct.storeName,
       productName: storeProduct.productname || storeProduct.itemname,
@@ -150,10 +189,13 @@ export default function Navbar() {
       rate: storeProduct.rate || 0,
       mrp: storeProduct.mrp || 0,
       scheme: storeProduct.scheme || "",
-      stock: (storeProduct.quantity > 0) ? "In Stock" : "Out of Stock",
+      // ✅ Use getStock() to determine stock
+      stock: getStock(storeProduct) > 0 ? "In Stock" : "Out of Stock",
+      stockCount: getStock(storeProduct), // store the actual number for later
       content: storeProduct.content || "Available",
       qtyPerBox: storeProduct.qtyPerBox || storeProduct.pack || 1,
     }));
+
     setSelectedProduct(product);
     setStoreList(storeItems);
     setShowCart(true);
@@ -165,14 +207,58 @@ export default function Navbar() {
       <div className="topbar d-flex align-items-center justify-content-between px-3">
         <div className="logo">Live<span>Order</span></div>
 
-        {/* SEARCH BOX */}
+        {/* SEARCH BOX with Store Selector */}
         <div className="search-box position-relative" ref={searchRef}>
           <div className="d-flex align-items-center border rounded px-2 py-1 bg-white">
-            <span className="me-2 small" style={{ color: "#000" }}>Product</span>
+            <span className="me-2 small" style={{ color: "#000", fontWeight: "500" }}>
+              Product
+            </span>
+
+            <div style={{ minWidth: "160px", marginRight: "8px" }}>
+              <Select
+                options={allStores}
+                placeholder="All Stores"
+                isClearable={true}
+                value={selectedStore}
+                onChange={(option) => setSelectedStore(option)}
+                isOptionDisabled={(option) => option.isDisabled}
+                styles={{
+                  control: (provided) => ({
+                    ...provided,
+                    border: "none",
+                    boxShadow: "none",
+                    minHeight: "30px",
+                    background: "transparent",
+                  }),
+                  indicatorSeparator: () => ({ display: "none" }),
+                  dropdownIndicator: (provided) => ({
+                    ...provided,
+                    padding: "2px",
+                  }),
+                  option: (provided, state) => ({
+                    ...provided,
+                    color: state.isDisabled ? "#adb5bd" : "#000",
+                    cursor: state.isDisabled ? "not-allowed" : "pointer",
+                    backgroundColor: state.isDisabled ? "#f8f9fa" : "transparent",
+                  }),
+                  singleValue: (provided) => ({
+                    ...provided,
+                    color: "#000",
+                    fontWeight: "500",
+                  }),
+                  placeholder: (provided) => ({
+                    ...provided,
+                    color: "#6c757d",
+                    fontWeight: "400",
+                  }),
+                }}
+              />
+            </div>
+
             <input
               type="text"
               className="form-control border-0 shadow-none"
-              style={{ color: "#000", background: "transparent" }}
+              style={{ color: "#000", background: "transparent", flex: 1 }}
               placeholder="Search medicines..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -250,7 +336,7 @@ export default function Navbar() {
                             {product.productname || product.itemname}
                           </div>
                           <div style={{ fontSize: "12px", color: "#555" }}>
-                            {product.company || "Manufacturer"}
+                            {product.manufacturer || "Manufacturer"} • {product.storeName || "Store"}
                           </div>
                         </div>
                       </div>
@@ -281,7 +367,7 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* RIGHT ICONS (Heart, Bell, Cart, Profile) */}
+        {/* RIGHT ICONS */}
         <div className="d-flex align-items-center position-relative" ref={dropdownRef}>
           <span className="icon me-3 position-relative">
             <i className="bi bi-heart"></i>

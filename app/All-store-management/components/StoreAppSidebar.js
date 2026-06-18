@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";  // ✅ added useRouter
 import { motion, AnimatePresence } from "framer-motion";
+import OrderNotificationBell from "./OrderNotificationBell";
 import "./StoreSidebar.css";
 
 export default function StoreAppSidebar() {
+  const router = useRouter(); // ✅ for navigation
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [productsOpen, setProductsOpen] = useState(false);
@@ -161,15 +163,24 @@ export default function StoreAppSidebar() {
             </AnimatePresence>
           </div>
 
-          {/* Orders */}
-          <Link
-            href="/All-store-management/Orders"
-            className={`store-nav-item ${isActive("/All-store-management/Orders") ? "active" : ""}`}
-            onClick={handleNav}
-          >
-            <i className="bi bi-cart-check"></i>
-            <span>Orders</span>
-          </Link>
+          {/* Orders with Notification Bell next to it */}
+          <div className="store-nav-item-wrapper">
+            <Link
+              href="/All-store-management/Orders"
+              className={`store-nav-item ${isActive("/All-store-management/Orders") ? "active" : ""}`}
+              onClick={handleNav}
+              style={{ flex: 1 }}
+            >
+              <i className="bi bi-cart-check"></i>
+              <span>Orders</span>
+            </Link>
+            <OrderNotificationBell
+              onClick={() => {
+                // Navigate to Orders page with Requests tab
+                router.push("/All-store-management/Orders?tab=Requests");
+              }}
+            />
+          </div>
         </nav>
       </aside>
     </>

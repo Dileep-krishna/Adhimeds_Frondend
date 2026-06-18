@@ -77,3 +77,14 @@
   color: red;
   margin-top: 4px;
 }
+/* Larger toast notifications */
+.custom-toast {
+  font-size: 1.1rem !important;
+  padding: 16px 24px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15) !important;
+  min-width: 320px !important;
+}
+.custom-toast .sonner-toast-description {
+  font-size: 0.95rem;
+}

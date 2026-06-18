@@ -7,7 +7,6 @@ const CartContext = createContext();
 export function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState([]);
 
-  // ✅ Load from sessionStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedCart = sessionStorage.getItem("cart");
@@ -17,7 +16,6 @@ export function CartProvider({ children }) {
     }
   }, []);
 
-  // ✅ Save to sessionStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
       sessionStorage.setItem("cart", JSON.stringify(cartItems));
@@ -26,25 +24,24 @@ export function CartProvider({ children }) {
 
   const addItem = (newItem) => {
     setCartItems((prev) => {
-      const existingIndex = prev.findIndex(
-        (item) =>
-          item.productId === newItem.productId &&
-          item.storeName === newItem.storeName
-      );
-
+      // ✅ Use `id` as the unique key (not productId)
+      const existingIndex = prev.findIndex((item) => item.id === newItem.id);
       if (existingIndex >= 0) {
         const updated = [...prev];
         updated[existingIndex].quantity += newItem.quantity;
         return updated;
       }
-
-      return [...prev, { ...newItem, id: Date.now() }];
+      // Ensure an id exists (fallback)
+      const itemToAdd = { ...newItem };
+      if (!itemToAdd.id) {
+        itemToAdd.id = `${Date.now()}-${Math.random()}`;
+      }
+      return [...prev, itemToAdd];
     });
   };
 
   const updateQuantity = (id, newQty) => {
     if (newQty < 1) return;
-
     setCartItems((prev) =>
       prev.map((item) =>
         item.id === id ? { ...item, quantity: newQty } : item
@@ -58,7 +55,7 @@ export function CartProvider({ children }) {
 
   const clearCart = () => {
     setCartItems([]);
-    sessionStorage.removeItem("cart"); // optional cleanup
+    sessionStorage.removeItem("cart");
   };
 
   return (

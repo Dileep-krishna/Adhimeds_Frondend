@@ -241,3 +241,79 @@ html, body {
     width: 100%;
   }
 }
+.store-sidebar-footer {
+  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* If sidebar is collapsed */
+.store-sidebar.store-closed .store-sidebar-footer {
+  padding: 16px 10px;
+}
+
+.store-sidebar.store-closed .order-notification-bell {
+  font-size: 1.2rem;
+  padding: 8px 10px;
+}
+
+/* Override notification bell styles for dark sidebar */
+.store-sidebar .order-notification-bell {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.store-sidebar .order-notification-bell:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.store-sidebar .order-notification-bell.has-notifications {
+  color: #ffc107;
+}
+
+/* Dropdown in sidebar needs to be positioned correctly */
+.store-sidebar .order-notification-dropdown {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  background: #fff;
+  color: #212529;
+}
+.store-nav-item-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 8px;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.store-nav-item-wrapper .store-nav-item {
+  flex: 1;
+  border-radius: 0;
+}
+
+/* Adjust bell positioning inside the wrapper */
+.store-nav-item-wrapper .order-notification-bell {
+  padding: 6px 8px;
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.store-nav-item-wrapper .order-notification-bell:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.store-nav-item-wrapper .order-notification-bell.has-notifications {
+  color: #ffc107;
+}
+
+/* Remove the old footer bell */
+.store-sidebar-footer {
+  display: none;
+}

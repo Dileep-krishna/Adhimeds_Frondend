@@ -1,0 +1,252 @@
+/* Notification Bell */
+.order-notification-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.order-notification-bell {
+  position: relative;
+  background: transparent;
+  border: none;
+  font-size: 1.4rem;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.order-notification-bell:hover {
+  background: rgba(13, 110, 253, 0.08);
+  color: #0d6efd;
+}
+
+/* Blinking animation */
+.order-notification-bell.has-notifications {
+  animation: bell-blink 1.2s ease-in-out infinite;
+  color: #0d6efd;
+}
+
+@keyframes bell-blink {
+  0%,
+  100% {
+    opacity: 1;
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-10deg);
+  }
+  50% {
+    opacity: 0.5;
+    transform: rotate(10deg);
+  }
+  75% {
+    transform: rotate(-5deg);
+  }
+}
+
+/* Badge */
+.notification-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #dc3545;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  animation: badge-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
+
+/* Dropdown */
+.order-notification-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 380px;
+  max-height: 480px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e9ecef;
+  z-index: 1000;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid #f1f3f5;
+  background: #fafbfc;
+}
+
+.dropdown-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #212529;
+}
+
+.dropdown-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.clear-all-btn {
+  background: none;
+  border: none;
+  font-size: 0.75rem;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.clear-all-btn:hover {
+  background: #f1f3f5;
+  color: #dc3545;
+}
+
+.dropdown-body {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 340px;
+  padding: 6px 0;
+}
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #adb5bd;
+}
+
+.empty-state i {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+}
+
+.empty-state p {
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* Notification item */
+.notification-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 18px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  border-bottom: 1px solid #f8f9fa;
+  position: relative;
+}
+
+.notification-item:hover {
+  background: #f8f9fa;
+}
+
+.notification-item.unread {
+  background: #f0f7ff;
+}
+
+.notification-item.unread:hover {
+  background: #e3f0ff;
+}
+
+.notification-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #e7f1ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #0d6efd;
+  font-size: 1rem;
+}
+
+.notification-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-message {
+  font-size: 0.85rem;
+  color: #212529;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.notification-time {
+  font-size: 0.7rem;
+  color: #adb5bd;
+  display: block;
+  margin-top: 2px;
+}
+
+.unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #0d6efd;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+/* Footer */
+.dropdown-footer {
+  padding: 10px 18px;
+  border-top: 1px solid #f1f3f5;
+  text-align: center;
+  background: #fafbfc;
+}
+
+.view-all-btn {
+  background: none;
+  border: none;
+  font-size: 0.8rem;
+  color: #0d6efd;
+  cursor: pointer;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.view-all-btn:hover {
+  background: #e7f1ff;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .order-notification-dropdown {
+    width: 320px;
+    right: -50px;
+  }
+}

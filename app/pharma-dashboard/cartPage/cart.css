@@ -63,3 +63,9 @@
 .checkout-btn:hover {
   background-color: #5a4bd1;
 }
+.cart-item-card {
+  transition: box-shadow 0.2s ease;
+}
+.cart-item-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+}
