@@ -44,7 +44,7 @@
 
 /* ========== MAIN DASHBOARD CONTAINER ========== */
 .super-admin-dashboard {
-  max-width: 1400px;
+  width:100%;
   margin: 0 auto;
   padding: 1.5rem;
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;

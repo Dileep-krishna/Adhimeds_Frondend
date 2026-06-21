@@ -2,38 +2,30 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";  // ✅ added useRouter
+import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import OrderNotificationBell from "./OrderNotificationBell";
 import "./StoreSidebar.css";
 
 export default function StoreAppSidebar() {
-  const router = useRouter(); // ✅ for navigation
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [productsOpen, setProductsOpen] = useState(false);
   const [productsExpandOpen, setProductsExpandOpen] = useState(false);
   const pathname = usePathname();
-  const [userClicked, setUserClicked] = useState(false);
 
-  // Auto-open submenus on route change (only after user click)
+  // Auto‑open submenus when on product routes (does NOT close them automatically)
   useEffect(() => {
-    if (!userClicked) {
-      setProductsOpen(false);
-      setProductsExpandOpen(false);
-      return;
-    }
     if (
       pathname.startsWith("/All-store-management/All-Products") ||
       pathname.startsWith("/All-store-management/Store-Product")
     ) {
       setProductsOpen(true);
       setProductsExpandOpen(true);
-    } else {
-      setProductsOpen(false);
-      setProductsExpandOpen(false);
     }
-  }, [pathname, userClicked]);
+    // No `else` – we never forcibly close the dropdown
+  }, [pathname]);
 
   // Responsive check
   useEffect(() => {
@@ -49,28 +41,30 @@ export default function StoreAppSidebar() {
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
   const toggleProducts = () => {
-    setUserClicked(true);
-    setProductsOpen(!productsOpen);
-    if (productsOpen) setProductsExpandOpen(false);
+    setProductsOpen((prev) => !prev);
+    if (productsOpen) setProductsExpandOpen(false); // close nested when collapsing
   };
   const toggleProductsExpand = () => {
-    setUserClicked(true);
-    setProductsExpandOpen(!productsExpandOpen);
+    setProductsExpandOpen((prev) => !prev);
   };
   const handleNav = () => {
     if (isMobile) setSidebarOpen(false);
   };
+  const handleLogout = () => {
+    // Replace with your actual logout logic
+    window.location.href = "/login";
+  };
 
   const isActive = (path) => pathname === path;
 
-  // Animation variants
+  // Faster animations (0.2s)
   const dropdownVariants = {
-    hidden: { height: 0, opacity: 0, transition: { duration: 0.25, ease: "easeInOut" } },
-    visible: { height: "auto", opacity: 1, transition: { duration: 0.3, ease: "easeOut" } }
+    hidden: { height: 0, opacity: 0, transition: { duration: 0.2, ease: "easeInOut" } },
+    visible: { height: "auto", opacity: 1, transition: { duration: 0.2, ease: "easeOut" } }
   };
   const nestedVariants = {
-    hidden: { height: 0, opacity: 0, transition: { duration: 0.2, ease: "easeInOut" } },
-    visible: { height: "auto", opacity: 1, transition: { duration: 0.25, ease: "easeOut" } }
+    hidden: { height: 0, opacity: 0, transition: { duration: 0.15, ease: "easeInOut" } },
+    visible: { height: "auto", opacity: 1, transition: { duration: 0.15, ease: "easeOut" } }
   };
 
   return (
@@ -127,7 +121,7 @@ export default function StoreAppSidebar() {
                       onClick={toggleProductsExpand}
                       style={{ cursor: "pointer", justifyContent: "space-between" }}
                     >
-                      <span>products</span>
+                      <span>Products</span>
                       <i className={`bi bi-chevron-${productsExpandOpen ? "up" : "down"}`}></i>
                     </div>
                     <AnimatePresence>
@@ -145,14 +139,14 @@ export default function StoreAppSidebar() {
                             className="store-dropdown-sub-item"
                             onClick={handleNav}
                           >
-                            All-products
+                            <i className="bi bi-box-seam"></i> All‑Products
                           </Link>
                           <Link
                             href="/All-store-management/Store-Product"
                             className="store-dropdown-sub-item"
                             onClick={handleNav}
                           >
-                            Store Products
+                            <i className="bi bi-shop"></i> Store Products
                           </Link>
                         </motion.div>
                       )}
@@ -176,12 +170,19 @@ export default function StoreAppSidebar() {
             </Link>
             <OrderNotificationBell
               onClick={() => {
-                // Navigate to Orders page with Requests tab
                 router.push("/All-store-management/Orders?tab=Requests");
               }}
             />
           </div>
         </nav>
+
+        {/* Logout Button – bottom */}
+        <div className="store-sidebar-footer">
+          <button onClick={handleLogout} className="store-logout-btn">
+            <i className="bi bi-box-arrow-right"></i>
+            <span>Logout</span>
+          </button>
+        </div>
       </aside>
     </>
   );
