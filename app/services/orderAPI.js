@@ -58,4 +58,44 @@ export const deleteItem = async (orderId, itemId) => {
   return handleResponse(res, `DELETE /orders/${orderId}/items/${itemId}`);
 };
 
-// ❌ REMOVED: deleteOrder – no longer needed
+// ---------- NOTIFICATION API FUNCTIONS ----------
+
+// Get all notifications
+export const getNotifications = async () => {
+  const url = `${SERVERURL}/notifications`;
+  console.log(`📡 GET ${url}`);
+  const res = await fetch(url);
+  return handleResponse(res, 'GET /notifications');
+};
+
+// Create a new notification
+export const createNotification = async (orderId, message) => {
+  const url = `${SERVERURL}/notifications`;
+  console.log(`📡 POST ${url}`);
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orderId, message }),
+  });
+  return handleResponse(res, 'POST /notifications');
+};
+
+// Mark a notification as read
+export const markNotificationRead = async (notificationId) => {
+  const url = `${SERVERURL}/notifications/${notificationId}`;
+  console.log(`📡 PUT ${url}`);
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ read: true }),
+  });
+  return handleResponse(res, `PUT /notifications/${notificationId}`);
+};
+
+// Clear all notifications
+export const clearAllNotifications = async () => {
+  const url = `${SERVERURL}/notifications`;
+  console.log(`📡 DELETE ${url}`);
+  const res = await fetch(url, { method: 'DELETE' });
+  return handleResponse(res, 'DELETE /notifications');
+};

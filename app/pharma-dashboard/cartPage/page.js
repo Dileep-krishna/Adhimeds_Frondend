@@ -30,10 +30,8 @@ export default function CartPage() {
       if (response.success) {
         toast.success("✅ Order placed successfully!", { id: loadingToast });
 
-        // ✅ Try to get the order from the response
         let order = response.order || response.data?.order;
 
-        // If no order object, build one from cart items
         if (!order) {
           console.warn("⚠️ No order data in response – building from cart items");
           order = {
@@ -42,13 +40,12 @@ export default function CartPage() {
               _id: item.id,
               productName: item.productName,
               quantity: item.quantity,
-              status: "pending", // all new orders are pending
+              status: "pending",
             })),
             createdAt: new Date().toISOString(),
           };
         }
 
-        // Ensure each item has `status: "pending"`
         if (order.items) {
           order.items = order.items.map(item => ({
             ...item,
@@ -56,9 +53,7 @@ export default function CartPage() {
           }));
         }
 
-        // Trigger the notification
         triggerNewOrder(order);
-
         clearCart();
       } else {
         toast.error(response.message || "Failed to place order.", {

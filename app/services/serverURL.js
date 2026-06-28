@@ -1,5 +1,4 @@
-const SERVERURL="http://localhost:5000"
+// ✅ Automatically switches based on environment
+const SERVERURL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
-// const SERVERURL="https://adhimeds-backend-7.onrender.com"
-
-export default SERVERURL
+export default SERVERURL;

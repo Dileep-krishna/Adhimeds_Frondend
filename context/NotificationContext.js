@@ -3,8 +3,6 @@
 import { createContext, useContext, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 
-const MAX_NOTIFICATIONS = 20;
-
 const NotificationContext = createContext();
 
 export function NotificationProvider({ children }) {
@@ -19,7 +17,8 @@ export function NotificationProvider({ children }) {
       read: false,
     };
 
-    setNotifications((prev) => [newNotif, ...prev].slice(0, MAX_NOTIFICATIONS));
+    // ✅ No limit – keep all notifications
+    setNotifications((prev) => [newNotif, ...prev]);
 
     const toastFn = toast[type] || toast.info;
     toastFn(message, {

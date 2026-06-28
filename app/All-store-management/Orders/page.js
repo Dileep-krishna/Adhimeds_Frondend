@@ -5,19 +5,20 @@ import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAllOrders, updateItemStatus, deleteItem } from "../../services/orderAPI";
 import { toast } from "sonner";
-import { useOrderNotifications } from "@/context/OrderNotificationContext"; // ✅ import
+import { useOrderNotifications } from "@/context/OrderNotificationContext";
 import "./orders.css";
 
 export default function OrdersPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { refreshNotifications } = useOrderNotifications(); // ✅ now defined
+  const { refreshNotificationsWithSound } = useOrderNotifications();
   const [activeStatus, setActiveStatus] = useState("Requests");
 
-  // ---------- Fetch orders ----------
+  // ---------- Fetch orders with real-time updates ----------
   const {
     data: orders = [],
     isLoading,
+    refetch, // Added refetch for manual refresh
   } = useQuery({
     queryKey: ["orders"],
     queryFn: async () => {
@@ -25,37 +26,41 @@ export default function OrdersPage() {
       if (!response.success) throw new Error("Failed to load orders");
       return response.data;
     },
-    refetchInterval: 10000,
-    staleTime: 5000,
+    refetchInterval: 5000, // Reduced to 5s for faster updates
+    staleTime: 2000,
   });
 
-  // ---------- Mutations ----------
+  // ---------- Mutations with immediate UI updates ----------
   const acceptMutation = useMutation({
     mutationFn: ({ orderId, itemId }) => updateItemStatus(orderId, itemId, "processing"),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Product accepted!");
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      refreshNotifications(); // ✅ immediate sync
+      // Invalidate and refetch immediately
+      await queryClient.invalidateQueries({ queryKey: ["orders"] });
+      await refetch(); // Force refetch
+      refreshNotificationsWithSound(); // Update notifications
     },
     onError: () => toast.error("Failed to accept product"),
   });
 
   const rejectMutation = useMutation({
     mutationFn: ({ orderId, itemId }) => updateItemStatus(orderId, itemId, "cancelled"),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Product rejected!");
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      refreshNotifications(); // ✅ immediate sync
+      await queryClient.invalidateQueries({ queryKey: ["orders"] });
+      await refetch();
+      refreshNotificationsWithSound();
     },
     onError: () => toast.error("Failed to reject product"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: ({ orderId, itemId }) => deleteItem(orderId, itemId),
-    onSuccess: (_, variables) => {
+    onSuccess: async (_, variables) => {
       toast.success(`"${variables.productName}" deleted!`);
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      refreshNotifications(); // ✅ immediate sync
+      await queryClient.invalidateQueries({ queryKey: ["orders"] });
+      await refetch();
+      refreshNotificationsWithSound();
     },
     onError: () => toast.error("Failed to delete item"),
   });

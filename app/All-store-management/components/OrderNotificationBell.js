@@ -6,8 +6,14 @@ import { useOrderNotifications } from "@/context/OrderNotificationContext";
 import "./OrderNotificationBell.css";
 
 export default function OrderNotificationBell({ onClick }) {
-  const { unreadCount, notifications, markAsRead, clearAll } =
-    useOrderNotifications();
+  const { 
+    unreadCount, 
+    notifications, 
+    markAsRead, 
+    clearAll,
+    refreshNotificationsSilent,
+    isRinging
+  } = useOrderNotifications();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -28,8 +34,8 @@ export default function OrderNotificationBell({ onClick }) {
       onClick();
       return;
     }
+    refreshNotificationsSilent();
     setIsOpen(!isOpen);
-    // ❌ No automatic markAllAsRead – user decides
   };
 
   const handleViewOrder = (orderId) => {
@@ -55,7 +61,7 @@ export default function OrderNotificationBell({ onClick }) {
   return (
     <div className="order-notification-wrapper" ref={dropdownRef}>
       <button
-        className={`order-notification-bell ${unreadCount > 0 ? "has-notifications" : ""}`}
+        className={`order-notification-bell ${unreadCount > 0 ? "has-notifications" : ""} ${isRinging ? "ringing" : ""}`}
         onClick={handleBellClick}
         aria-label={`Notifications ${unreadCount > 0 ? `(${unreadCount} unread)` : ""}`}
       >
