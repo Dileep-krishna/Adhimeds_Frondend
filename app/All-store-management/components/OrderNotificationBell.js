@@ -1,141 +1,62 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { useOrderNotifications } from "@/context/OrderNotificationContext";
 import "./OrderNotificationBell.css";
 
-export default function OrderNotificationBell({ onClick }) {
-  const { 
-    unreadCount, 
-    notifications, 
-    markAsRead, 
-    clearAll,
-    refreshNotificationsSilent,
-    isRinging
-  } = useOrderNotifications();
-  const router = useRouter();
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
+export default function OrderNotificationBell() {
+  const { unreadCount, isRinging, playNotificationSound } = useOrderNotifications();
 
-  // Close dropdown on outside click
+  // Log state changes
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const handleBellClick = () => {
-    if (onClick) {
-      onClick();
-      return;
+    console.log(`🛎️ Bell: unreadCount=${unreadCount}, isRinging=${isRinging}`);
+    if (isRinging) {
+      console.log("🔔 Bell is ringing – playing sound");
+      playNotificationSound();
+    } else {
+      console.log("🔕 Bell stopped ringing");
     }
-    refreshNotificationsSilent();
-    setIsOpen(!isOpen);
-  };
-
-  const handleViewOrder = (orderId) => {
-    router.push(`/All-store-management/Orders/${orderId}`);
-    setIsOpen(false);
-  };
-
-  const handleViewAll = () => {
-    router.push("/All-store-management/Orders");
-    setIsOpen(false);
-  };
-
-  const formatTime = (timestamp) => {
-    const diff = Date.now() - new Date(timestamp).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "Just now";
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    return new Date(timestamp).toLocaleDateString();
-  };
+  }, [isRinging, playNotificationSound, unreadCount]);
 
   return (
-    <div className="order-notification-wrapper" ref={dropdownRef}>
-      <button
-        className={`order-notification-bell ${unreadCount > 0 ? "has-notifications" : ""} ${isRinging ? "ringing" : ""}`}
-        onClick={handleBellClick}
-        aria-label={`Notifications ${unreadCount > 0 ? `(${unreadCount} unread)` : ""}`}
+    <div className="order-notification-bell" style={{ position: "relative", display: "inline-block" }}>
+      <div 
+        className={`bell-icon ${isRinging ? "ringing" : ""}`}
+        style={{ cursor: "pointer", fontSize: "1.8rem", position: "relative" }}
       >
         <i className="bi bi-bell-fill"></i>
         {unreadCount > 0 && (
-          <span className="notification-badge">
-            {unreadCount > 9 ? "9+" : unreadCount}
+          <span 
+            className="badge bg-danger rounded-pill" 
+            style={{
+              position: "absolute",
+              top: "-10px",
+              right: "-12px",
+              fontSize: "0.7rem",
+              minWidth: "20px",
+              padding: "2px 6px",
+            }}
+          >
+            {unreadCount}
           </span>
         )}
-      </button>
-
-      {/* Dropdown – only if no custom onClick and isOpen */}
-      {!onClick && isOpen && (
-        <div className="order-notification-dropdown">
-          <div className="dropdown-header">
-            <span className="dropdown-title">Notifications</span>
-            <div className="dropdown-actions">
-              {notifications.length > 0 && (
-                <button className="clear-all-btn" onClick={clearAll}>
-                  Clear all
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="dropdown-body">
-            {notifications.length === 0 ? (
-              <div className="empty-state">
-                <i className="bi bi-check-circle"></i>
-                <p>All caught up! 🎉</p>
-              </div>
-            ) : (
-              notifications.slice(0, 10).map((notif) => (
-                <div
-                  key={notif.id}
-                  className={`notification-item ${!notif.read ? "unread" : ""}`}
-                  onClick={() => {
-                    if (!notif.read) markAsRead(notif.id);
-                    handleViewOrder(notif.orderId);
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      if (!notif.read) markAsRead(notif.id);
-                      handleViewOrder(notif.orderId);
-                    }
-                  }}
-                >
-                  <div className="notification-icon">
-                    <i className="bi bi-cart-plus"></i>
-                  </div>
-                  <div className="notification-content">
-                    <div className="notification-message">{notif.message}</div>
-                    <span className="notification-time">
-                      {formatTime(notif.timestamp)}
-                    </span>
-                  </div>
-                  {!notif.read && <span className="unread-dot"></span>}
-                </div>
-              ))
-            )}
-          </div>
-
-          {notifications.length > 0 && (
-            <div className="dropdown-footer">
-              <button onClick={handleViewAll} className="view-all-btn">
-                View all orders
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+        {isRinging && (
+          <span 
+            className="ringing-dot"
+            style={{
+              position: "absolute",
+              bottom: "-4px",
+              right: "-4px",
+              width: "14px",
+              height: "14px",
+              borderRadius: "50%",
+              background: "red",
+              animation: "pulse 0.8s infinite",
+              boxShadow: "0 0 8px red",
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 }

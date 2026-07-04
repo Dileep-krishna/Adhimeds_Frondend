@@ -15,57 +15,62 @@ export default function CartPage() {
   const router = useRouter();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
-  const handleCheckout = async () => {
-    if (cartItems.length === 0) {
-      toast.error("Your cart is empty.");
-      return;
-    }
+const handleCheckout = async () => {
+  if (cartItems.length === 0) {
+    toast.error("Your cart is empty.");
+    return;
+  }
 
-    const loadingToast = toast.loading("Placing your order...");
-    setIsCheckingOut(true);
+  const loadingToast = toast.loading("Placing your order...");
+  setIsCheckingOut(true);
 
-    try {
-      const response = await placeOrder(cartItems);
+  try {
+    const response = await placeOrder(cartItems);
 
-      if (response.success) {
-        toast.success("✅ Order placed successfully!", { id: loadingToast });
+    if (response.success) {
+      toast.success("✅ Order placed successfully!", { id: loadingToast });
 
-        let order = response.order || response.data?.order;
+      let order = response.order || response.data?.order;
 
-        if (!order) {
-          console.warn("⚠️ No order data in response – building from cart items");
-          order = {
-            _id: response.orderId || `temp-${Date.now()}`,
-            items: cartItems.map(item => ({
-              _id: item.id,
-              productName: item.productName,
-              quantity: item.quantity,
-              status: "pending",
-            })),
-            createdAt: new Date().toISOString(),
-          };
-        }
-
-        if (order.items) {
-          order.items = order.items.map(item => ({
-            ...item,
-            status: item.status || "pending",
-          }));
-        }
-
-        triggerNewOrder(order);
-        clearCart();
-      } else {
-        toast.error(response.message || "Failed to place order.", {
-          id: loadingToast,
-        });
+      if (!order) {
+        console.warn("⚠️ No order data in response – building from cart items");
+        order = {
+          _id: response.orderId || `temp-${Date.now()}`,
+          items: cartItems.map(item => ({
+            _id: item.id,
+            productName: item.productName,
+            quantity: item.quantity,
+            status: "pending",
+          })),
+          createdAt: new Date().toISOString(),
+        };
       }
-    } catch (error) {
-      toast.error("Network error. Please try again.", { id: loadingToast });
-    } finally {
-      setIsCheckingOut(false);
+
+      if (order.items) {
+        order.items = order.items.map(item => ({
+          ...item,
+          status: item.status || "pending",
+        }));
+      }
+
+      triggerNewOrder(order);
+      clearCart();
+
+      // ❌ REMOVED: router.push("/All-store-management/Order-Requests");
+      // ✅ The order is now in the database – the admin will see it when they visit the Order‑Requests page.
+
+      // Optional: stay on cart, show success, maybe clear the form
+    } else {
+      toast.error(response.message || "Failed to place order.", {
+        id: loadingToast,
+      });
     }
-  };
+  } catch (error) {
+    toast.error("Network error. Please try again.", { id: loadingToast });
+  } finally {
+    setIsCheckingOut(false);
+  }
+};
 
   return (
     <div className="cart-container container-fluid">

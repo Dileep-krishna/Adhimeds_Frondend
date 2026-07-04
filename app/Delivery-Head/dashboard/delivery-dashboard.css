@@ -1,0 +1,165 @@
+/* delivery-dashboard.css */
+
+.delivery-dashboard {
+  background-color: #f8fafc;
+  min-height: 100vh;
+}
+
+/* Stat Cards */
+.stat-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: default;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08) !important;
+}
+
+.stat-icon {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Chart Cards */
+.chart-card {
+  transition: transform 0.2s ease;
+}
+
+.chart-card:hover {
+  transform: translateY(-2px);
+}
+
+/* Table styles */
+.table th {
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6b7280;
+  border-bottom-width: 1px;
+}
+
+.table td {
+  font-size: 0.9rem;
+  vertical-align: middle;
+}
+
+/* Badge styles */
+.badge {
+  font-weight: 500;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+/* Quick action buttons */
+.btn-rounded-pill {
+  border-radius: 50px !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .delivery-dashboard {
+    padding: 0.75rem;
+  }
+
+  .stat-card h3 {
+    font-size: 1.5rem;
+  }
+
+  .stat-card .stat-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .stat-card .stat-icon i {
+    font-size: 1.2rem;
+  }
+
+  .chart-card {
+    min-height: 280px;
+  }
+
+  .table-responsive {
+    font-size: 0.8rem;
+  }
+
+  .table td,
+  .table th {
+    padding: 0.5rem 0.4rem;
+  }
+
+  .btn-sm {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .stat-card .stat-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .stat-card .stat-icon i {
+    font-size: 1rem;
+  }
+
+  .stat-card h3 {
+    font-size: 1.25rem;
+  }
+
+  .stat-card .badge {
+    font-size: 0.6rem;
+  }
+}
+
+/* Dark mode support */
+:global(.dark) .delivery-dashboard {
+  background-color: #0f1724;
+}
+
+:global(.dark) .stat-card,
+:global(.dark) .chart-card,
+:global(.dark) .bg-white {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+:global(.dark) .stat-card .text-muted {
+  color: #94a3b8 !important;
+}
+
+:global(.dark) .stat-card h3 {
+  color: #f1f5f9 !important;
+}
+
+:global(.dark) .table-light {
+  background-color: #1e293b !important;
+}
+
+:global(.dark) .table {
+  color: #e2e8f0 !important;
+}
+
+:global(.dark) .table td,
+:global(.dark) .table th {
+  border-color: #334155 !important;
+}
+
+:global(.dark) .table-hover tbody tr:hover {
+  background-color: #1e293b !important;
+}
+
+:global(.dark) .btn-outline-secondary {
+  border-color: #475569;
+  color: #94a3b8;
+}
+
+:global(.dark) .btn-outline-secondary:hover {
+  background-color: #334155;
+  color: #ffffff;
+}

@@ -1,30 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAllOrders, updateItemStatus, deleteItem } from "../../services/orderAPI";
 import { toast } from "sonner";
 import { useOrderNotifications } from "@/context/OrderNotificationContext";
-import "./orders.css";
 
-export default function OrdersPage() {
+export default function AllOrdersPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { refreshNotificationsWithSound, stopRinging } = useOrderNotifications();
 
-  // Read active tab from URL, default to "Requests"
-  let activeStatus = searchParams.get("tab") || "Requests";
-
-  // ✅ If "All" is somehow passed, redirect to the dedicated All-Orders page
-  useEffect(() => {
-    if (activeStatus === "All") {
-      router.replace("/All-store-management/All-Orders");
-    }
-  }, [activeStatus, router]);
-
-  // ---------- Fetch orders with real-time updates ----------
+  // ---------- Fetch all orders ----------
   const {
     data: orders = [],
     isLoading,
@@ -41,31 +29,21 @@ export default function OrdersPage() {
     refetchOnWindowFocus: false,
   });
 
-  // ---------- Mutations with immediate UI updates ----------
+  // ---------- Mutations (same as OrdersPage) ----------
   const acceptMutation = useMutation({
     mutationFn: ({ orderId, itemId }) => updateItemStatus(orderId, itemId, "processing"),
     onSuccess: async (data, variables) => {
       toast.success("Product accepted!");
       stopRinging();
-
-      queryClient.setQueryData(["orders"], (oldData) => {
-        if (!oldData) return oldData;
-        return oldData.map(order => {
-          if (order._id === variables.orderId) {
-            return {
-              ...order,
-              items: order.items.map(item => {
-                if (item._id === variables.itemId) {
-                  return { ...item, status: "processing" };
-                }
-                return item;
-              })
-            };
-          }
-          return order;
-        });
-      });
-
+      queryClient.setQueryData(["orders"], (oldData) =>
+        oldData?.map(order =>
+          order._id === variables.orderId
+            ? { ...order, items: order.items.map(item =>
+                item._id === variables.itemId ? { ...item, status: "processing" } : item
+              ) }
+            : order
+        )
+      );
       await queryClient.invalidateQueries({ queryKey: ["orders"] });
       await refetch();
       refreshNotificationsWithSound();
@@ -78,25 +56,15 @@ export default function OrdersPage() {
     onSuccess: async (data, variables) => {
       toast.success("Product rejected!");
       stopRinging();
-
-      queryClient.setQueryData(["orders"], (oldData) => {
-        if (!oldData) return oldData;
-        return oldData.map(order => {
-          if (order._id === variables.orderId) {
-            return {
-              ...order,
-              items: order.items.map(item => {
-                if (item._id === variables.itemId) {
-                  return { ...item, status: "cancelled" };
-                }
-                return item;
-              })
-            };
-          }
-          return order;
-        });
-      });
-
+      queryClient.setQueryData(["orders"], (oldData) =>
+        oldData?.map(order =>
+          order._id === variables.orderId
+            ? { ...order, items: order.items.map(item =>
+                item._id === variables.itemId ? { ...item, status: "cancelled" } : item
+              ) }
+            : order
+        )
+      );
       await queryClient.invalidateQueries({ queryKey: ["orders"] });
       await refetch();
       refreshNotificationsWithSound();
@@ -109,20 +77,15 @@ export default function OrdersPage() {
     onSuccess: async (data, variables) => {
       toast.success(`"${variables.productName}" deleted!`);
       stopRinging();
-
-      queryClient.setQueryData(["orders"], (oldData) => {
-        if (!oldData) return oldData;
-        return oldData.map(order => {
-          if (order._id === variables.orderId) {
-            return {
-              ...order,
-              items: order.items.filter(item => item._id !== variables.itemId)
-            };
-          }
-          return order;
-        }).filter(order => order.items.length > 0);
-      });
-
+      queryClient.setQueryData(["orders"], (oldData) =>
+        oldData
+          ?.map(order =>
+            order._id === variables.orderId
+              ? { ...order, items: order.items.filter(item => item._id !== variables.itemId) }
+              : order
+          )
+          .filter(order => order.items.length > 0)
+      );
       await queryClient.invalidateQueries({ queryKey: ["orders"] });
       await refetch();
       refreshNotificationsWithSound();
@@ -147,23 +110,6 @@ export default function OrdersPage() {
   };
 
   // ---------- UI Helpers ----------
-  // ✅ "All" is REMOVED from statusMap – only specific filters remain
-  const statusMap = {
-    "Requests": "pending",
-    "Accepted Requests": "processing",
-    "Prepayment Requests": "pending",
-    "Confirmed Prepayments": "processing",
-    "Final Preorders": "completed",
-    "In Shipping": "processing",
-    "Delivered": "completed",
-    "Refund": "cancelled",
-  };
-
-  // ✅ Display name for the current tab (capitalized)
-  const getTabDisplayName = (tab) => {
-    return tab || "Requests";
-  };
-
   const formatDate = (dateString) => {
     const d = new Date(dateString);
     return d.toLocaleDateString("en-US", {
@@ -183,29 +129,12 @@ export default function OrdersPage() {
     return map[status] || "bg-secondary";
   };
 
-  // ✅ getCount now only works with mapped statuses – "All" case removed
-  const getCount = (label) => {
-    let count = 0;
-    const mapped = statusMap[label];
-    if (!mapped) return 0; // safety fallback
-
-    orders.forEach((order) => {
-      (order.items || []).forEach((item) => {
-        if (item.status === mapped) {
-          count++;
-        }
-      });
-    });
-    return count;
-  };
-
-  // ✅ expandedRows – "All" case completely removed
-  const expandedRows = [];
-  orders.forEach((order) => {
-    (order.items || []).forEach((item) => {
-      const mapped = statusMap[activeStatus];
-      if (mapped && item.status === mapped) {
-        expandedRows.push({ order, item });
+  // ✅ Flatten all items from all orders (EXCLUDE pending items)
+  const allItems = [];
+  orders.forEach(order => {
+    (order.items || []).forEach(item => {
+      if (item.status !== "pending") {   // <-- ONLY show non-pending items
+        allItems.push({ order, item });
       }
     });
   });
@@ -220,23 +149,20 @@ export default function OrdersPage() {
     <div className="container-fluid px-4">
       <div className="row mt-4">
         <div className="col-12">
-          {/* ✅ Updated header – shows the actual tab name */}
           <h4 className="mb-3">
-            {getTabDisplayName(activeStatus)}{" "}
-            <span className="text-muted fs-6">({getCount(activeStatus)})</span>
+            All Orders <span className="text-muted fs-6">({allItems.length})</span>
           </h4>
 
-          {/* Orders Table */}
           {isLoading ? (
             <div className="text-center py-5">
               <div className="spinner-border text-primary" role="status">
                 <span className="visually-hidden">Loading...</span>
               </div>
             </div>
-          ) : expandedRows.length === 0 ? (
+          ) : allItems.length === 0 ? (
             <div className="text-center text-muted py-5">
-              <h5>No items found</h5>
-              <p>No items match this filter.</p>
+              <h5>No orders found</h5>
+              <p>All orders have been processed.</p>
             </div>
           ) : (
             <div className="table-responsive">
@@ -254,7 +180,7 @@ export default function OrdersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {expandedRows.map(({ order, item }) => {
+                  {allItems.map(({ order, item }) => {
                     const isPending = item.status === "pending";
                     const key = `${order._id}-${item._id}`;
                     const itemTotal = (item.mrp || 0) * (item.quantity || 1);
