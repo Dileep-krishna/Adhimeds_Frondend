@@ -17,9 +17,9 @@ export default function DeliveryHeadSidebar() {
   // Auto‑open orders dropdown when on orders pages
   useEffect(() => {
     if (
-      pathname.startsWith("/All-store-management/All-Orders") ||
-      pathname.startsWith("/All-store-management/Order-Requests") ||
-      pathname.startsWith("/All-store-management/Orders")
+      pathname.startsWith("/Delivery-Head/All-Order") ||
+      pathname.startsWith("/Delivery-Head/Order-Requests") ||
+      pathname.startsWith("/Delivery-Head/Orders")
     ) {
       setOrdersOpen(true);
     }
@@ -50,19 +50,19 @@ export default function DeliveryHeadSidebar() {
   const mainLinks = [
     {
       label: "Delivery Dashboard",
-      href: "/All-store-management/delivery-dashboard",
+      href: "/Delivery-Head/dashboard",
       icon: "bi-speedometer2",
     },
     {
       label: "Delivery Boys",
-      href: "/All-store-management/delivery-boys",
+      href: "/Delivery-Head/delivery-boys",
       icon: "bi-people",
     },
   ];
 
   const orderSubLinks = [
-    { label: "All Orders", href: "/All-store-management/All-Orders" },
-    { label: "Pending Requests", href: "/All-store-management/Order-Requests" },
+    { label: "All Orders", href: "/Delivery-Head/All-Orders" },
+    { label: "Pending Requests", href: "/Delivery-Head/Order-Requests" },
   ];
 
   const isActive = (path) => pathname === path;

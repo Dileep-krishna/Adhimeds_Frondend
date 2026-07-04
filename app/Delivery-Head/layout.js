@@ -12,10 +12,10 @@ export default function DeliveryHeadLayout({ children }) {
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
   return (
-    <div className="delivery-layout-wrapper">
+    <div className="delivery-layout-wrapper" suppressHydrationWarning>
       <DeliveryAppBar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
       <Backdrop show={sidebarOpen} onClick={toggleSidebar} />
-      <div className="delivery-main-content">
+      <div className="delivery-main-content" suppressHydrationWarning>
         <DeliveryHeaderBar onToggleSidebar={toggleSidebar} />
         <div className="container-fluid p-4">{children}</div>
       </div>

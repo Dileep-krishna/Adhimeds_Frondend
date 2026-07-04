@@ -89,3 +89,8 @@ export const toggleTodayDealAPI = async (id) => {
     throw error;
   }
 };
+
+// (Optional) assignment API – add when backend is ready
+export const assignOrdersToBoyAPI = async (boyId, orderIds) => {
+  return await commonAPI("POST", `${SERVERURL}/assign`, { boyId, orderIds });
+};
