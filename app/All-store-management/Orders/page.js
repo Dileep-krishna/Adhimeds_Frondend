@@ -11,14 +11,14 @@ import "./orders.css";
 export default function OrdersPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { refreshNotificationsWithSound } = useOrderNotifications();
+  const { refreshNotificationsWithSound, stopRinging } = useOrderNotifications();
   const [activeStatus, setActiveStatus] = useState("Requests");
 
   // ---------- Fetch orders with real-time updates ----------
   const {
     data: orders = [],
     isLoading,
-    refetch, // Added refetch for manual refresh
+    refetch,
   } = useQuery({
     queryKey: ["orders"],
     queryFn: async () => {
@@ -26,27 +26,71 @@ export default function OrdersPage() {
       if (!response.success) throw new Error("Failed to load orders");
       return response.data;
     },
-    refetchInterval: 5000, // Reduced to 5s for faster updates
-    staleTime: 2000,
+    refetchInterval: 30000,
+    staleTime: 10000,
+    refetchOnWindowFocus: false,
   });
 
   // ---------- Mutations with immediate UI updates ----------
   const acceptMutation = useMutation({
     mutationFn: ({ orderId, itemId }) => updateItemStatus(orderId, itemId, "processing"),
-    onSuccess: async () => {
+    onSuccess: async (data, variables) => {
       toast.success("Product accepted!");
-      // Invalidate and refetch immediately
+      stopRinging();
+      
+      // ✅ Update local state immediately
+      queryClient.setQueryData(["orders"], (oldData) => {
+        if (!oldData) return oldData;
+        return oldData.map(order => {
+          if (order._id === variables.orderId) {
+            return {
+              ...order,
+              items: order.items.map(item => {
+                if (item._id === variables.itemId) {
+                  return { ...item, status: "processing" };
+                }
+                return item;
+              })
+            };
+          }
+          return order;
+        });
+      });
+      
+      // ✅ Then refetch in background
       await queryClient.invalidateQueries({ queryKey: ["orders"] });
-      await refetch(); // Force refetch
-      refreshNotificationsWithSound(); // Update notifications
+      await refetch();
+      refreshNotificationsWithSound();
     },
     onError: () => toast.error("Failed to accept product"),
   });
 
   const rejectMutation = useMutation({
     mutationFn: ({ orderId, itemId }) => updateItemStatus(orderId, itemId, "cancelled"),
-    onSuccess: async () => {
+    onSuccess: async (data, variables) => {
       toast.success("Product rejected!");
+      stopRinging();
+      
+      // ✅ Update local state immediately
+      queryClient.setQueryData(["orders"], (oldData) => {
+        if (!oldData) return oldData;
+        return oldData.map(order => {
+          if (order._id === variables.orderId) {
+            return {
+              ...order,
+              items: order.items.map(item => {
+                if (item._id === variables.itemId) {
+                  return { ...item, status: "cancelled" };
+                }
+                return item;
+              })
+            };
+          }
+          return order;
+        });
+      });
+      
+      // ✅ Then refetch in background
       await queryClient.invalidateQueries({ queryKey: ["orders"] });
       await refetch();
       refreshNotificationsWithSound();
@@ -56,8 +100,25 @@ export default function OrdersPage() {
 
   const deleteMutation = useMutation({
     mutationFn: ({ orderId, itemId }) => deleteItem(orderId, itemId),
-    onSuccess: async (_, variables) => {
+    onSuccess: async (data, variables) => {
       toast.success(`"${variables.productName}" deleted!`);
+      stopRinging();
+      
+      // ✅ Update local state immediately - remove the item
+      queryClient.setQueryData(["orders"], (oldData) => {
+        if (!oldData) return oldData;
+        return oldData.map(order => {
+          if (order._id === variables.orderId) {
+            return {
+              ...order,
+              items: order.items.filter(item => item._id !== variables.itemId)
+            };
+          }
+          return order;
+        }).filter(order => order.items.length > 0); // Remove orders with no items
+      });
+      
+      // ✅ Then refetch in background
       await queryClient.invalidateQueries({ queryKey: ["orders"] });
       await refetch();
       refreshNotificationsWithSound();

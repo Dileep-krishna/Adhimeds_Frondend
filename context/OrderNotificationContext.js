@@ -8,8 +8,8 @@ import io from "socket.io-client";
 import SERVERURL from "@/app/services/serverURL";
 
 const NOTIFICATION_ENABLED_PATHS = ["/All-store-management/Orders"];
-const RING_INTERVAL = 5000;
-const MAX_RING_DURATION = 5 * 60 * 1000;
+const RING_INTERVAL = 3000; // ✅ Reduced to 3 seconds for more continuous ringing
+const MAX_RING_DURATION = 20 * 60 * 1000; // ✅ Increased to 30 minutes (or remove limit)
 
 const OrderNotificationContext = createContext();
 
@@ -26,12 +26,17 @@ export function OrderNotificationProvider({ children }) {
   const notifIdsRef = useRef(new Set());
   const isAudioUnlocked = useRef(false);
   const socketRef = useRef(null);
+  const pollingIntervalRef = useRef(null);
+  const isInitializedRef = useRef(false);
+  const isSyncingRef = useRef(false);
+  const hasRungForCurrentNotifs = useRef(false); // ✅ Track if we've already rung
 
   // ---- Preload audio ----
   useEffect(() => {
     audioRef.current = new Audio("/audio/notification-2.mp3");
     audioRef.current.preload = "auto";
     audioRef.current.volume = 0.7;
+    audioRef.current.loop = false; // We'll handle looping manually
     audioRef.current.load();
     return () => {
       if (audioRef.current) {
@@ -77,12 +82,31 @@ export function OrderNotificationProvider({ children }) {
 
   // ---- Ringing controls ----
   const startRinging = useCallback(() => {
-    if (isRingingRef.current) stopRinging();
+    // ✅ If already ringing, don't restart
+    if (isRingingRef.current) return;
+    
     isRingingRef.current = true;
     setIsRinging(true);
+    hasRungForCurrentNotifs.current = true;
+    
+    // Play sound immediately
     playSound();
-    ringingIntervalRef.current = setInterval(playSound, RING_INTERVAL);
-    ringingTimeoutRef.current = setTimeout(stopRinging, MAX_RING_DURATION);
+    
+    // ✅ Continue ringing every RING_INTERVAL
+    ringingIntervalRef.current = setInterval(() => {
+      if (isRingingRef.current) {
+        playSound();
+      }
+    }, RING_INTERVAL);
+    
+    // ✅ Optional: Stop after MAX_RING_DURATION (30 minutes)
+    ringingTimeoutRef.current = setTimeout(() => {
+      if (isRingingRef.current) {
+        stopRinging();
+      }
+    }, MAX_RING_DURATION);
+    
+    console.log("🔔 Ringing started");
   }, [playSound]);
 
   const stopRinging = useCallback(() => {
@@ -96,15 +120,25 @@ export function OrderNotificationProvider({ children }) {
     }
     isRingingRef.current = false;
     setIsRinging(false);
+    hasRungForCurrentNotifs.current = false;
+    console.log("🔕 Ringing stopped");
   }, []);
 
   // ---- Ring on path change ----
   useEffect(() => {
     const isEnabled = NOTIFICATION_ENABLED_PATHS.some(p => pathname.startsWith(p));
     const unreadCount = notifications.filter(n => !n.read).length;
+    
+    // ✅ Start ringing if on correct page and there are unread notifications
     if (isEnabled && unreadCount > 0 && !isRingingRef.current) {
       startRinging();
-    } else if (!isEnabled && isRingingRef.current) {
+    } 
+    // ✅ Stop ringing if not on correct page
+    else if (!isEnabled && isRingingRef.current) {
+      stopRinging();
+    }
+    // ✅ Stop ringing if all notifications are read
+    else if (isEnabled && unreadCount === 0 && isRingingRef.current) {
       stopRinging();
     }
   }, [pathname, notifications, startRinging, stopRinging]);
@@ -118,7 +152,13 @@ export function OrderNotificationProvider({ children }) {
       return [...filtered, ...prev];
     });
     newNotifs.forEach(n => notifIdsRef.current.add(`${n.orderId}-${n.itemId}`));
-  }, []);
+    
+    // ✅ Start ringing immediately when new notifications are added
+    const isEnabled = NOTIFICATION_ENABLED_PATHS.some(p => pathname.startsWith(p));
+    if (isEnabled && !isRingingRef.current) {
+      startRinging();
+    }
+  }, [pathname, startRinging]);
 
   // ---- Socket.IO listener ----
   useEffect(() => {
@@ -167,7 +207,7 @@ export function OrderNotificationProvider({ children }) {
         addNewNotifications(newNotifs);
         const isEnabled = NOTIFICATION_ENABLED_PATHS.some(p => pathname.startsWith(p));
         if (isEnabled) {
-          startRinging();
+          // ✅ Start ringing immediately (addNewNotifications already does this)
           toast.info(`📦 ${pendingItems.length} new order item${pendingItems.length > 1 ? "s" : ""} received!`, {
             duration: 5000,
           });
@@ -212,19 +252,25 @@ export function OrderNotificationProvider({ children }) {
     addNewNotifications(newNotifs);
     const isEnabled = NOTIFICATION_ENABLED_PATHS.some(p => pathname.startsWith(p));
     if (isEnabled) {
-      startRinging();
       toast.info(`📦 ${pendingItems.length} new order item${pendingItems.length > 1 ? "s" : ""} placed!`, { duration: 5000 });
     }
   }, [pathname, startRinging, addNewNotifications]);
 
-  // ---- syncNotifications with proper cleanup ----
+  // ---- syncNotifications ----
   const syncNotifications = useCallback(async (silent = false) => {
+    if (isSyncingRef.current) return;
+    
+    isSyncingRef.current = true;
     try {
+      console.log("📨 Fetching all orders");
       const response = await getAllOrders();
-      if (!response.success) return;
+      if (!response.success) {
+        isSyncingRef.current = false;
+        return;
+      }
       const currentOrders = response.data || [];
+      console.log(`✅ Found ${currentOrders.length} orders`);
 
-      // Track all pending items
       const pendingItemsMap = new Map();
       const allOrderItems = new Set();
 
@@ -257,9 +303,10 @@ export function OrderNotificationProvider({ children }) {
 
       // If no pending items, stop ringing and clear everything
       if (pendingItemsMap.size === 0) {
-        stopRinging();
+        if (isRingingRef.current) stopRinging();
         setNotifications([]);
         notifIdsRef.current.clear();
+        isSyncingRef.current = false;
         return;
       }
 
@@ -292,36 +339,49 @@ export function OrderNotificationProvider({ children }) {
         addNewNotifications(newNotifs);
         const isEnabled = NOTIFICATION_ENABLED_PATHS.some(p => pathname.startsWith(p));
         if (!silent && isEnabled) {
-          startRinging();
+          // ✅ startRinging is called inside addNewNotifications
           toast.info(`📦 ${newNotifs.length} new order item${newNotifs.length > 1 ? "s" : ""} received`, {
             duration: 5000,
           });
         }
       }
 
-      // Final check: stop ringing if no unread notifications
-      setTimeout(() => {
-        const currentUnread = notifications.filter(n => !n.read).length;
-        if (currentUnread === 0 && isRingingRef.current) {
-          stopRinging();
-        }
-      }, 100);
+      // ✅ Stop ringing if no unread notifications
+      const currentUnread = notifications.filter(n => !n.read).length;
+      if (currentUnread === 0 && isRingingRef.current) {
+        stopRinging();
+      }
 
     } catch (error) {
       console.error('Sync notifications error:', error);
       stopRinging();
+    } finally {
+      isSyncingRef.current = false;
     }
-  }, [pathname, startRinging, stopRinging, addNewNotifications, notifications]);
+  }, [addNewNotifications, stopRinging, notifications]);
 
   // ---- Polling (fallback) ----
-  useEffect(() => {
+// ---- Polling (fallback) - DISABLED ----
+// ---- Polling (fallback) ----
+useEffect(() => {
+  if (!isInitializedRef.current) {
+    isInitializedRef.current = true;
     syncNotifications(false);
-    const interval = setInterval(() => syncNotifications(false), 30000);
-    return () => {
-      clearInterval(interval);
-      stopRinging();
-    };
-  }, [syncNotifications, stopRinging]);
+  }
+  
+  // ✅ Increase polling interval to 60 seconds
+  pollingIntervalRef.current = setInterval(() => {
+    syncNotifications(false);
+  }, 60000); // Changed from 30000 to 60000 (1 minute)
+  
+  return () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    stopRinging();
+  };
+}, []);
 
   // ---- Refresh functions ----
   const refreshNotificationsSilent = useCallback(() => {
@@ -335,17 +395,20 @@ export function OrderNotificationProvider({ children }) {
   // ---- Other exposed functions ----
   const markAllAsRead = useCallback(() => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    // ✅ Stop ringing immediately when all marked as read
     if (isRingingRef.current) {
-      const unread = notifications.filter(n => !n.read).length;
-      if (unread === 0) stopRinging();
+      stopRinging();
     }
-  }, [notifications, stopRinging]);
+  }, [stopRinging]);
   
   const markAsRead = useCallback((id) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    // ✅ Check if all are read and stop ringing
     setTimeout(() => {
       const unread = notifications.filter(n => !n.read).length;
-      if (unread === 0 && isRingingRef.current) stopRinging();
+      if (unread === 0 && isRingingRef.current) {
+        stopRinging();
+      }
     }, 100);
   }, [notifications, stopRinging]);
   
@@ -380,7 +443,7 @@ export function OrderNotificationProvider({ children }) {
       refreshNotificationsWithSound,
       triggerNewOrder,
       testEmit,
-      stopRinging,
+      stopRinging, // ✅ Expose stopRinging for manual stop
     }}>
       {children}
     </OrderNotificationContext.Provider>

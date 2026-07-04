@@ -33,30 +33,94 @@ export default function Navbar() {
 
   const [loaded, setLoaded] = useState(false);
 
-  // ✅ Helper: get stock from product (supports multiple field names)
+  // Get logged-in store's ID and name
+  const [loggedInStoreId, setLoggedInStoreId] = useState(null);
+  const [loggedInStoreName, setLoggedInStoreName] = useState("");
+
+  // Get store info from localStorage on mount
+  useEffect(() => {
+    const storeId = localStorage.getItem('storeId') || sessionStorage.getItem('storeId');
+    const storeName = localStorage.getItem('storeName') || sessionStorage.getItem('storeName');
+    const storeEmail = localStorage.getItem('storeEmail') || sessionStorage.getItem('storeEmail');
+    
+    if (storeId) {
+      setLoggedInStoreId(storeId);
+    }
+    if (storeName) {
+      setLoggedInStoreName(storeName);
+    }
+    
+    // If we have email but not name, fetch it
+    if (storeEmail && !storeName) {
+      fetchStoreDetails(storeEmail);
+    }
+  }, []);
+
+  // Fetch store details if needed
+  const fetchStoreDetails = async (email) => {
+    try {
+      const response = await fetch(`/api/store/by-email?email=${email}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          const storeName = data.store.name || data.store.storeName;
+          localStorage.setItem('storeName', storeName);
+          setLoggedInStoreName(storeName);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch store details:", error);
+    }
+  };
+
+  // Helper: get stock from product
   const getStock = (product) => {
     return parseInt(product.stock ?? product.availableQty ?? product.quantity ?? 0);
   };
 
-  // Fetch all shops and products in parallel
+  // Fetch all shops and products
   useEffect(() => {
     if (loaded) return;
+    
     const abortController = new AbortController();
 
     async function fetchAllProducts() {
       setLoading(true);
       try {
+        // Get store name from state or localStorage
+        const storeName = loggedInStoreName || localStorage.getItem('storeName') || sessionStorage.getItem('storeName') || "AL-DAWAA PHARMA";
+        
+        console.log("🔍 Fetching products for store:", storeName);
+
+        // 1. Fetch all shops
         const shopsRes = await fetch("/api/medisoft/shops", { signal: abortController.signal });
         if (!shopsRes.ok) throw new Error("Failed to fetch shops");
         const shopsData = await shopsRes.json();
         const shops = Array.isArray(shopsData) ? shopsData : shopsData?.body || [];
+        
         if (shops.length === 0) {
           setError("No stores found");
           setLoading(false);
           return;
         }
 
-        const targetStoreName = "AL-DAWAA PHARMA";
+        console.log(`✅ Found ${shops.length} shops`);
+
+        // 2. Find the target store
+        const targetStoreName = storeName;
+        const targetShop = shops.find(shop => 
+          shop.name?.toUpperCase() === targetStoreName.toUpperCase()
+        );
+
+        if (!targetShop) {
+          setError(`Store "${targetStoreName}" not found`);
+          setLoading(false);
+          return;
+        }
+
+        console.log(`✅ Found target shop: ${targetShop.name} (${targetShop.shopid})`);
+
+        // 3. Set store options (only show target store)
         const storeOptions = shops.map((shop) => {
           const isTarget = shop.name?.toUpperCase() === targetStoreName.toUpperCase();
           return {
@@ -70,45 +134,65 @@ export default function Navbar() {
         const targetOption = storeOptions.find(opt => !opt.isDisabled);
         if (targetOption) {
           setSelectedStore(targetOption);
+          if (!loggedInStoreId) {
+            localStorage.setItem('storeId', targetOption.value);
+            setLoggedInStoreId(targetOption.value);
+          }
         }
 
-        const productPromises = shops.map(async (shop) => {
-          try {
-            const res = await fetch("/api/medisoft/products", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ shopId: shop.shopid }),
-              signal: abortController.signal,
-            });
-            if (!res.ok) return [];
-            const data = await res.json();
-            let products = [];
-            if (Array.isArray(data)) products = data;
-            else if (data?.products && Array.isArray(data.products)) products = data.products;
-            else if (data?.body && Array.isArray(data.body)) products = data.body;
-            else products = [];
-
-            return products.map(prod => ({
-              ...prod,
-              storeName: shop.name,
-              storeId: shop.shopid,
-              // Ensure we have a stock field (if missing, fallback to quantity)
-              stock: prod.stock ?? prod.quantity ?? 0,
-            }));
-          } catch (err) {
-            console.error(`Error for shop ${shop.shopid}:`, err);
-            return [];
-          }
+        // 4. Fetch products ONLY for the target store
+        console.log(`📦 Fetching products for shop: ${targetShop.shopid}`);
+        
+        const productsRes = await fetch("/api/medisoft/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ shopId: targetShop.shopid }),
+          signal: abortController.signal,
         });
 
-        const allProductArrays = await Promise.all(productPromises);
-        const allItems = allProductArrays.flat();
-        setAllProducts(allItems);
-        setFilteredProducts(allItems.slice(0, 6));
+        let products = [];
+        if (productsRes.ok) {
+          const data = await productsRes.json();
+          console.log("📦 Products API response:", data);
+          
+          // Handle different response formats
+          if (Array.isArray(data)) {
+            products = data;
+          } else if (data?.products && Array.isArray(data.products)) {
+            products = data.products;
+          } else if (data?.body && Array.isArray(data.body)) {
+            products = data.body;
+          } else if (data?.data && Array.isArray(data.data)) {
+            products = data.data;
+          } else {
+            // If no products found, try to get from all shops as fallback
+            console.warn("⚠️ No products found in target store, trying fallback...");
+            products = await fetchAllProductsFallback(shops, targetStoreName, abortController.signal);
+          }
+        } else {
+          console.warn("⚠️ Products API failed, trying fallback...");
+          products = await fetchAllProductsFallback(shops, targetStoreName, abortController.signal);
+        }
+
+        // 5. Normalize products
+        const normalizedProducts = products.map(prod => ({
+          ...prod,
+          productName: prod.productname || prod.itemname || prod.name || 'Unnamed Product',
+          storeName: targetShop.name,
+          storeId: targetShop.shopid,
+          stock: parseInt(prod.stock ?? prod.availableQty ?? prod.quantity ?? 0),
+          mrp: prod.mrp || prod.price || 0,
+          rate: prod.rate || prod.price || 0,
+        }));
+
+        console.log(`✅ Found ${normalizedProducts.length} products for ${targetStoreName}`);
+        setAllProducts(normalizedProducts);
+        setFilteredProducts(normalizedProducts.slice(0, 6));
         setLoaded(true);
+        
       } catch (err) {
         if (err.name !== 'AbortError') {
-          console.error(err);
+          console.error("❌ Error fetching products:", err);
           setError(err.message);
         }
       } finally {
@@ -116,9 +200,45 @@ export default function Navbar() {
       }
     }
 
+    // Fallback: fetch from all shops and filter
+    async function fetchAllProductsFallback(shops, targetStoreName, signal) {
+      console.log("🔄 Fetching from all shops as fallback...");
+      const allProducts = [];
+      
+      for (const shop of shops) {
+        try {
+          const res = await fetch("/api/medisoft/products", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ shopId: shop.shopid }),
+            signal: signal,
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            let products = [];
+            if (Array.isArray(data)) products = data;
+            else if (data?.products && Array.isArray(data.products)) products = data.products;
+            else if (data?.body && Array.isArray(data.body)) products = data.body;
+            else if (data?.data && Array.isArray(data.data)) products = data.data;
+            
+            // Only keep products from target store
+            if (shop.name?.toUpperCase() === targetStoreName.toUpperCase()) {
+              allProducts.push(...products);
+            }
+          }
+        } catch (err) {
+          console.error(`Error fetching from shop ${shop.shopid}:`, err);
+        }
+      }
+      
+      console.log(`✅ Fallback found ${allProducts.length} products`);
+      return allProducts;
+    }
+
     fetchAllProducts();
     return () => abortController.abort();
-  }, [loaded]);
+  }, [loaded, loggedInStoreName, loggedInStoreId]);
 
   // Debounce search input
   const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
@@ -143,7 +263,7 @@ export default function Navbar() {
     }
     const lower = debouncedTerm.toLowerCase();
     const filtered = storeFiltered.filter(p =>
-      (p.productname || p.itemname || "").toLowerCase().includes(lower)
+      (p.productName || p.productname || p.itemname || "").toLowerCase().includes(lower)
     );
     setFilteredProducts(filtered.slice(0, 10));
     setShowResults(true);
@@ -171,27 +291,38 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // ✅ FIXED: addToCart now uses getStock() correctly
+  // addToCart uses logged-in store
   const addToCart = (product, e) => {
     e.stopPropagation();
-    const productName = product.productname || product.itemname;
+    const productName = product.productName || product.productname || product.itemname;
 
     // Find all stores that sell this product
     const matchingStores = allProducts.filter(p =>
-      (p.productname || p.itemname) === productName
+      (p.productName || p.productname || p.itemname) === productName
     );
 
-    // Build store list with correct stock status
-    const storeItems = matchingStores.map(storeProduct => ({
+    // Use logged-in store name
+    const targetStoreName = loggedInStoreName || localStorage.getItem('storeName') || sessionStorage.getItem('storeName') || "AL-DAWAA PHARMA";
+    const filteredStores = matchingStores.filter(storeProduct => 
+      storeProduct.storeName?.toUpperCase() === targetStoreName.toUpperCase()
+    );
+
+    // If product not found in logged-in store, show message
+    if (filteredStores.length === 0) {
+      alert(`This product is not available in ${targetStoreName}`);
+      return;
+    }
+
+    // Build store list with filtered stores
+    const storeItems = filteredStores.map(storeProduct => ({
       storeName: storeProduct.storeName,
-      productName: storeProduct.productname || storeProduct.itemname,
+      productName: storeProduct.productName || storeProduct.productname || storeProduct.itemname,
       pack: storeProduct.pack || "N/A",
       rate: storeProduct.rate || 0,
       mrp: storeProduct.mrp || 0,
       scheme: storeProduct.scheme || "",
-      // ✅ Use getStock() to determine stock
       stock: getStock(storeProduct) > 0 ? "In Stock" : "Out of Stock",
-      stockCount: getStock(storeProduct), // store the actual number for later
+      stockCount: getStock(storeProduct),
       content: storeProduct.content || "Available",
       qtyPerBox: storeProduct.qtyPerBox || storeProduct.pack || 1,
     }));
@@ -259,7 +390,7 @@ export default function Navbar() {
               type="text"
               className="form-control border-0 shadow-none"
               style={{ color: "#000", background: "transparent", flex: 1 }}
-              placeholder="Search medicines..."
+              placeholder={`Search in ${loggedInStoreName || 'store'}...`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onFocus={() => allProducts.length && setShowResults(true)}
@@ -295,7 +426,10 @@ export default function Navbar() {
                   style={{ fontSize: "12px", cursor: "pointer", color: "#0d6efd" }}
                   onClick={() => {
                     setSearchTerm("");
-                    setFilteredProducts(allProducts.slice(0, 6));
+                    const storeProducts = allProducts.filter(p => 
+                      p.storeName?.toUpperCase() === (loggedInStoreName || "AL-DAWAA PHARMA").toUpperCase()
+                    );
+                    setFilteredProducts(storeProducts.slice(0, 6));
                   }}
                 >
                   Clear All 🗑
@@ -304,11 +438,20 @@ export default function Navbar() {
 
               <div>
                 {loading ? (
-                  <div className="text-center p-3" style={{ color: "#000" }}>Loading products...</div>
+                  <div className="text-center p-3" style={{ color: "#000" }}>
+                    <div className="spinner-border spinner-border-sm me-2" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </div>
+                    Loading products...
+                  </div>
                 ) : error ? (
                   <div className="text-center p-3 text-danger">⚠️ {error}</div>
                 ) : filteredProducts.length === 0 ? (
-                  <div className="text-center p-3" style={{ color: "#6c757d" }}>No products found</div>
+                  <div className="text-center p-3" style={{ color: "#6c757d" }}>
+                    <div style={{ fontSize: "2rem", marginBottom: "8px" }}>📦</div>
+                    No products found
+                    {searchTerm && ` for "${searchTerm}"`}
+                  </div>
                 ) : (
                   filteredProducts.map((product, idx) => (
                     <div
@@ -333,7 +476,7 @@ export default function Navbar() {
                         </div>
                         <div>
                           <div style={{ fontSize: "14px", fontWeight: "500", color: "#000" }}>
-                            {product.productname || product.itemname}
+                            {product.productName || product.productname || product.itemname}
                           </div>
                           <div style={{ fontSize: "12px", color: "#555" }}>
                             {product.manufacturer || "Manufacturer"} • {product.storeName || "Store"}
@@ -342,21 +485,22 @@ export default function Navbar() {
                       </div>
                       <div className="text-end">
                         <div style={{ fontSize: "12px", color: "#555" }}>
-                          Qty/Box: {product.qtyPerBox || product.pack || 1}
+                          Stock: {getStock(product)} | Qty/Box: {product.qtyPerBox || product.pack || 1}
                         </div>
                         <button
                           className="btn btn-sm mt-1"
                           style={{
                             border: "1px solid #00b894",
-                            color: "#00b894",
+                            color: getStock(product) > 0 ? "#00b894" : "#dc3545",
                             background: "#fff",
                             borderRadius: "6px",
                             padding: "3px 14px",
                             fontSize: "12px",
                           }}
                           onClick={(e) => addToCart(product, e)}
+                          disabled={getStock(product) <= 0}
                         >
-                          Add
+                          {getStock(product) > 0 ? "Add" : "Out of Stock"}
                         </button>
                       </div>
                     </div>
@@ -395,7 +539,17 @@ export default function Navbar() {
                 <input type="checkbox" />
               </div>
               <p className="dropdown-item">Item Mapping</p>
-              <p className="dropdown-item text-danger">Sign Out</p>
+              <p className="dropdown-item text-danger" onClick={() => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('storeId');
+                localStorage.removeItem('storeName');
+                localStorage.removeItem('storeEmail');
+                sessionStorage.removeItem('token');
+                sessionStorage.removeItem('storeId');
+                sessionStorage.removeItem('storeName');
+                sessionStorage.removeItem('storeEmail');
+                router.push('/login');
+              }}>Sign Out</p>
             </div>
           )}
         </div>
