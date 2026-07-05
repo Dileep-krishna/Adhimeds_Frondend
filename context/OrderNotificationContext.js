@@ -8,18 +8,17 @@ import io from "socket.io-client";
 import SERVERURL from "@/app/services/serverURL";
 import { useQueryClient } from "@tanstack/react-query";
 
-// ✅ Pages where notifications are enabled
 const NOTIFICATION_ENABLED_PATHS = [
   "/All-store-management/Orders",
   "/All-store-management/All-Orders",
   "/All-store-management/Order-Requests"
 ];
 
-const RING_INTERVAL = 5000; // 5 seconds
-const MAX_RING_DURATION = 20 * 60 * 1000; // 20 minutes
-const POLLING_INTERVAL = 600000; // 10 minutes
-const SYNC_DEBOUNCE = 2000; // 2 seconds
-const MIN_SYNC_INTERVAL = 60000; // 1 minute – rate limit
+const RING_INTERVAL = 5000;
+const MAX_RING_DURATION = 20 * 60 * 1000;
+const POLLING_INTERVAL = 600000;
+const SYNC_DEBOUNCE = 2000;
+const MIN_SYNC_INTERVAL = 60000;
 
 const OrderNotificationContext = createContext();
 
@@ -40,7 +39,7 @@ export function OrderNotificationProvider({ children }) {
   const socketRef = useRef(null);
   const isSocketConnected = useRef(false);
   const pollingIntervalRef = useRef(null);
-  const pollingActiveRef = useRef(false); // ✅ track polling state
+  const pollingActiveRef = useRef(false);
   const isInitializedRef = useRef(false);
   const isSyncingRef = useRef(false);
   const syncTimeoutRef = useRef(null);
@@ -62,7 +61,7 @@ export function OrderNotificationProvider({ children }) {
     };
   }, []);
 
-  // ---- Unlock audio on user interaction ----
+  // ---- Unlock audio ----
   useEffect(() => {
     const unlockAudio = () => {
       if (isAudioUnlocked.current) return;
@@ -162,7 +161,7 @@ export function OrderNotificationProvider({ children }) {
     }, MAX_RING_DURATION);
   }, [playSound, stopRinging]);
 
-  // ---- Ring on path and notifications change ----
+  // ---- Ring on path & notifications change ----
   useEffect(() => {
     const isEnabled = NOTIFICATION_ENABLED_PATHS.some(p => pathname.startsWith(p));
     const unreadCount = notifications.filter(n => !n.read).length;
@@ -177,7 +176,7 @@ export function OrderNotificationProvider({ children }) {
     }
   }, [pathname, notifications, startRinging, stopRinging]);
 
-  // ---- Add new notifications ----
+  // ---- Add new notifications (with path check!) ----
   const addNewNotifications = useCallback((newNotifs) => {
     console.log("📥 addNewNotifications called with", newNotifs.length, "items");
     if (newNotifs.length === 0) return;
@@ -196,39 +195,37 @@ export function OrderNotificationProvider({ children }) {
     });
 
     queryClient.invalidateQueries({ queryKey: ['orders'] });
-    startRinging();
-  }, [startRinging, queryClient]);
+
+    // 🔥 ONLY ring if we are on an enabled page
+    const isEnabled = NOTIFICATION_ENABLED_PATHS.some(p => pathname.startsWith(p));
+    if (isEnabled) {
+      startRinging();
+    } else {
+      console.log("⏭️ Ringing skipped – path not enabled");
+    }
+  }, [startRinging, queryClient, pathname]);
 
   // ---- syncNotifications (debounced + rate limited + path check) ----
   const syncNotifications = useCallback(async (silent = false) => {
-    // ✅ Check if current path is enabled
     const isEnabled = NOTIFICATION_ENABLED_PATHS.some(p => pathname.startsWith(p));
     if (!isEnabled) {
       console.log("⏭️ Sync skipped – path not enabled");
       return;
     }
-
-    // If socket is connected and we're not forcing, skip
     if (isSocketConnected.current && !silent) {
       console.log("✅ Socket connected – skipping poll");
       return;
     }
-
-    // Rate limit: don't sync more than once per minute
     const now = Date.now();
     if (now - lastSyncTimeRef.current < MIN_SYNC_INTERVAL) {
       console.log("⏳ Skipping sync – rate limited (1 min)");
       return;
     }
-
     if (isSyncingRef.current) {
       console.log("⏳ Sync already in progress – skipping");
       return;
     }
-
-    if (syncTimeoutRef.current) {
-      clearTimeout(syncTimeoutRef.current);
-    }
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
 
     syncTimeoutRef.current = setTimeout(async () => {
       console.log("🔄 syncNotifications started (silent:", silent, ")");
@@ -353,14 +350,12 @@ export function OrderNotificationProvider({ children }) {
     socket.on("connect", () => {
       console.log("✅ Socket.IO connected");
       isSocketConnected.current = true;
-      // Stop polling when connected
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
         pollingActiveRef.current = false;
         console.log("🛑 Polling stopped (socket connected)");
       }
-      // Silent sync only if path enabled and not recently synced
       const isEnabled = NOTIFICATION_ENABLED_PATHS.some(p => pathname.startsWith(p));
       if (isEnabled) {
         const now = Date.now();
@@ -378,7 +373,6 @@ export function OrderNotificationProvider({ children }) {
       console.log("🔴 Socket.IO disconnected:", reason);
       isSocketConnected.current = false;
       const isEnabled = NOTIFICATION_ENABLED_PATHS.some(p => pathname.startsWith(p));
-      // Restart polling only if path enabled and not already polling
       if (isEnabled && !pollingActiveRef.current) {
         setTimeout(() => {
           if (!isSocketConnected.current && !pollingActiveRef.current) {
@@ -467,7 +461,7 @@ export function OrderNotificationProvider({ children }) {
     };
   }, [pathname, startRinging, addNewNotifications, syncNotifications]);
 
-  // ---- triggerNewOrder (called from cart) ----
+  // ---- triggerNewOrder ----
   const triggerNewOrder = useCallback(async (order) => {
     console.log("🛒 triggerNewOrder called with order:", order);
     if (!order?.items) return;
@@ -518,7 +512,6 @@ export function OrderNotificationProvider({ children }) {
       }
     }
 
-    // Start polling only if path is enabled AND socket is not connected AND not already polling
     if (isEnabled && !isSocketConnected.current && !pollingActiveRef.current) {
       pollingActiveRef.current = true;
       pollingIntervalRef.current = setInterval(() => {
@@ -527,7 +520,6 @@ export function OrderNotificationProvider({ children }) {
       }, POLLING_INTERVAL);
       console.log(`🔄 Polling started – interval: ${POLLING_INTERVAL}ms`);
     } else if (!isEnabled && pollingActiveRef.current) {
-      // Stop polling if path becomes disabled
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;

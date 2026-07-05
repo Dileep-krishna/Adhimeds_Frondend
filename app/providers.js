@@ -12,7 +12,7 @@ export default function Providers({ children }) {
   return (
     <QueryClientProvider client={queryClient}>
       <CartProvider>
-        <NotificationProvider>
+        {/* <NotificationProvider> */}
           <OrderNotificationProvider>   {/* ✅ new wrapper – added without changing existing code */}
             {children}
             <Toaster
@@ -22,7 +22,7 @@ export default function Providers({ children }) {
               visibleToasts={3}
             />
           </OrderNotificationProvider>
-        </NotificationProvider>
+        {/* </NotificationProvider> */}
       </CartProvider>
     </QueryClientProvider>
   );
