@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAllOrders, updateItemStatus, deleteItem } from "../../services/orderAPI";
 import { toast } from "sonner";
 import { useOrderNotifications } from "@/context/OrderNotificationContext";
-
+import "./all-orders.css";  
 export default function AllOrdersPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -29,7 +29,7 @@ export default function AllOrdersPage() {
     refetchOnWindowFocus: false,
   });
 
-  // ---------- Mutations (same as OrdersPage) ----------
+  // ---------- Mutations ----------
   const acceptMutation = useMutation({
     mutationFn: ({ orderId, itemId }) => updateItemStatus(orderId, itemId, "processing"),
     onSuccess: async (data, variables) => {
@@ -125,15 +125,16 @@ export default function AllOrdersPage() {
       processing: "bg-info text-white",
       completed: "bg-success text-white",
       cancelled: "bg-danger text-white",
+      assigned: "bg-primary text-white",
     };
-    return map[status] || "bg-secondary";
+    return map[status] || "bg-secondary text-white";
   };
 
-  // ✅ Flatten all items from all orders (EXCLUDE pending items)
+  // Flatten items (EXCLUDE pending)
   const allItems = [];
   orders.forEach(order => {
     (order.items || []).forEach(item => {
-      if (item.status !== "pending") {   // <-- ONLY show non-pending items
+      if (item.status !== "pending") {
         allItems.push({ order, item });
       }
     });
@@ -144,48 +145,88 @@ export default function AllOrdersPage() {
     rejectMutation.isPending ||
     deleteMutation.isPending;
 
-  // ---------- Render ----------
   return (
-    <div className="container-fluid px-4">
-      <div className="row mt-4">
-        <div className="col-12">
-          <h4 className="mb-3">
-            All Orders <span className="text-muted fs-6">({allItems.length})</span>
-          </h4>
+    <div className="container-fluid py-4">
+
+
+      <div className="card border-0 shadow-sm rounded-4">
+
+        {/* Header */}
+        <div className="card-header bg-white border-0 py-3 px-4">
+          <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <h5 className="fw-bold mb-0">
+              All Orders
+              <span className="badge bg-light text-dark ms-2">
+                {allItems.length}
+              </span>
+            </h5>
+
+            {/* ✅ FILTER BAR – forced inline with flex */}
+            <div className="filter-bar">
+              <select className="form-select form-select-sm" style={{ width: 'auto', minWidth: '140px' }}>
+                <option>Bulk Action</option>
+              </select>
+
+              <select className="form-select form-select-sm" style={{ width: 'auto', minWidth: '180px' }}>
+                <option>Filter by Delivery Status</option>
+              </select>
+
+              <select className="form-select form-select-sm" style={{ width: 'auto', minWidth: '100px' }}>
+                <option>Paid</option>
+                <option>Un-Paid</option>
+              </select>
+
+              <input
+                type="date"
+                className="form-control form-control-sm"
+                style={{ width: 'auto', minWidth: '140px' }}
+              />
+
+              <input
+                type="text"
+                placeholder="Type Order code & hit Enter"
+                className="form-control form-control-sm"
+                style={{ width: 'auto', minWidth: '200px' }}
+              />
+
+              <button className="btn btn-primary btn-sm px-4" style={{ whiteSpace: 'nowrap' }}>
+                Filter
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="card-body p-0">
 
           {isLoading ? (
             <div className="text-center py-5">
-              <div className="spinner-border text-primary" role="status">
-                <span className="visually-hidden">Loading...</span>
-              </div>
+              <div className="spinner-border text-primary"></div>
             </div>
           ) : allItems.length === 0 ? (
-            <div className="text-center text-muted py-5">
-              <h5>No orders found</h5>
-              <p>All orders have been processed.</p>
+            <div className="text-center py-5">
+              <h5>No Orders Found</h5>
+              <p className="text-muted">All orders have been processed.</p>
             </div>
           ) : (
-            <div className="table-responsive">
-              <table className="table table-bordered table-hover align-middle">
-                <thead className="table-light">
+            <div className="order-table-wrapper">
+              <table>
+                <thead>
                   <tr>
-                    <th>Product / Quantity</th>
-                    <th>Order Code / Created</th>
-                    <th>Price / Prepayment</th>
-                    <th>Seller</th>
+                    <th>Order Code</th>
+                    <th>Num. of Products</th>
                     <th>Customer</th>
-                    <th>Status</th>
-                    <th>Refund</th>
-                    <th>Actions</th>
+                    <th>Seller</th>
+                    <th>Amount</th>
+                    <th>Delivery Status</th>
+                    <th>Payment method</th>
+                    <th>Payment Status</th>
+                    <th className="text-center">Options</th>
                   </tr>
                 </thead>
                 <tbody>
                   {allItems.map(({ order, item }) => {
-                    const isPending = item.status === "pending";
                     const key = `${order._id}-${item._id}`;
-                    const itemTotal = (item.mrp || 0) * (item.quantity || 1);
-                    const prepayment = itemTotal * 0.3;
-
+                    const isPending = item.status === "pending";
                     const isThisItemLoading =
                       (acceptMutation.isPending && acceptMutation.variables?.itemId === item._id) ||
                       (rejectMutation.isPending && rejectMutation.variables?.itemId === item._id) ||
@@ -194,87 +235,79 @@ export default function AllOrdersPage() {
                     return (
                       <tr key={key}>
                         <td>
-                          <div className="fw-semibold">{item.productName}</div>
-                          <small className="text-muted">QTY: {item.quantity || 1}</small>
-                        </td>
-                        <td>
                           <div className="fw-semibold">
-                            {order._id.substring(order._id.length - 8)}
+                            {order._id}
                           </div>
                           <small className="text-muted">
-                            Created: {formatDate(order.createdAt)}
+                            {formatDate(order.createdAt)}
                           </small>
                         </td>
+                        <td>{order.items?.length || 0}</td>
+                        <td>Guest</td>
                         <td>
-                          <div>${itemTotal.toFixed(2)}</div>
-                          <small className="text-muted">
-                            / ${prepayment.toFixed(2)} prepayment
-                          </small>
+                          {item.storeName ||
+                            order.items?.[0]?.storeName ||
+                            "Inhouse Order"}
                         </td>
-                        <td>{item.storeName || order.items?.[0]?.storeName || "N/A"}</td>
-                        <td>
-                          <div>Guest</div>
-                          <small className="text-muted">customer@example.com</small>
+                        <td className="fw-semibold">
+                          ₹{(order.total || 0).toFixed(2)}
                         </td>
                         <td>
-                          <span className={`badge ${getStatusBadge(item.status)}`}>
+                          <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(item.status)}`}>
                             {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
                           </span>
                         </td>
+                        <td>Cash on Delivery</td>
                         <td>
-                          <span className="badge bg-success">Refundable</span>
+                          <span className="badge bg-danger rounded-pill px-3 py-2">
+                            Un-Paid
+                          </span>
                         </td>
                         <td>
-                          <div className="d-flex gap-1 flex-wrap">
+                          <div className="d-flex justify-content-center gap-2">
                             {isPending ? (
                               <>
                                 <button
-                                  className="btn btn-sm btn-success"
+                                  className="btn btn-success btn-sm rounded-pill px-3"
                                   onClick={() => handleAccept(order._id, item._id)}
                                   disabled={isThisItemLoading || isLoadingAction}
                                 >
-                                  {isThisItemLoading && acceptMutation.isPending ? (
-                                    <span className="spinner-border spinner-border-sm" />
-                                  ) : (
-                                    "Accept"
-                                  )}
+                                  Accept
                                 </button>
                                 <button
-                                  className="btn btn-sm btn-danger"
+                                  className="btn btn-danger btn-sm rounded-pill px-3"
                                   onClick={() => handleReject(order._id, item._id)}
                                   disabled={isThisItemLoading || isLoadingAction}
                                 >
-                                  {isThisItemLoading && rejectMutation.isPending ? (
-                                    <span className="spinner-border spinner-border-sm" />
-                                  ) : (
-                                    "Reject"
-                                  )}
+                                  Reject
                                 </button>
                               </>
                             ) : (
                               <>
                                 <button
-                                  className="btn btn-sm btn-outline-primary"
-                                  onClick={() => router.push(`/pharma-dashboard/orders/${order._id}`)}
+                                  className="btn btn-light rounded-circle shadow-sm"
+                                  onClick={() =>
+                                    router.push(`/All-store-management/Order-Details`)
+                                  }
                                 >
-                                  <i className="bi bi-eye"></i>
+                                  <i className="bi bi-eye text-primary"></i>
                                 </button>
                                 <button
-                                  className="btn btn-sm btn-outline-danger"
-                                  onClick={() => handleDeleteItem(order._id, item._id, item.productName)}
+                                  className="btn btn-light rounded-circle shadow-sm"
+                                  onClick={() =>
+                                    toast.info("Download invoice for order " + order._id)
+                                  }
+                                >
+                                  <i className="bi bi-download text-secondary"></i>
+                                </button>
+                                <button
+                                  className="btn btn-light rounded-circle shadow-sm"
+                                  onClick={() =>
+                                    handleDeleteItem(order._id, item._id, item.productName)
+                                  }
                                   disabled={isThisItemLoading || isLoadingAction}
                                 >
-                                  {isThisItemLoading && deleteMutation.isPending ? (
-                                    <span className="spinner-border spinner-border-sm" />
-                                  ) : (
-                                    <i className="bi bi-trash"></i>
-                                  )}
-                                </button>
-                                <button
-                                  className="btn btn-sm btn-outline-secondary"
-                                  onClick={() => toast.info("Download invoice for order " + order._id)}
-                                >
-                                  <i className="bi bi-download"></i>
+                                  <i className="bi bi-trash text-danger"></i>
                                 </button>
                               </>
                             )}
@@ -287,7 +320,9 @@ export default function AllOrdersPage() {
               </table>
             </div>
           )}
+
         </div>
+
       </div>
     </div>
   );

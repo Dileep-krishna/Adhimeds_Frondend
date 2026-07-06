@@ -47,12 +47,13 @@ export default function StoreLoginPage() {
         const storage = rememberMe ? localStorage : sessionStorage;
         storage.setItem("token", data.token);
         storage.setItem("storeId", data.storeId);
+        storage.setItem("shopid", data.shopid || "");   // ✅ Store shopid
         storage.setItem("storeName", data.storeName);
         storage.setItem("storeEmail", email);
 
         toast.success("Login successful! Redirecting...");
         setTimeout(() => {
-          router.replace("/All-store-management/store-dashboard"); // ✅ Use replace
+          router.replace("/All-store-management/store-dashboard");
         }, 1000);
       } else {
         toast.error(data.message || "Invalid credentials");

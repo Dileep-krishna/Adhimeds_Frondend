@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { GoogleMap, LoadScript, Marker, Autocomplete } from '@react-google-maps/api';
 import toast, { Toaster } from 'react-hot-toast';
 import { createStoreAPI } from '../../../services/storeManagementAPI';
 import '../medical-stores.css';
-import './storeAdd.css'; // separate CSS for additional styles
+import './storeAdd.css';
 
 const mapContainerStyle = { width: '100%', height: '300px', borderRadius: '8px' };
 const defaultCenter = { lat: 9.9312, lng: 76.2673 };
@@ -19,6 +19,7 @@ export default function AddStorePage() {
 
   const [formData, setFormData] = useState({
     storeName: '',
+    shopid: '',               // ✅ Medisoft shop ID
     searchLocation: '',
     address: '',
     latitude: defaultCenter.lat,
@@ -39,9 +40,27 @@ export default function AddStorePage() {
   const [map, setMap] = useState(null);
   const [autocomplete, setAutocomplete] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [shopsList, setShopsList] = useState([]);
   const searchBoxRef = useRef(null);
 
-  // Memoized coordinate update to avoid recreations
+  // Fetch shops for validation
+  useEffect(() => {
+    const fetchShops = async () => {
+      try {
+        const res = await fetch('/api/medisoft/shops');
+        if (res.ok) {
+          const data = await res.json();
+          setShopsList(Array.isArray(data) ? data : []);
+        } else {
+          console.warn('Could not fetch shops');
+        }
+      } catch (error) {
+        console.warn('Error fetching shops:', error);
+      }
+    };
+    fetchShops();
+  }, []);
+
   const updatePosition = useCallback((lat, lng) => {
     setFormData(prev => ({ ...prev, latitude: lat, longitude: lng }));
     if (map) map.panTo({ lat, lng });
@@ -98,12 +117,11 @@ export default function AddStorePage() {
     }
     setThumbnailFiles(files);
     const previews = files.map(file => URL.createObjectURL(file));
-    // Cleanup old previews
     thumbnailPreviews.forEach(url => URL.revokeObjectURL(url));
     setThumbnailPreviews(previews);
   }, [thumbnailPreviews]);
 
-  // --- Mandatory field validation (all fields) ---
+  // --- Validation with shopid check ---
   const validateForm = useCallback(() => {
     const requiredFields = [
       'storeName', 'vendorCategory', 'pincode', 'emailAddress',
@@ -142,8 +160,17 @@ export default function AddStorePage() {
       toast.error('At least one thumbnail image is required');
       return false;
     }
+
+    // ✅ Check shopid (if provided) – now uses toast.error (not warning)
+    if (formData.shopid && formData.shopid.trim() !== '') {
+      const exists = shopsList.some(shop => shop.shopid === formData.shopid.trim());
+      if (!exists) {
+        toast.error('Shop ID does not match any known store. You can still save, but verify the ID.');
+      }
+    }
+
     return true;
-  }, [formData, thumbnailFiles]);
+  }, [formData, thumbnailFiles, shopsList]);
 
   const saveStore = useCallback(async () => {
     if (!validateForm()) return;
@@ -151,7 +178,6 @@ export default function AddStorePage() {
     setSaving(true);
     try {
       const payload = new FormData();
-      // Append all fields (now all mandatory)
       Object.keys(formData).forEach(key => {
         if (formData[key] !== undefined && formData[key] !== null) {
           payload.append(key, formData[key]);
@@ -176,7 +202,7 @@ export default function AddStorePage() {
     }
   }, [formData, thumbnailFiles, validateForm, router]);
 
-  // Cleanup object URLs on unmount
+  // Cleanup object URLs
   React.useEffect(() => {
     return () => {
       thumbnailPreviews.forEach(url => URL.revokeObjectURL(url));
@@ -214,7 +240,19 @@ export default function AddStorePage() {
               />
             </div>
 
-            {/* Search Location (now mandatory) */}
+            {/* Medisoft Shop ID (optional) */}
+            <div className="form-group">
+              <label>Medisoft Shop ID (optional)</label>
+              <input
+                type="text"
+                value={formData.shopid}
+                onChange={(e) => setFormData({ ...formData, shopid: e.target.value })}
+                placeholder="e.g., 30, 3743, 3783, 3752"
+              />
+              <small className="text-muted">If provided, it will be validated against existing shops.</small>
+            </div>
+
+            {/* Search Location */}
             <div className="form-group">
               <label>Search for location *</label>
               <Autocomplete onLoad={onLoadAutocomplete} onPlaceChanged={onPlaceChanged}>
@@ -270,7 +308,7 @@ export default function AddStorePage() {
               </div>
             </div>
 
-            {/* Address (mandatory) */}
+            {/* Address */}
             <div className="form-group">
               <label>Address *</label>
               <input
@@ -374,7 +412,7 @@ export default function AddStorePage() {
               />
             </div>
 
-            {/* Thumbnails (mandatory) */}
+            {/* Thumbnails */}
             <div className="form-group">
               <label>Thumbnail Images * (max 5)</label>
               <input

@@ -15,62 +15,121 @@ export default function CartPage() {
   const router = useRouter();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
-const handleCheckout = async () => {
-  if (cartItems.length === 0) {
-    toast.error("Your cart is empty.");
-    return;
-  }
-
-  const loadingToast = toast.loading("Placing your order...");
-  setIsCheckingOut(true);
-
-  try {
-    const response = await placeOrder(cartItems);
-
-    if (response.success) {
-      toast.success("✅ Order placed successfully!", { id: loadingToast });
-
-      let order = response.order || response.data?.order;
-
-      if (!order) {
-        console.warn("⚠️ No order data in response – building from cart items");
-        order = {
-          _id: response.orderId || `temp-${Date.now()}`,
-          items: cartItems.map(item => ({
-            _id: item.id,
-            productName: item.productName,
-            quantity: item.quantity,
-            status: "pending",
-          })),
-          createdAt: new Date().toISOString(),
-        };
-      }
-
-      if (order.items) {
-        order.items = order.items.map(item => ({
-          ...item,
-          status: item.status || "pending",
-        }));
-      }
-
-      triggerNewOrder(order);
-      clearCart();
-
-      // ❌ REMOVED: router.push("/All-store-management/Order-Requests");
-      // ✅ The order is now in the database – the admin will see it when they visit the Order‑Requests page.
-
-      // Optional: stay on cart, show success, maybe clear the form
-    } else {
-      toast.error(response.message || "Failed to place order.", {
-        id: loadingToast,
-      });
+  const handleCheckout = async () => {
+    if (cartItems.length === 0) {
+      toast.error("Your cart is empty.");
+      return;
     }
-  } catch (error) {
-    toast.error("Network error. Please try again.", { id: loadingToast });
-  } finally {
-    setIsCheckingOut(false);
-  }
-};
+
+    // ✅ Get store name from the cart items (all items should have the same store)
+    const storeName = cartItems[0]?.storeName;
+    if (!storeName) {
+      toast.error("Store name not found in cart. Please add items from a valid store.");
+      return;
+    }
+
+    // ✅ Check if all items belong to the same store
+    const allItemsMatch = cartItems.every(item => item.storeName === storeName);
+    if (!allItemsMatch) {
+      toast.error("Cart contains items from multiple stores. Please clear and try again.");
+      return;
+    }
+
+    // ✅ Get shopid from storage, or fetch it using the store name
+    let shopid = localStorage.getItem('shopid') || sessionStorage.getItem('shopid');
+    
+    if (!shopid) {
+      // Auto‑fetch shopid from Medisoft shops API using storeName
+      try {
+        const shopsRes = await fetch('/api/medisoft/shops');
+        if (shopsRes.ok) {
+          const shops = await shopsRes.json();
+          const matchedShop = shops.find(shop => 
+            shop.name?.toUpperCase() === storeName.toUpperCase()
+          );
+          if (matchedShop) {
+            shopid = matchedShop.shopid;
+            // Save it for future use
+            localStorage.setItem('shopid', shopid);
+            console.log(`✅ Auto‑fetched shopid: ${shopid}`);
+          } else {
+            toast.error(`Store "${storeName}" not found in the system.`);
+            return;
+          }
+        } else {
+          toast.error("Unable to verify store. Please try again.");
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to fetch shops:", err);
+        toast.error("Network error. Please try again.");
+        return;
+      }
+    }
+
+    // ✅ Verify shopid against Medisoft shops (optional but recommended)
+    try {
+      const shopsRes = await fetch('/api/medisoft/shops');
+      if (shopsRes.ok) {
+        const shops = await shopsRes.json();
+        const shopExists = shops.some(shop => shop.shopid === shopid);
+        if (!shopExists) {
+          toast.error("Store ID is invalid. Please contact support.");
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("Could not verify shopid, proceeding anyway.");
+    }
+
+    // ✅ All validations passed – proceed with order
+    const loadingToast = toast.loading("Placing your order...");
+    setIsCheckingOut(true);
+
+    try {
+      const response = await placeOrder(cartItems);
+
+      if (response.success) {
+        toast.success("✅ Order placed successfully!", { id: loadingToast });
+
+        let order = response.order || response.data?.order;
+
+        if (!order) {
+          console.warn("⚠️ No order data in response – building from cart items");
+          order = {
+            _id: response.orderId || `temp-${Date.now()}`,
+            items: cartItems.map(item => ({
+              _id: item.id,
+              productName: item.productName,
+              quantity: item.quantity,
+              status: "pending",
+            })),
+            createdAt: new Date().toISOString(),
+          };
+        }
+
+        if (order.items) {
+          order.items = order.items.map(item => ({
+            ...item,
+            status: item.status || "pending",
+          }));
+        }
+
+        triggerNewOrder(order);
+        clearCart();
+
+        // The order is now saved. The store admin will see it in Order‑Requests.
+      } else {
+        toast.error(response.message || "Failed to place order.", {
+          id: loadingToast,
+        });
+      }
+    } catch (error) {
+      toast.error("Network error. Please try again.", { id: loadingToast });
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
 
   return (
     <div className="cart-container container-fluid">

@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import "./delivery-boys.css";
 import { getDeliveryBoysAPI } from "@/app/services/deliveryService";
+import { getAllOrders, updateItemStatus } from "@/app/services/orderAPI";
 
 export default function DeliveryBoysPage() {
   const queryClient = useQueryClient();
@@ -12,50 +13,120 @@ export default function DeliveryBoysPage() {
   const [selectedBoy, setSelectedBoy] = useState(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedOrders, setSelectedOrders] = useState([]);
+  const [assignedModalOpen, setAssignedModalOpen] = useState(false);
+  const [viewingBoy, setViewingBoy] = useState(null);
 
-  // ---------- Fetch delivery boys ----------
+  // Fetch boys
   const {
     data: boys = [],
-    isLoading,
+    isLoading: boysLoading,
     error,
-    refetch,
+    refetch: refetchBoys,
   } = useQuery({
     queryKey: ["deliveryBoys"],
-    queryFn: getDeliveryBoysAPI,
+    queryFn: async () => {
+      const response = await getDeliveryBoysAPI();
+      let boysData = [];
+      if (Array.isArray(response)) boysData = response;
+      else if (response?.data && Array.isArray(response.data)) boysData = response.data;
+      else if (response?.body && Array.isArray(response.body)) boysData = response.body;
+      else if (response?.result && Array.isArray(response.result)) boysData = response.result;
+      else if (response?.success && Array.isArray(response.data)) boysData = response.data;
+      else {
+        for (const key of Object.keys(response || {})) {
+          if (Array.isArray(response[key])) { boysData = response[key]; break; }
+        }
+      }
+      return boysData;
+    },
     staleTime: 60000,
     refetchInterval: 30000,
-    placeholderData: (prev) => prev, // prevents blinking on refetch
+    placeholderData: (prev) => prev,
   });
 
-  // ---------- Mock pending orders (replace with real API) ----------
-  const pendingOrders = useMemo(
-    () => [
-      { id: "ORD-001", customer: "John Doe", items: 3, amount: "₹450" },
-      { id: "ORD-002", customer: "Jane Smith", items: 2, amount: "₹320" },
-      { id: "ORD-003", customer: "Bob Johnson", items: 1, amount: "₹120" },
-    ],
-    []
-  );
+  // Fetch orders
+  const {
+    data: orders = [],
+    isLoading: ordersLoading,
+    refetch: refetchOrders,
+  } = useQuery({
+    queryKey: ["orders"],
+    queryFn: async () => {
+      const response = await getAllOrders();
+      let ordersData = [];
+      if (Array.isArray(response)) ordersData = response;
+      else if (response?.data && Array.isArray(response.data)) ordersData = response.data;
+      else if (response?.body && Array.isArray(response.body)) ordersData = response.body;
+      else {
+        for (const key of Object.keys(response || {})) {
+          if (Array.isArray(response[key])) { ordersData = response[key]; break; }
+        }
+      }
+      return ordersData;
+    },
+    staleTime: 10000,
+    refetchInterval: 30000,
+    placeholderData: (prev) => prev,
+  });
 
-  // ---------- Assign orders mutation (mock) ----------
+  // Filter orders ready for assignment
+  const assignableOrders = useMemo(() => {
+    const items = [];
+    orders.forEach(order => {
+      (order.items || []).forEach(item => {
+        if (item.status === "assigned" && !item.assignedTo) {
+          items.push({ order, item });
+        }
+      });
+    });
+    return items;
+  }, [orders]);
+
+  // Get orders assigned to a specific boy
+  const getAssignedOrdersForBoy = (boyId) => {
+    const items = [];
+    orders.forEach(order => {
+      (order.items || []).forEach(item => {
+        if (item.assignedTo === boyId) {
+          items.push({ order, item });
+        }
+      });
+    });
+    return items;
+  };
+
+  // Assign mutation
   const assignMutation = useMutation({
     mutationFn: async ({ boyId, orderIds }) => {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      console.log(`Assigning orders ${orderIds} to boy ${boyId}`);
-      return { success: true };
+      const results = [];
+      for (const { orderId, itemId } of orderIds) {
+        try {
+          const result = await updateItemStatus(orderId, itemId, "assigned", boyId);
+          results.push(result);
+        } catch (err) {
+          console.error(`Failed to assign item ${itemId}:`, err);
+          throw err;
+        }
+      }
+      return results;
     },
     onSuccess: () => {
       toast.success("Orders assigned successfully!");
       setAssignModalOpen(false);
       setSelectedBoy(null);
       setSelectedOrders([]);
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      refetchOrders();
       queryClient.invalidateQueries({ queryKey: ["deliveryBoys"] });
+      refetchBoys();
     },
-    onError: () => toast.error("Failed to assign orders"),
+    onError: (error) => {
+      console.error("Assign error:", error);
+      toast.error("Failed to assign orders");
+    },
   });
 
-  // ---------- Stats calculations ----------
+  // Stats
   const stats = useMemo(() => {
     const total = boys.length;
     const active = boys.filter((b) => b.status === "active").length;
@@ -66,7 +137,7 @@ export default function DeliveryBoysPage() {
     return { total, active, offline, totalDeliveries, avgRating: avgRating.toFixed(1) };
   }, [boys]);
 
-  // ---------- Filtered boys ----------
+  // Filtered boys
   const filteredBoys = useMemo(() => {
     if (!searchTerm.trim()) return boys;
     return boys.filter(
@@ -77,18 +148,18 @@ export default function DeliveryBoysPage() {
     );
   }, [boys, searchTerm]);
 
-  // ---------- Handlers ----------
+  // Handlers
   const handleAssignClick = (boy) => {
     setSelectedBoy(boy);
     setSelectedOrders([]);
     setAssignModalOpen(true);
   };
 
-  const handleOrderToggle = (orderId) => {
+  const handleOrderToggle = (orderId, itemId) => {
     setSelectedOrders((prev) =>
-      prev.includes(orderId)
-        ? prev.filter((id) => id !== orderId)
-        : [...prev, orderId]
+      prev.some(o => o.orderId === orderId && o.itemId === itemId)
+        ? prev.filter(o => !(o.orderId === orderId && o.itemId === itemId))
+        : [...prev, { orderId, itemId }]
     );
   };
 
@@ -101,7 +172,13 @@ export default function DeliveryBoysPage() {
     assignMutation.mutate({ boyId: selectedBoy.id, orderIds: selectedOrders });
   };
 
-  // ---------- Render ----------
+  const handleViewAssigned = (boy) => {
+    setViewingBoy(boy);
+    setAssignedModalOpen(true);
+  };
+
+  const isLoading = boysLoading || ordersLoading;
+
   return (
     <div className="delivery-boys-container container-fluid px-4 py-4">
       {/* Page Header */}
@@ -110,7 +187,7 @@ export default function DeliveryBoysPage() {
           <h4 className="fw-bold mb-1">👥 Delivery Boys</h4>
           <p className="text-muted small">Manage your delivery team and assign orders</p>
         </div>
-        <button className="btn btn-dark rounded-pill px-4" onClick={() => refetch()}>
+        <button className="btn btn-dark rounded-pill px-4" onClick={() => refetchBoys()}>
           <i className="bi bi-arrow-clockwise me-2"></i>Refresh
         </button>
       </div>
@@ -210,83 +287,96 @@ export default function DeliveryBoysPage() {
         </div>
       ) : (
         <div className="row g-4">
-          {filteredBoys.map((boy) => (
-            // ✅ Unique key
-            <div key={boy.id || boy._id} className="col-12 col-md-6 col-lg-4">
-              <div className="boy-card bg-white rounded-3 p-3 shadow-sm h-100 d-flex flex-column">
-                {/* Avatar – with Bootstrap icon fallback (no 404) */}
-                <div className="d-flex align-items-start gap-3">
-                  <div className="boy-avatar position-relative">
-                    {boy.avatar ? (
-                      <img
-                        src={boy.avatar}
-                        alt={boy.name}
-                        className="rounded-circle border"
-                        style={{ width: "64px", height: "64px", objectFit: "cover" }}
-                        onError={(e) => (e.target.style.display = "none")}
-                      />
-                    ) : (
-                      <div
-                        className="rounded-circle border d-flex align-items-center justify-content-center bg-light"
-                        style={{ width: "64px", height: "64px" }}
-                      >
-                        <i className="bi bi-person fs-2 text-secondary"></i>
-                      </div>
-                    )}
-                    <span
-                      className={`status-dot position-absolute bottom-0 end-0 p-1 rounded-circle border border-white ${
-                        boy.status === "active" ? "bg-success" : "bg-secondary"
-                      }`}
-                      style={{ width: "14px", height: "14px" }}
-                    ></span>
+          {filteredBoys.map((boy) => {
+            const assignedOrders = getAssignedOrdersForBoy(boy.id || boy._id);
+            return (
+              <div key={boy.id || boy._id} className="col-12 col-md-6 col-lg-4">
+                <div className="boy-card bg-white rounded-3 p-3 shadow-sm h-100 d-flex flex-column">
+                  {/* Avatar & Info */}
+                  <div className="d-flex align-items-start gap-3">
+                    <div className="boy-avatar position-relative">
+                      {boy.avatar ? (
+                        <img
+                          src={boy.avatar}
+                          alt={boy.name}
+                          className="rounded-circle border"
+                          style={{ width: "64px", height: "64px", objectFit: "cover" }}
+                          onError={(e) => (e.target.style.display = "none")}
+                        />
+                      ) : (
+                        <div
+                          className="rounded-circle border d-flex align-items-center justify-content-center bg-light"
+                          style={{ width: "64px", height: "64px" }}
+                        >
+                          <i className="bi bi-person fs-2 text-secondary"></i>
+                        </div>
+                      )}
+                      <span
+                        className={`status-dot position-absolute bottom-0 end-0 p-1 rounded-circle border border-white ${
+                          boy.status === "active" ? "bg-success" : "bg-secondary"
+                        }`}
+                        style={{ width: "14px", height: "14px" }}
+                      ></span>
+                    </div>
+                    <div className="flex-grow-1">
+                      <h6 className="fw-bold mb-0">{boy.name}</h6>
+                      <p className="small text-muted mb-0">
+                        <i className="bi bi-phone me-1"></i>{boy.phone}
+                      </p>
+                      <p className="small text-muted mb-0">
+                        <i className="bi bi-envelope me-1"></i>{boy.email || "N/A"}
+                      </p>
+                    </div>
+                    <span className={`badge ${boy.status === "active" ? "bg-success" : "bg-secondary"}`}>
+                      {boy.status || "offline"}
+                    </span>
                   </div>
-                  <div className="flex-grow-1">
-                    <h6 className="fw-bold mb-0">{boy.name}</h6>
-                    <p className="small text-muted mb-0">
-                      <i className="bi bi-phone me-1"></i>{boy.phone}
-                    </p>
-                    <p className="small text-muted mb-0">
-                      <i className="bi bi-envelope me-1"></i>{boy.email || "N/A"}
-                    </p>
-                  </div>
-                  <span className={`badge ${boy.status === "active" ? "bg-success" : "bg-secondary"}`}>
-                    {boy.status || "offline"}
-                  </span>
-                </div>
 
-                {/* Stats */}
-                <div className="d-flex justify-content-between mt-3 pt-3 border-top">
-                  <div>
-                    <small className="text-muted">Deliveries</small>
-                    <p className="fw-bold mb-0">{boy.totalDeliveries || 0}</p>
+                  {/* Stats */}
+                  <div className="d-flex justify-content-between mt-3 pt-3 border-top">
+                    <div>
+                      <small className="text-muted">Deliveries</small>
+                      <p className="fw-bold mb-0">{boy.totalDeliveries || 0}</p>
+                    </div>
+                    <div>
+                      <small className="text-muted">Rating</small>
+                      <p className="fw-bold mb-0">
+                        <i className="bi bi-star-fill text-warning me-1"></i>
+                        {boy.rating || 0}
+                      </p>
+                    </div>
+                    <div>
+                      <small className="text-muted">Joined</small>
+                      <p className="fw-bold mb-0 small">
+                        {boy.joinedDate
+                          ? new Date(boy.joinedDate).toLocaleDateString()
+                          : "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <small className="text-muted">Assigned</small>
+                      <p className="fw-bold mb-0 small">{assignedOrders.length}</p>
+                    </div>
                   </div>
-                  <div>
-                    <small className="text-muted">Rating</small>
-                    <p className="fw-bold mb-0">
-                      <i className="bi bi-star-fill text-warning me-1"></i>
-                      {boy.rating || 0}
-                    </p>
-                  </div>
-                  <div>
-                    <small className="text-muted">Joined</small>
-                    <p className="fw-bold mb-0 small">
-                      {boy.joinedDate
-                        ? new Date(boy.joinedDate).toLocaleDateString()
-                        : "N/A"}
-                    </p>
-                  </div>
-                </div>
 
-                {/* Assign Button */}
-                <button
-                  className="btn btn-primary rounded-pill mt-3 w-100"
-                  onClick={() => handleAssignClick(boy)}
-                >
-                  <i className="bi bi-check2-square me-2"></i>Assign Orders
-                </button>
+                  {/* Buttons */}
+                  <button
+                    className="btn btn-primary rounded-pill mt-2 w-100"
+                    onClick={() => handleAssignClick(boy)}
+                  >
+                    <i className="bi bi-check2-square me-2"></i>Assign Orders
+                  </button>
+                  <button
+                    className="btn btn-outline-secondary rounded-pill mt-1 w-100"
+                    onClick={() => handleViewAssigned(boy)}
+                    disabled={assignedOrders.length === 0}
+                  >
+                    <i className="bi bi-eye me-2"></i>View Assigned ({assignedOrders.length})
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -316,34 +406,39 @@ export default function DeliveryBoysPage() {
                 <p className="text-muted small">
                   Select orders to assign to this delivery boy:
                 </p>
-                {pendingOrders.length === 0 ? (
-                  <p className="text-center text-muted py-3">No pending orders</p>
+                {assignableOrders.length === 0 ? (
+                  <p className="text-center text-muted py-3">No orders ready for assignment</p>
                 ) : (
                   <div className="list-group">
-                    {pendingOrders.map((order) => (
-                      <label
-                        key={order.id}
-                        className={`list-group-item list-group-item-action d-flex align-items-center gap-3 ${
-                          selectedOrders.includes(order.id) ? "active" : ""
-                        }`}
-                        style={{ cursor: "pointer" }}
-                      >
-                        <input
-                          type="checkbox"
-                          className="form-check-input"
-                          checked={selectedOrders.includes(order.id)}
-                          onChange={() => handleOrderToggle(order.id)}
-                          style={{ transform: "scale(1.2)" }}
-                        />
-                        <div className="flex-grow-1">
-                          <strong>{order.id}</strong> – {order.customer}
-                          <br />
-                          <small className="text-muted">
-                            {order.items} items · {order.amount}
-                          </small>
-                        </div>
-                      </label>
-                    ))}
+                    {assignableOrders.map(({ order, item }) => {
+                      const isChecked = selectedOrders.some(
+                        o => o.orderId === order._id && o.itemId === item._id
+                      );
+                      return (
+                        <label
+                          key={`${order._id}-${item._id}`}
+                          className={`list-group-item list-group-item-action d-flex align-items-center gap-3 ${
+                            isChecked ? "active" : ""
+                          }`}
+                          style={{ cursor: "pointer" }}
+                        >
+                          <input
+                            type="checkbox"
+                            className="form-check-input"
+                            checked={isChecked}
+                            onChange={() => handleOrderToggle(order._id, item._id)}
+                            style={{ transform: "scale(1.2)" }}
+                          />
+                          <div className="flex-grow-1">
+                            <strong>#{order._id.slice(-8)}</strong> – {item.productName}
+                            <br />
+                            <small className="text-muted">
+                              {item.storeName} · Qty: {item.quantity} · ₹{(item.mrp || 0) * item.quantity}
+                            </small>
+                          </div>
+                        </label>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -367,6 +462,81 @@ export default function DeliveryBoysPage() {
                   ) : (
                     `Assign ${selectedOrders.length} Order(s)`
                   )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Assigned Orders Modal */}
+      {assignedModalOpen && viewingBoy && (
+        <div
+          className="modal fade show d-block"
+          style={{ background: "rgba(0,0,0,0.5)" }}
+          onClick={() => setAssignedModalOpen(false)}
+        >
+          <div
+            className="modal-dialog modal-dialog-centered modal-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-content rounded-4 shadow-lg">
+              <div className="modal-header border-0">
+                <h5 className="modal-title fw-bold">
+                  Orders assigned to {viewingBoy.name}
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setAssignedModalOpen(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                {(() => {
+                  const assignedItems = getAssignedOrdersForBoy(viewingBoy.id || viewingBoy._id);
+                  if (assignedItems.length === 0) {
+                    return <p className="text-center text-muted py-3">No orders assigned</p>;
+                  }
+                  return (
+                    <div className="table-responsive">
+                      <table className="table table-bordered table-hover align-middle">
+                        <thead className="table-light">
+                          <tr>
+                            <th>Order ID</th>
+                            <th>Product</th>
+                            <th>Store</th>
+                            <th>Qty</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {assignedItems.map(({ order, item }) => (
+                            <tr key={`${order._id}-${item._id}`}>
+                              <td>#{order._id.slice(-8)}</td>
+                              <td>{item.productName}</td>
+                              <td>{item.storeName}</td>
+                              <td>{item.quantity}</td>
+                              <td>₹{(item.mrp || 0) * item.quantity}</td>
+                              <td>
+                                <span className="badge bg-info text-white">
+                                  {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
+              </div>
+              <div className="modal-footer border-0">
+                <button
+                  className="btn btn-outline-secondary rounded-pill px-4"
+                  onClick={() => setAssignedModalOpen(false)}
+                >
+                  Close
                 </button>
               </div>
             </div>

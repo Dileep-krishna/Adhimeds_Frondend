@@ -34,6 +34,12 @@ export const createStoreAPI = async (storeData) => {
     options.headers = { "Content-Type": "application/json" };
     options.body = JSON.stringify(storeData);
   }
+  if (storeData instanceof FormData) {
+  console.log('📦 FormData entries being sent to backend:');
+  for (let pair of storeData.entries()) {
+    console.log(`  ${pair[0]}: ${pair[1]}`);
+  }
+}
   // If it's FormData, browser sets correct multipart boundary automatically – do NOT set Content-Type header.
 
   const res = await fetch(url, options);
@@ -61,6 +67,12 @@ export const getStoreByIdAPI = async (id) => {
 // ✅ UPDATE STORE – supports both JSON and FormData
 export const updateStoreAPI = async (id, storeData) => {
   const url = `${SERVERURL}/store/${id}`;
+  if (storeData instanceof FormData) {
+  console.log('📦 FormData entries being sent to backend:');
+  for (let pair of storeData.entries()) {
+    console.log(`  ${pair[0]}: ${pair[1]}`);
+  }
+}
   console.log(`✏️ PUT ${url}`, storeData instanceof FormData ? 'FormData with files' : storeData);
 
   const isFormData = storeData instanceof FormData;

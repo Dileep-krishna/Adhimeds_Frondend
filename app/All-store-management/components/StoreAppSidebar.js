@@ -11,15 +11,25 @@ export default function StoreAppSidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const currentTab = searchParams.get("tab") || "Requests"; // default
+  const currentTab = searchParams.get("tab") || "Requests";
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [productsOpen, setProductsOpen] = useState(false);
   const [productsExpandOpen, setProductsExpandOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
+  const [storeName, setStoreName] = useState("STORE HUB"); // ✅ dynamic store name
 
-  // Auto‑open products submenu when on product routes
+  // Read store name from storage on mount
+  useEffect(() => {
+    const name =
+      localStorage.getItem("storeName") ||
+      sessionStorage.getItem("storeName") ||
+      "STORE HUB";
+    setStoreName(name);
+  }, []);
+
+  // Auto‑open products submenu
   useEffect(() => {
     if (
       pathname.startsWith("/All-store-management/All-Products") ||
@@ -30,12 +40,12 @@ export default function StoreAppSidebar() {
     }
   }, [pathname]);
 
-  // Auto‑open orders dropdown when on orders pages
+  // Auto‑open orders dropdown
   useEffect(() => {
     if (
       pathname.startsWith("/All-store-management/Orders") ||
       pathname.startsWith("/All-store-management/All-Orders") ||
-      pathname.startsWith("/All-store-management/Order-Requests")  // ← new route
+      pathname.startsWith("/All-store-management/Order-Requests")
     ) {
       setOrdersOpen(true);
     }
@@ -64,21 +74,11 @@ export default function StoreAppSidebar() {
     window.location.href = "/login";
   };
 
-  // ✅ Order tabs – "Requests" points to the new dedicated page
   const orderTabs = [
     { label: "All Orders", href: "/All-store-management/All-Orders" },
     { label: "Requests", href: "/All-store-management/Order-Requests" },
-    // Other tabs are commented out – uncomment if needed
-    // { label: "Accepted Requests", href: "/All-store-management/Orders?tab=Accepted%20Requests" },
-    // { label: "Prepayment Requests", href: "/All-store-management/Orders?tab=Prepayment%20Requests" },
-    // { label: "Confirmed Prepayments", href: "/All-store-management/Orders?tab=Confirmed%20Prepayments" },
-    // { label: "Final Preorders", href: "/All-store-management/Orders?tab=Final%20Preorders" },
-    // { label: "In Shipping", href: "/All-store-management/Orders?tab=In%20Shipping" },
-    // { label: "Delivered", href: "/All-store-management/Orders?tab=Delivered" },
-    // { label: "Refund", href: "/All-store-management/Orders?tab=Refund" },
   ];
 
-  // ✅ Active tab detection – handles both dedicated pages and query‑param tabs
   const isTabActive = (tab) => {
     if (tab.label === "All Orders") {
       return pathname === "/All-store-management/All-Orders";
@@ -86,11 +86,9 @@ export default function StoreAppSidebar() {
     if (tab.label === "Requests") {
       return pathname === "/All-store-management/Order-Requests";
     }
-    // For other tabs (if uncommented), check query param
     return currentTab === tab.label;
   };
 
-  // Animations (reuse same as products)
   const dropdownVariants = {
     hidden: { height: 0, opacity: 0, transition: { duration: 0.2, ease: "easeInOut" } },
     visible: { height: "auto", opacity: 1, transition: { duration: 0.2, ease: "easeOut" } },
@@ -98,7 +96,6 @@ export default function StoreAppSidebar() {
 
   return (
     <>
-      {/* Mobile menu button */}
       <button className="store-mobile-menu-btn" onClick={toggleSidebar}>
         <i className={`bi ${sidebarOpen ? "bi-x-lg" : "bi-list"}`}></i>
       </button>
@@ -108,7 +105,7 @@ export default function StoreAppSidebar() {
           <div className="store-logo-circle">
             <img src="/images/logo.webp" alt="Logo" className="store-logo-img" />
           </div>
-          <h2 className="store-logo-text">STORE HUB</h2>
+          <h2 className="store-logo-text">{storeName}</h2> {/* ✅ dynamic store name */}
         </div>
 
         <nav className="store-sidebar-nav">
@@ -122,7 +119,7 @@ export default function StoreAppSidebar() {
             <span>Dashboard</span>
           </Link>
 
-          {/* Products Dropdown (unchanged) */}
+          {/* Products Dropdown */}
           <div className="store-dropdown-parent">
             <div className="store-dropdown-header-wrapper">
               <button className="store-dropdown-main-link" onClick={toggleProducts}>
@@ -186,7 +183,7 @@ export default function StoreAppSidebar() {
             </AnimatePresence>
           </div>
 
-          {/* ======== Orders Dropdown ======== */}
+          {/* Orders Dropdown */}
           <div className="store-dropdown-parent">
             <div className="store-dropdown-header-wrapper">
               <button
@@ -200,7 +197,7 @@ export default function StoreAppSidebar() {
               <div style={{ display: "flex", alignItems: "center" }}>
                 <OrderNotificationBell
                   onClick={() => {
-                    router.push("/All-store-management/Order-Requests"); // ← updated: goes to Requests page
+                    router.push("/All-store-management/Order-Requests");
                   }}
                   style={{ marginRight: "4px" }}
                 />
@@ -234,7 +231,6 @@ export default function StoreAppSidebar() {
               )}
             </AnimatePresence>
           </div>
-          {/* ============================================== */}
         </nav>
 
         {/* Logout Button */}

@@ -13,7 +13,6 @@ const defaultCenter = { lat: 9.9312, lng: 76.2673 };
 const mapOptions = { disableDefaultUI: false, zoomControl: true };
 const libraries = ['places'];
 
-// Helper: convert relative image path to absolute backend URL
 const getImageUrl = (path) => {
   if (!path) return null;
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
@@ -21,7 +20,6 @@ const getImageUrl = (path) => {
   return `${SERVERURL}${normalized}`;
 };
 
-// Skeleton loader component
 const SkeletonLoader = () => (
   <div className="medical-stores-container">
     <div className="stores-hero">
@@ -33,7 +31,7 @@ const SkeletonLoader = () => (
     </div>
     <div className="store-form-card">
       <div className="form-section">
-        {Array(12).fill().map((_, i) => (
+        {Array(13).fill().map((_, i) => (
           <div key={i} className="form-group">
             <div className="skeleton-label" style={{ width: '120px', height: '16px', marginBottom: '8px' }} />
             <div className="skeleton-input" style={{ width: '100%', height: '40px', borderRadius: '8px' }} />
@@ -73,8 +71,27 @@ export default function EditStorePage() {
   const [thumbnailFiles, setThumbnailFiles] = useState([]);
   const [existingThumbnails, setExistingThumbnails] = useState([]);
   const [thumbnailPreviews, setThumbnailPreviews] = useState([]);
+  const [shopsList, setShopsList] = useState([]);
 
-  // Cleanup previews on unmount
+  // Fetch shops for validation
+  useEffect(() => {
+    const fetchShops = async () => {
+      try {
+        const res = await fetch('/api/medisoft/shops');
+        if (res.ok) {
+          const data = await res.json();
+          setShopsList(Array.isArray(data) ? data : []);
+          console.log('✅ Medisoft shops loaded for validation:', data.length);
+        } else {
+          console.warn('Could not fetch shops');
+        }
+      } catch (error) {
+        console.warn('Error fetching shops:', error);
+      }
+    };
+    fetchShops();
+  }, []);
+
   useEffect(() => {
     return () => {
       thumbnailPreviews.forEach(url => URL.revokeObjectURL(url));
@@ -82,12 +99,17 @@ export default function EditStorePage() {
   }, [thumbnailPreviews]);
 
   const fetchStore = useCallback(async () => {
+    console.log('📥 Fetching store with ID:', id);
     try {
       const response = await getStoreByIdAPI(id);
+      console.log('📥 API response from getStoreById:', response);
       if (response.success) {
         const store = response.data;
+        console.log('📥 Store data loaded:', store);
+        console.log('📥 shopid field in response:', store.shopid || '⚠️ NOT PRESENT');
         setFormData({
           storeName: store.storeName || '',
+          shopid: store.shopid || '',
           searchLocation: store.searchLocation || '',
           address: store.address || '',
           latitude: store.latitude,
@@ -109,6 +131,7 @@ export default function EditStorePage() {
         router.push('/super-admin/store-management');
       }
     } catch (error) {
+      console.error('❌ Error loading store:', error);
       toast.error('Error loading store');
     } finally {
       setLoading(false);
@@ -171,28 +194,45 @@ export default function EditStorePage() {
     const files = Array.from(e.target.files);
     setThumbnailFiles(files);
     const previews = files.map(file => URL.createObjectURL(file));
-    // Cleanup old previews
     thumbnailPreviews.forEach(url => URL.revokeObjectURL(url));
     setThumbnailPreviews(previews);
   }, [thumbnailPreviews]);
 
-  const updateStore = useCallback(async () => {
+  // ✅ Validation with shopid check – using toast.error instead of warning
+  const validateForm = useCallback(() => {
     if (!formData.storeName.trim()) {
       toast.error('Store name required');
-      return;
+      return false;
     }
     if (formData.latitude < -90 || formData.latitude > 90 || formData.longitude < -180 || formData.longitude > 180) {
       toast.error('Invalid coordinates');
-      return;
+      return false;
     }
+    if (formData.shopid && formData.shopid.trim() !== '') {
+      const exists = shopsList.some(shop => shop.shopid === formData.shopid.trim());
+      if (!exists) {
+        // 🔧 FIX: use toast.error (not toast.warning)
+        toast.error('Shop ID does not match any known store. You can still save, but verify the ID.');
+      }
+    }
+    return true;
+  }, [formData, shopsList]);
+
+  const updateStore = useCallback(async () => {
+    if (!validateForm()) return;
+
+    console.log('🔄 Update store triggered for ID:', id);
+    console.log('📤 Current formData:', formData);
+    console.log('📤 shopid value being sent:', formData.shopid || '(empty)');
 
     setSaving(true);
     try {
       const payload = new FormData();
       payload.append('storeName', formData.storeName);
+      payload.append('shopid', formData.shopid || '');
       payload.append('latitude', formData.latitude);
       payload.append('longitude', formData.longitude);
-      
+
       if (formData.searchLocation) payload.append('searchLocation', formData.searchLocation);
       if (formData.address) payload.append('address', formData.address);
       if (formData.status) payload.append('status', formData.status);
@@ -203,17 +243,26 @@ export default function EditStorePage() {
       if (formData.gstNumber) payload.append('gstNumber', formData.gstNumber);
       if (formData.contactNumber) payload.append('contactNumber', formData.contactNumber);
       if (formData.pharmacistName) payload.append('pharmacistName', formData.pharmacistName);
-      
+
       const passwordInput = document.querySelector('input[name="password"]');
       if (passwordInput && passwordInput.value.trim()) {
         payload.append('password', passwordInput.value.trim());
       }
-      
+
       thumbnailFiles.forEach(file => {
         payload.append('thumbnailImages', file);
       });
 
+      // Log all FormData entries
+      console.log('📦 FormData entries being sent:');
+      for (let pair of payload.entries()) {
+        console.log(`  ${pair[0]}: ${pair[1]}`);
+      }
+
       const response = await updateStoreAPI(id, payload);
+      console.log('📥 Update API response:', response);
+      console.log('📥 shopid in response:', response.data?.shopid || '⚠️ NOT PRESENT');
+
       if (response.success) {
         toast.success('Store updated successfully');
         router.push('/super-admin/store-managment');
@@ -221,14 +270,13 @@ export default function EditStorePage() {
         toast.error(response.message || 'Update failed');
       }
     } catch (error) {
-      console.error(error);
+      console.error('❌ Update error:', error);
       toast.error('Server error while updating store');
     } finally {
       setSaving(false);
     }
-  }, [formData, thumbnailFiles, id, router]);
+  }, [formData, thumbnailFiles, id, router, validateForm]);
 
-  // Memoize existing thumbnails display
   const existingThumbnailsDisplay = useMemo(() => {
     if (existingThumbnails.length === 0) return null;
     return (
@@ -272,6 +320,7 @@ export default function EditStorePage() {
 
         <div className="store-form-card">
           <div className="form-section">
+            {/* Store Name */}
             <div className="form-group">
               <label>Store Name *</label>
               <input
@@ -281,6 +330,19 @@ export default function EditStorePage() {
               />
             </div>
 
+            {/* Medisoft Shop ID (optional) */}
+            <div className="form-group">
+              <label>Medisoft Shop ID (optional)</label>
+              <input
+                type="text"
+                value={formData.shopid}
+                onChange={(e) => setFormData({ ...formData, shopid: e.target.value })}
+                placeholder="e.g., 30, 3743, 3783, 3752"
+              />
+              <small className="text-muted">If provided, it will be validated against existing shops.</small>
+            </div>
+
+            {/* Search Location */}
             <div className="form-group">
               <label>Search location (optional)</label>
               <Autocomplete onLoad={onLoadAutocomplete} onPlaceChanged={onPlaceChanged}>
@@ -295,6 +357,7 @@ export default function EditStorePage() {
               </Autocomplete>
             </div>
 
+            {/* Map */}
             <div className="form-group">
               <label>Exact Location *</label>
               <GoogleMap
@@ -313,6 +376,7 @@ export default function EditStorePage() {
               </GoogleMap>
             </div>
 
+            {/* Lat/Lng */}
             <div className="latlng-inputs">
               <div className="lat-input">
                 <label>Latitude *</label>
@@ -334,6 +398,7 @@ export default function EditStorePage() {
               </div>
             </div>
 
+            {/* Address */}
             <div className="form-group">
               <label>Address (optional)</label>
               <input
@@ -343,6 +408,7 @@ export default function EditStorePage() {
               />
             </div>
 
+            {/* Vendor Category */}
             <div className="form-group">
               <label>Vendor Category (optional)</label>
               <select
@@ -356,6 +422,7 @@ export default function EditStorePage() {
               </select>
             </div>
 
+            {/* Pincode */}
             <div className="form-group">
               <label>Pincode (optional)</label>
               <input
@@ -366,6 +433,7 @@ export default function EditStorePage() {
               />
             </div>
 
+            {/* Email */}
             <div className="form-group">
               <label>Email Address (optional)</label>
               <input
@@ -375,6 +443,7 @@ export default function EditStorePage() {
               />
             </div>
 
+            {/* Password */}
             <div className="form-group">
               <label>Password (leave blank to keep current)</label>
               <input
@@ -384,6 +453,7 @@ export default function EditStorePage() {
               />
             </div>
 
+            {/* Drug License */}
             <div className="form-group">
               <label>Drug License Number (optional)</label>
               <input
@@ -393,6 +463,7 @@ export default function EditStorePage() {
               />
             </div>
 
+            {/* GST */}
             <div className="form-group">
               <label>GST Number (optional)</label>
               <input
@@ -402,6 +473,7 @@ export default function EditStorePage() {
               />
             </div>
 
+            {/* Contact */}
             <div className="form-group">
               <label>Contact Number (optional, 10 digits)</label>
               <input
@@ -412,6 +484,7 @@ export default function EditStorePage() {
               />
             </div>
 
+            {/* Pharmacist */}
             <div className="form-group">
               <label>Pharmacist Name (optional)</label>
               <input
@@ -421,6 +494,7 @@ export default function EditStorePage() {
               />
             </div>
 
+            {/* Thumbnails */}
             <div className="form-group">
               <label>Thumbnail Images</label>
               {existingThumbnailsDisplay}
@@ -440,6 +514,7 @@ export default function EditStorePage() {
               <small className="text-muted">Upload new images to replace all existing thumbnails.</small>
             </div>
 
+            {/* Status */}
             <div className="form-group">
               <label>Status (optional)</label>
               <select

@@ -39,13 +39,20 @@ export const getOrderById = async (orderId) => {
   return handleResponse(res, `GET /orders/${orderId}`);
 };
 
-export const updateItemStatus = async (orderId, itemId, status) => {
+// ✅ UPDATED: Accepts assignedTo and sends it in the body
+export const updateItemStatus = async (orderId, itemId, status, assignedTo) => {
   const url = `${SERVERURL}/orders/${orderId}/items/${itemId}`;
   console.log(`📡 PUT ${url}`);
+  
+  const body = { status };
+  if (assignedTo !== undefined) {
+    body.assignedTo = assignedTo;
+  }
+  
   const res = await fetch(url, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(body),
   });
   return handleResponse(res, `PUT /orders/${orderId}/items/${itemId}`);
 };

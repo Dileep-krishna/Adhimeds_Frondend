@@ -1,0 +1,135 @@
+/* all-orders.css */
+
+/* ---------- Card & Header ---------- */
+.card {
+  border-radius: 18px !important;
+  overflow: hidden !important;
+}
+.card-header {
+  background: #ffffff !important;
+}
+
+/* ---------- Filter Bar ---------- */
+.filter-bar {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+.filter-bar > * {
+  flex: 0 0 auto !important;
+  display: inline-block !important;
+}
+.filter-bar .form-control,
+.filter-bar .form-select {
+  width: auto !important;
+  min-width: 140px !important;
+  border-radius: 10px !important;
+  border-color: #e0e0e0 !important;
+  font-size: 14px !important;
+}
+.filter-bar .form-control:focus,
+.filter-bar .form-select:focus {
+  border-color: #0d6efd !important;
+  box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15) !important;
+}
+.filter-bar .btn {
+  white-space: nowrap !important;
+}
+
+/* ---------- Table ---------- */
+.order-table-wrapper {
+  display: block !important;
+  width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+.order-table-wrapper table {
+  display: table !important;
+  width: 100% !important;
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+}
+.order-table-wrapper thead {
+  display: table-header-group !important;
+}
+.order-table-wrapper tbody {
+  display: table-row-group !important;
+}
+.order-table-wrapper tr {
+  display: table-row !important;
+}
+.order-table-wrapper th,
+.order-table-wrapper td {
+  display: table-cell !important;
+  padding: 16px 18px !important;
+  vertical-align: middle !important;
+  border-bottom: 1px solid #f2f2f2 !important;
+  text-align: left !important;
+  font-size: 14px !important;
+  color: #212529 !important;
+}
+.order-table-wrapper th {
+  background: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #555 !important;
+  border-bottom: 1px solid #ececec !important;
+  white-space: nowrap !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2 !important;
+}
+.order-table-wrapper tbody tr:hover {
+  background: #fafcff !important;
+}
+
+/* ---- Order Code & Date styling ---- */
+.order-code {
+  font-weight: 600 !important;
+  font-family: 'SF Mono', 'Menlo', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace !important;
+  font-size: 14px !important;
+  letter-spacing: 0.2px !important;
+  color: #0a2b4e !important;
+}
+.order-date {
+  font-size: 12px !important;
+  color: #6c757d !important;
+  display: block !important;
+  margin-top: 2px !important;
+}
+
+/* ---------- Action Buttons ---------- */
+.order-table-wrapper .btn.rounded-circle {
+  width: 40px !important;
+  height: 40px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: none !important;
+  background: #f8f9fa !important;
+}
+.order-table-wrapper .btn.rounded-circle:hover {
+  background: #e9ecef !important;
+}
+
+/* ---------- Badges ---------- */
+.badge {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 768px) {
+  .order-table-wrapper th,
+  .order-table-wrapper td {
+    padding: 12px 14px !important;
+    font-size: 13px !important;
+  }
+  .order-code {
+    font-size: 13px !important;
+  }
+  .order-date {
+    font-size: 11px !important;
+  }
+}
