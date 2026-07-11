@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useCallback, memo } from "react";
-import { useNotifications } from "@/context/NotificationContext";
+
 import { useRouter } from "next/navigation";
 
 // Memoized item – no `startTransition` to avoid complexity
@@ -14,9 +14,8 @@ const NotificationItem = memo(({ notif, onMarkAsRead }) => {
 
   return (
     <div
-      className={`list-group-item list-group-item-action d-flex justify-content-between align-items-start ${
-        !notif.read ? "bg-light" : ""
-      }`}
+      className={`list-group-item list-group-item-action d-flex justify-content-between align-items-start ${!notif.read ? "bg-light" : ""
+        }`}
       onClick={handleClick}
       style={{ cursor: "pointer", transition: "background 0.1s ease" }}
     >
@@ -39,7 +38,7 @@ const NotificationItem = memo(({ notif, onMarkAsRead }) => {
 NotificationItem.displayName = "NotificationItem";
 
 export default function NotificationsPage() {
-  const { notifications, markAsRead, clearAll, unreadCount } = useNotifications();
+
   const router = useRouter();
 
   const notificationList = useMemo(() => notifications, [notifications]);

@@ -2,7 +2,6 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CartProvider } from '@/context/CartContext';
-import { NotificationProvider } from '@/context/NotificationContext';
 import { OrderNotificationProvider } from '@/context/OrderNotificationContext'; // ✅ added
 import { Toaster } from 'sonner';
 
