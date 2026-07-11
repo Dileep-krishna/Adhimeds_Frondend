@@ -32,7 +32,7 @@ export default function CategoriesPage() {
   const [iconPreview, setIconPreview] = useState(null);
   const [coverPreview, setCoverPreview] = useState(null);
 
-  const BASE_URL = `${SERVERURL}/category`;
+  const BASE_URL = `${SERVERURL}/api/category`;
 
   const getImageUrl = useCallback((filename) => {
     if (!filename) return null;

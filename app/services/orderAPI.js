@@ -1,108 +1,85 @@
+// services/orderService.js
 import SERVERURL from './serverURL';
 
-async function handleResponse(res, endpoint) {
-  console.log(`🌐 ${endpoint} - Response status: ${res.status}`);
+// Minimal JSON parser – throws if invalid
+async function handleResponse(res) {
   const text = await res.text();
-  console.log(`📄 ${endpoint} - Response body preview:`, text.substring(0, 300));
   try {
     return JSON.parse(text);
-  } catch (e) {
-    console.error(`❌ ${endpoint} - Failed to parse JSON. Raw response:`, text);
-    throw new Error('Server returned invalid JSON');
+  } catch {
+    throw new Error('Invalid JSON response');
   }
 }
 
 // ---------- ORDER API FUNCTIONS ----------
 
 export const placeOrder = async (items) => {
-  const url = `${SERVERURL}/orders`;
-  console.log(`📡 POST ${url}`);
-  const res = await fetch(url, {
+  const res = await fetch(`${SERVERURL}/api/orders`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ items }),
   });
-  return handleResponse(res, 'POST /orders');
+  return handleResponse(res);
 };
 
 export const getAllOrders = async () => {
-  const url = `${SERVERURL}/orders`;
-  console.log(`📡 GET ${url}`);
-  const res = await fetch(url);
-  return handleResponse(res, 'GET /orders');
+  const res = await fetch(`${SERVERURL}/api/orders`);
+  return handleResponse(res);
 };
 
 export const getOrderById = async (orderId) => {
-  const url = `${SERVERURL}/orders/${orderId}`;
-  console.log(`📡 GET ${url}`);
-  const res = await fetch(url);
-  return handleResponse(res, `GET /orders/${orderId}`);
+  const res = await fetch(`${SERVERURL}/api/orders/${orderId}`);
+  return handleResponse(res);
 };
 
-// ✅ UPDATED: Accepts assignedTo and sends it in the body
 export const updateItemStatus = async (orderId, itemId, status, assignedTo) => {
-  const url = `${SERVERURL}/orders/${orderId}/items/${itemId}`;
-  console.log(`📡 PUT ${url}`);
-  
   const body = { status };
   if (assignedTo !== undefined) {
     body.assignedTo = assignedTo;
   }
-  
-  const res = await fetch(url, {
+  const res = await fetch(`${SERVERURL}/api/orders/${orderId}/items/${itemId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  return handleResponse(res, `PUT /orders/${orderId}/items/${itemId}`);
+  return handleResponse(res);
 };
 
-// ✅ New: Delete a single item from an order
 export const deleteItem = async (orderId, itemId) => {
-  const url = `${SERVERURL}/orders/${orderId}/items/${itemId}`;
-  console.log(`📡 DELETE ${url}`);
-  const res = await fetch(url, { method: 'DELETE' });
-  return handleResponse(res, `DELETE /orders/${orderId}/items/${itemId}`);
+  const res = await fetch(`${SERVERURL}/api/orders/${orderId}/items/${itemId}`, {
+    method: 'DELETE',
+  });
+  return handleResponse(res);
 };
 
 // ---------- NOTIFICATION API FUNCTIONS ----------
 
-// Get all notifications
 export const getNotifications = async () => {
-  const url = `${SERVERURL}/notifications`;
-  console.log(`📡 GET ${url}`);
-  const res = await fetch(url);
-  return handleResponse(res, 'GET /notifications');
+  const res = await fetch(`${SERVERURL}/api/notifications`);
+  return handleResponse(res);
 };
 
-// Create a new notification
 export const createNotification = async (orderId, message) => {
-  const url = `${SERVERURL}/notifications`;
-  console.log(`📡 POST ${url}`);
-  const res = await fetch(url, {
+  const res = await fetch(`${SERVERURL}/api/notifications`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ orderId, message }),
   });
-  return handleResponse(res, 'POST /notifications');
+  return handleResponse(res);
 };
 
-// Mark a notification as read
 export const markNotificationRead = async (notificationId) => {
-  const url = `${SERVERURL}/notifications/${notificationId}`;
-  console.log(`📡 PUT ${url}`);
-  const res = await fetch(url, {
+  const res = await fetch(`${SERVERURL}/api/notifications/${notificationId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ read: true }),
   });
-  return handleResponse(res, `PUT /notifications/${notificationId}`);
+  return handleResponse(res);
 };
 
-// Clear all notifications
 export const clearAllNotifications = async () => {
-  const url = `${SERVERURL}/notifications`;
-  console.log(`📡 DELETE ${url}`);
-  const res = await fetch(url, { method: 'DELETE' });
-  return handleResponse(res, 'DELETE /notifications');
+  const res = await fetch(`${SERVERURL}/api/notifications`, {
+    method: 'DELETE',
+  });
+  return handleResponse(res);
 };

@@ -1,30 +1,19 @@
 // storeManagementAPI.js
 import SERVERURL from "./serverURL";
 
-console.log('🔧 SERVERURL loaded as:', SERVERURL);
-
-// Helper to log and handle responses
-async function handleResponse(res, endpoint) {
-  console.log(`📡 ${endpoint} - Response status:`, res.status);
-  console.log(`📡 ${endpoint} - Content-Type:`, res.headers.get('content-type'));
-
+// Helper to parse JSON response; throws raw text if not JSON
+async function handleResponse(res) {
   const text = await res.text();
-  console.log(`📄 ${endpoint} - Response body preview (first 300 chars):`, text.substring(0, 300));
-
   try {
     return JSON.parse(text);
-  } catch (e) {
-    console.error(`❌ ${endpoint} - Failed to parse JSON. Response is not valid JSON.`);
-    console.error(`   Full response:`, text);
-    throw new Error(`Server returned HTML instead of JSON. Check if backend route exists at ${SERVERURL}/store`);
+  } catch {
+    throw new Error(`Server returned non‑JSON: ${text.substring(0, 200)}`);
   }
 }
 
-// ✅ CREATE STORE – supports both JSON and FormData (for file uploads)
+// CREATE STORE – accepts FormData (for file uploads) or plain object
 export const createStoreAPI = async (storeData) => {
-  const url = `${SERVERURL}/store`;
-  console.log(`🚀 POST ${url}`, storeData instanceof FormData ? 'FormData with files' : storeData);
-
+  const url = `${SERVERURL}/api/store`;
   const isFormData = storeData instanceof FormData;
   const options = {
     method: "POST",
@@ -34,47 +23,29 @@ export const createStoreAPI = async (storeData) => {
     options.headers = { "Content-Type": "application/json" };
     options.body = JSON.stringify(storeData);
   }
-  if (storeData instanceof FormData) {
-  console.log('📦 FormData entries being sent to backend:');
-  for (let pair of storeData.entries()) {
-    console.log(`  ${pair[0]}: ${pair[1]}`);
-  }
-}
-  // If it's FormData, browser sets correct multipart boundary automatically – do NOT set Content-Type header.
-
   const res = await fetch(url, options);
-  return handleResponse(res, 'POST /store');
+  return handleResponse(res);
 };
 
-// ✅ GET ALL STORES (unchanged)
+// GET ALL STORES – optional query parameters
 export const getStoresAPI = async (queryParams = "") => {
-  const url = queryParams ? `${SERVERURL}/store?${queryParams}` : `${SERVERURL}/store`;
-  console.log(`🔍 GET ${url}`);
-  
+  const url = queryParams
+    ? `${SERVERURL}/api/store?${queryParams}`
+    : `${SERVERURL}/api/store`;
   const res = await fetch(url);
-  return handleResponse(res, 'GET /store');
+  return handleResponse(res);
 };
 
-// ✅ GET SINGLE STORE BY ID (unchanged)
+// GET SINGLE STORE BY ID
 export const getStoreByIdAPI = async (id) => {
-  const url = `${SERVERURL}/store/${id}`;
-  console.log(`🔍 GET ${url}`);
-  
+  const url = `${SERVERURL}/api/store/${id}`;
   const res = await fetch(url);
-  return handleResponse(res, `GET /store/${id}`);
+  return handleResponse(res);
 };
 
-// ✅ UPDATE STORE – supports both JSON and FormData
+// UPDATE STORE – accepts FormData or plain object
 export const updateStoreAPI = async (id, storeData) => {
-  const url = `${SERVERURL}/store/${id}`;
-  if (storeData instanceof FormData) {
-  console.log('📦 FormData entries being sent to backend:');
-  for (let pair of storeData.entries()) {
-    console.log(`  ${pair[0]}: ${pair[1]}`);
-  }
-}
-  console.log(`✏️ PUT ${url}`, storeData instanceof FormData ? 'FormData with files' : storeData);
-
+  const url = `${SERVERURL}/api/store/${id}`;
   const isFormData = storeData instanceof FormData;
   const options = {
     method: "PUT",
@@ -84,16 +55,13 @@ export const updateStoreAPI = async (id, storeData) => {
     options.headers = { "Content-Type": "application/json" };
     options.body = JSON.stringify(storeData);
   }
-
   const res = await fetch(url, options);
-  return handleResponse(res, `PUT /store/${id}`);
+  return handleResponse(res);
 };
 
-// ✅ DELETE STORE (unchanged)
+// DELETE STORE
 export const deleteStoreAPI = async (id) => {
-  const url = `${SERVERURL}/store/${id}`;
-  console.log(`🗑️ DELETE ${url}`);
-  
+  const url = `${SERVERURL}/api/store/${id}`;
   const res = await fetch(url, { method: "DELETE" });
-  return handleResponse(res, `DELETE /store/${id}`);
+  return handleResponse(res);
 };

@@ -27,7 +27,7 @@ export default function LoginPage() {
     console.log("   Password length:", password.length);
     
     // Use the backend login route (adjust URL if needed)
-  const backendUrl = `${SERVERURL}/login`;
+  const backendUrl = `${SERVERURL}/api/login`;
 console.log("🌐 Fetching URL:", backendUrl)
     
     try {

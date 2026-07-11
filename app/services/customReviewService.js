@@ -1,68 +1,54 @@
+// services/customReviewService.js
 import SERVERURL from "./serverURL";
 
-async function handleResponse(res, endpoint) {
+// Minimal JSON parser – throws if invalid
+async function handleResponse(res) {
   const text = await res.text();
-  console.log(`📡 ${endpoint} - Status: ${res.status}`);
-  console.log(`📄 ${endpoint} - Raw response:`, text.substring(0, 500));
-
-  if (!text || text.trim() === '') {
-    throw new Error(`Empty response from ${endpoint}`);
-  }
-
   try {
-    const json = JSON.parse(text);
-    if (!res.ok) {
-      throw new Error(json.message || `HTTP ${res.status}`);
-    }
-    return json;
-  } catch (e) {
-    console.error(`❌ Invalid JSON from ${endpoint}`, e.message);
-    throw new Error(`Server returned invalid response (not JSON). Check backend logs.`);
+    return JSON.parse(text);
+  } catch {
+    throw new Error('Invalid JSON response');
   }
 }
 
-// ------------------- CREATE -------------------
+// CREATE – supports FormData (with file uploads)
 export const createCustomReviewAPI = async (formData) => {
-  const url = `${SERVERURL}/custom-reviews`;
-  const res = await fetch(url, {
+  const res = await fetch(`${SERVERURL}/api/custom-reviews`, {
     method: 'POST',
     body: formData,
   });
-  return handleResponse(res, 'POST /custom-reviews');
+  return handleResponse(res);
 };
 
-// ------------------- GET ALL (with optional filters) -------------------
+// GET ALL – with optional filters (e.g., ?productId=...)
 export const getAllCustomReviewsAPI = async (filters = {}) => {
   const queryParams = new URLSearchParams(filters).toString();
-  const url = queryParams 
-    ? `${SERVERURL}/custom-reviews?${queryParams}`
-    : `${SERVERURL}/custom-reviews`;
+  const url = queryParams
+    ? `${SERVERURL}/api/custom-reviews?${queryParams}`
+    : `${SERVERURL}/api/custom-reviews`;
   const res = await fetch(url);
-  return handleResponse(res, 'GET /custom-reviews');
+  return handleResponse(res);
 };
 
-// ------------------- GET SINGLE -------------------
+// GET SINGLE BY ID
 export const getCustomReviewById = async (id) => {
-  const url = `${SERVERURL}/custom-reviews/${id}`;
-  const res = await fetch(url);
-  return handleResponse(res, `GET /custom-reviews/${id}`);
+  const res = await fetch(`${SERVERURL}/api/custom-reviews/${id}`);
+  return handleResponse(res);
 };
 
-// ------------------- UPDATE -------------------
+// UPDATE – supports FormData (with optional file)
 export const updateCustomReviewAPI = async (id, formData) => {
-  const url = `${SERVERURL}/custom-reviews/${id}`;
-  const res = await fetch(url, {
+  const res = await fetch(`${SERVERURL}/api/custom-reviews/${id}`, {
     method: 'PUT',
     body: formData,
   });
-  return handleResponse(res, `PUT /custom-reviews/${id}`);
+  return handleResponse(res);
 };
 
-// ------------------- DELETE -------------------
+// DELETE
 export const deleteCustomReviewAPI = async (id) => {
-  const url = `${SERVERURL}/custom-reviews/${id}`;
-  const res = await fetch(url, {
+  const res = await fetch(`${SERVERURL}/api/custom-reviews/${id}`, {
     method: 'DELETE',
   });
-  return handleResponse(res, `DELETE /custom-reviews/${id}`);
+  return handleResponse(res);
 };

@@ -15,8 +15,8 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body className={outfit.className}>
+    <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
+      <body className={outfit.className} suppressHydrationWarning>
         <SidebarProvider>
           <Providers>{children}</Providers>
         </SidebarProvider>

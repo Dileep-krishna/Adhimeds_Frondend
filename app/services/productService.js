@@ -1,190 +1,107 @@
 // services/productService.js
 import SERVERURL from "./serverURL";
 
-console.log('🔧 PRODUCT SERVICE - SERVERURL loaded as:', SERVERURL);
-
-// Helper function to handle fetch responses with full logging
-async function handleResponse(res, endpoint) {
-  console.log(`📡 ${endpoint} - Response status:`, res.status);
-  console.log(`📡 ${endpoint} - Content-Type:`, res.headers.get('content-type'));
-
+async function handleResponse(res) {
   const text = await res.text();
-  console.log(`📄 ${endpoint} - Response body preview (first 400 chars):`, text.substring(0, 400));
-
-  if (!text || text.trim() === '') {
-    console.error(`❌ ${endpoint} - Empty response body`);
-    throw new Error('Server returned empty response');
-  }
-
   try {
-    const json = JSON.parse(text);
-    console.log(`✅ ${endpoint} - Successfully parsed JSON`);
-    return json;
-  } catch (e) {
-    console.error(`❌ ${endpoint} - Failed to parse JSON. Error:`, e.message);
-    console.error(`   Raw response (first 500 chars):`, text.substring(0, 500));
-    throw new Error(`Server returned invalid JSON (maybe HTML error page). Check if backend route exists at ${SERVERURL}/products`);
+    return JSON.parse(text);
+  } catch {
+    throw new Error('Invalid JSON response');
   }
 }
 
-// ✅ CREATE PRODUCT – now works with both JSON and FormData
+// CREATE PRODUCT (supports JSON or FormData)
 export const createProductAPI = async (productData) => {
-  const url = `${SERVERURL}/products`;
   const isFormData = productData instanceof FormData;
-  console.log(`🚀 POST ${url}`);
-  if (isFormData) {
-    console.log('   Payload: FormData (cannot stringify)');
-  } else {
-    console.log('   Payload:', JSON.stringify(productData, null, 2));
+  const options = {
+    method: "POST",
+    body: isFormData ? productData : JSON.stringify(productData),
+  };
+  if (!isFormData) {
+    options.headers = { "Content-Type": "application/json" };
   }
-
-  try {
-    const headers = isFormData ? {} : { "Content-Type": "application/json" };
-    const body = isFormData ? productData : JSON.stringify(productData);
-    const res = await fetch(url, {
-      method: "POST",
-      headers,
-      body,
-    });
-    return await handleResponse(res, 'POST /products');
-  } catch (error) {
-    console.error(`❌ Network or fetch error in createProductAPI:`, error.message);
-    throw error;
-  }
+  const res = await fetch(`${SERVERURL}/api/products`, options);
+  return handleResponse(res);
 };
 
-// ✅ GET ALL PRODUCTS (with optional query params)
+// GET ALL PRODUCTS (with optional query params)
 export const getProductsAPI = async (queryParams = "") => {
-  const url = queryParams ? `${SERVERURL}/products?${queryParams}` : `${SERVERURL}/products`;
-  console.log(`🔍 GET ${url}`);
-
-  try {
-    const res = await fetch(url);
-    return await handleResponse(res, 'GET /products');
-  } catch (error) {
-    console.error(`❌ Network error in getProductsAPI:`, error.message);
-    throw error;
-  }
+  const url = queryParams
+    ? `${SERVERURL}/api/products?${queryParams}`
+    : `${SERVERURL}/api/products`;
+  const res = await fetch(url);
+  return handleResponse(res);
 };
 
-// ✅ GET SINGLE PRODUCT BY ID
+// GET SINGLE PRODUCT BY ID
 export const getProductByIdAPI = async (id) => {
-  if (!id) {
-    console.error('❌ getProductByIdAPI called with no ID');
-    throw new Error('Product ID is required');
-  }
-  const url = `${SERVERURL}/products/${id}`;
-  console.log(`🔍 GET ${url}`);
-
-  try {
-    const res = await fetch(url);
-    return await handleResponse(res, `GET /products/${id}`);
-  } catch (error) {
-    console.error(`❌ Network error in getProductByIdAPI:`, error.message);
-    throw error;
-  }
+  if (!id) throw new Error('Product ID is required');
+  const res = await fetch(`${SERVERURL}/api/products/${id}`);
+  return handleResponse(res);
 };
 
-// ✅ UPDATE PRODUCT – now works with both JSON and FormData
+// UPDATE PRODUCT (supports JSON or FormData)
 export const updateProductAPI = async (id, productData) => {
-  const url = `${SERVERURL}/products/${id}`;
+  if (!id) throw new Error('Product ID is required');
   const isFormData = productData instanceof FormData;
-  console.log(`🔄 PUT ${url}`);
-  if (isFormData) {
-    console.log('   Payload: FormData (cannot stringify)');
-  } else {
-    console.log('   Payload:', JSON.stringify(productData, null, 2));
-  }
-
-  const headers = isFormData ? {} : { "Content-Type": "application/json" };
-  const body = isFormData ? productData : JSON.stringify(productData);
-  const res = await fetch(url, {
+  const options = {
     method: "PUT",
-    headers,
-    body,
-  });
-  return handleResponse(res, `PUT /products/${id}`);
+    body: isFormData ? productData : JSON.stringify(productData),
+  };
+  if (!isFormData) {
+    options.headers = { "Content-Type": "application/json" };
+  }
+  const res = await fetch(`${SERVERURL}/api/products/${id}`, options);
+  return handleResponse(res);
 };
 
-// ✅ DELETE PRODUCT
+// DELETE PRODUCT
 export const deleteProductAPI = async (id) => {
-  if (!id) {
-    console.error('❌ deleteProductAPI called with no ID');
-    throw new Error('Product ID is required');
-  }
-  const url = `${SERVERURL}/products/${id}`;
-  console.log(`🗑️ DELETE ${url}`);
-
-  try {
-    const res = await fetch(url, { method: "DELETE" });
-    return await handleResponse(res, `DELETE /products/${id}`);
-  } catch (error) {
-    console.error(`❌ Network error in deleteProductAPI:`, error.message);
-    throw error;
-  }
+  if (!id) throw new Error('Product ID is required');
+  const res = await fetch(`${SERVERURL}/api/products/${id}`, {
+    method: "DELETE",
+  });
+  return handleResponse(res);
 };
 
-// ================= STORE PRODUCT OVERRIDE APIS (store users only) =================
-// These functions require a storeId and use the new /store/products/ endpoints.
-// They do not affect the master product collection.
-
-// ✅ GET product with store overrides merged (store user)
+// ================= STORE PRODUCT OVERRIDE APIS =================
+// GET product with store overrides merged
 export const getStoreProductAPI = async (productId, storeId) => {
   if (!productId) throw new Error('Product ID is required');
   if (!storeId) throw new Error('Store ID is required');
-  const url = `${SERVERURL}/store/products/${productId}?storeId=${storeId}`;
-  console.log(`🔍 GET (store) ${url}`);
-  try {
-    const res = await fetch(url);
-    return await handleResponse(res, `GET /store/products/${productId}`);
-  } catch (error) {
-    console.error(`❌ Network error in getStoreProductAPI:`, error.message);
-    throw error;
-  }
+  const res = await fetch(`${SERVERURL}/api/store/products/${productId}?storeId=${storeId}`);
+  return handleResponse(res);
 };
 
-// ✅ UPDATE store‑specific fields (only allowed fields) – store user
+// UPDATE store‑specific fields (store user)
 export const updateStoreProductAPI = async (productId, storeId, data) => {
   if (!productId) throw new Error('Product ID is required');
   if (!storeId) throw new Error('Store ID is required');
-  const url = `${SERVERURL}/store/products/${productId}?storeId=${storeId}`;
-  console.log(`🔄 PUT (store) ${url}`);
   const isFormData = data instanceof FormData;
-  const headers = isFormData ? {} : { "Content-Type": "application/json" };
-  const body = isFormData ? data : JSON.stringify(data);
-  try {
-    const res = await fetch(url, { method: 'PUT', headers, body });
-    return await handleResponse(res, `PUT /store/products/${productId}`);
-  } catch (error) {
-    console.error(`❌ Network error in updateStoreProductAPI:`, error.message);
-    throw error;
+  const options = {
+    method: "PUT",
+    body: isFormData ? data : JSON.stringify(data),
+  };
+  if (!isFormData) {
+    options.headers = { "Content-Type": "application/json" };
   }
+  const res = await fetch(`${SERVERURL}/api/store/products/${productId}?storeId=${storeId}`, options);
+  return handleResponse(res);
 };
 
-// ✅ DELETE store overrides – revert to master product (store user)
+// DELETE store overrides – revert to master product
 export const deleteStoreOverrideAPI = async (productId, storeId) => {
   if (!productId) throw new Error('Product ID is required');
   if (!storeId) throw new Error('Store ID is required');
-  const url = `${SERVERURL}/store/products/${productId}/override?storeId=${storeId}`;
-  console.log(`🗑️ DELETE (store) ${url}`);
-  try {
-    const res = await fetch(url, { method: 'DELETE' });
-    return await handleResponse(res, `DELETE /store/products/${productId}/override`);
-  } catch (error) {
-    console.error(`❌ Network error in deleteStoreOverrideAPI:`, error.message);
-    throw error;
-  }
+  const res = await fetch(`${SERVERURL}/api/store/products/${productId}/override?storeId=${storeId}`, {
+    method: "DELETE",
+  });
+  return handleResponse(res);
 };
-// ✅ GET all products for a store (merged with overrides)
+
+// GET all products for a store (merged with overrides)
 export const getAllStoreProductsAPI = async (storeId) => {
   if (!storeId) throw new Error('Store ID is required');
-  const url = `${SERVERURL}/store/products?storeId=${storeId}`;
-  console.log(`🔍 GET (store list) ${url}`);
-  try {
-    const res = await fetch(url);
-    return await handleResponse(res, 'GET /store/products');
-  } catch (error) {
-    console.error(`❌ Network error in getAllStoreProductsAPI:`, error.message);
-    throw error;
-  }
+  const res = await fetch(`${SERVERURL}/api/store/products?storeId=${storeId}`);
+  return handleResponse(res);
 };

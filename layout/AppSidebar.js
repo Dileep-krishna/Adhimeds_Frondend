@@ -5,22 +5,16 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import {
-  Sidebar,
-  Menu,
-  MenuItem,
-  SubMenu,
-  ProSidebarProvider,
-  useProSidebar,
-} from "react-pro-sidebar";
+import { Sidebar, Menu, MenuItem, SubMenu } from "react-pro-sidebar";
 import { useSidebar } from "../context/SidebarContext";
 import {
   GridIcon,
   CalenderIcon,
   UserCircleIcon,
 } from "../icons/index";
+import "./AppSidebar.css";
 
-// ---------- Navigation Data (unchanged) ----------
+// ---------- Navigation Data (full) ----------
 const productManagement = {
   name: "Product Management",
   icon: <i className="bi bi-box"></i>,
@@ -225,12 +219,12 @@ const navItems = [
 const SidebarContent = memo(() => {
   const pathname = usePathname();
   const { isExpanded, isMobileOpen, isHovered } = useSidebar();
-  const { collapseSidebar, collapsed } = useProSidebar();
 
+  const [collapsed, setCollapsed] = useState(false);
   const [expandedKeys, setExpandedKeys] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Detect mobile screen
+  // Detect mobile
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 992);
@@ -248,8 +242,8 @@ const SidebarContent = memo(() => {
   }, [isExpanded, isMobileOpen, isHovered, isMobile]);
 
   useEffect(() => {
-    collapseSidebar(shouldCollapse);
-  }, [shouldCollapse, collapseSidebar]);
+    setCollapsed(shouldCollapse);
+  }, [shouldCollapse]);
 
   const isActive = useCallback(
     (path) => {
@@ -278,7 +272,6 @@ const SidebarContent = memo(() => {
     });
   }, []);
 
-  // Recursive menu renderer (memoized)
   const renderMenuItems = useCallback(
     (items, parentKey = "") => {
       return items.map((item) => {
@@ -343,11 +336,9 @@ const SidebarContent = memo(() => {
     }
   }, [pathname, isActive]);
 
-  // Animation values
   const desktopWidth = collapsed ? "90px" : "280px";
   const mobileX = isMobileOpen ? 0 : "-100%";
 
-  // ----- White theme menuItemStyles -----
   const menuItemStyles = {
     button: ({ active, level }) => {
       const base = {
@@ -364,7 +355,6 @@ const SidebarContent = memo(() => {
           color: "#0f172a",
         },
       };
-      // Indent nested items
       if (level === 1) {
         return { ...base, paddingLeft: "36px" };
       }
@@ -382,6 +372,7 @@ const SidebarContent = memo(() => {
 
   return (
     <motion.div
+      className={`sidebar-wrapper ${isMobile ? "mobile" : ""}`}
       animate={{
         ...(isMobile
           ? { x: mobileX }
@@ -390,25 +381,6 @@ const SidebarContent = memo(() => {
       transition={{
         duration: 0.3,
         ease: "easeInOut",
-      }}
-      style={{
-        height: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        background: "#ffffff",
-        borderRight: "1px solid #e2e8f0",
-        overflow: "hidden",
-        willChange: "width, transform",
-        flexShrink: 0,
-        boxShadow: "2px 0 12px rgba(0,0,0,0.05)",
-        ...(isMobile && {
-          position: "fixed",
-          top: 0,
-          left: 0,
-          zIndex: 1050,
-          width: "280px",
-          transform: "translateX(-100%)",
-        }),
       }}
     >
       <Sidebar
@@ -424,38 +396,12 @@ const SidebarContent = memo(() => {
           background: "transparent",
         }}
         menuItemStyles={menuItemStyles}
+        collapsed={collapsed}
       >
-        {/* Logo Section with rounded avatar */}
-        <div
-          style={{
-            padding: "24px 20px 16px 20px",
-            marginBottom: "12px",
-            display: "flex",
-            alignItems: "center",
-            gap: "14px",
-            borderBottom: "1px solid #e2e8f0",
-          }}
-        >
-          <Link
-            href="/"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "14px",
-              textDecoration: "none",
-            }}
-          >
-            <div
-              style={{
-                width: "48px",
-                height: "48px",
-                borderRadius: "50%",
-                overflow: "hidden",
-                background: "#f1f5f9",
-                boxShadow: "0 0 0 2px #3b82f6",
-                flexShrink: 0,
-              }}
-            >
+        {/* Logo Section */}
+        <div className="sidebar-logo">
+          <Link href="/" className="sidebar-logo-link">
+            <div className="sidebar-logo-avatar">
               <Image
                 src="/images/logo.webp"
                 alt="Logo"
@@ -466,64 +412,23 @@ const SidebarContent = memo(() => {
               />
             </div>
             {(!collapsed || isMobile) && (
-              <span
-                style={{
-                  fontSize: "1.3rem",
-                  fontWeight: "700",
-                  color: "#0f172a",
-                  letterSpacing: "0.5px",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                ADHIMEDICINE
-              </span>
+              <span className="sidebar-logo-text">ADHIMEDICINE</span>
             )}
           </Link>
         </div>
 
         {/* Menu Area */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "4px 0" }}>
+        <div className="sidebar-menu-area">
           <Menu>{renderMenuItems(navItems)}</Menu>
         </div>
 
         {/* Logout Button */}
-        <div
-          style={{
-            padding: "16px 20px",
-            borderTop: "1px solid #e2e8f0",
-            marginTop: "auto",
-          }}
-        >
+        <div className="sidebar-logout">
           <button
             onClick={handleLogout}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "14px",
-              width: "100%",
-              padding: "12px 16px",
-              borderRadius: "12px",
-              border: "none",
-              background: "transparent",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-              color: "#ef4444",
-              fontWeight: "500",
-              fontSize: "0.95rem",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#fef2f2";
-              e.currentTarget.style.color = "#b91c1c";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = "#ef4444";
-            }}
+            className="sidebar-logout-btn"
           >
-            <i
-              className="bi bi-box-arrow-right"
-              style={{ fontSize: "1.25rem" }}
-            ></i>
+            <i className="bi bi-box-arrow-right sidebar-logout-icon"></i>
             {(!collapsed || isMobile) && <span>Logout</span>}
           </button>
         </div>
@@ -535,11 +440,7 @@ const SidebarContent = memo(() => {
 SidebarContent.displayName = "SidebarContent";
 
 const AppSidebar = () => {
-  return (
-    <ProSidebarProvider>
-      <SidebarContent />
-    </ProSidebarProvider>
-  );
+  return <SidebarContent />;
 };
 
 export default AppSidebar;

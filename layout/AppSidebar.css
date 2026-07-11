@@ -1,0 +1,91 @@
+/* layout/AppSidebar.css */
+
+.sidebar-wrapper {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+}
+
+.sidebar-wrapper.mobile {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1050;
+  width: 280px;
+}
+
+.sidebar-logo {
+  padding: 24px 20px 16px 20px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.sidebar-logo-link {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-decoration: none;
+}
+
+.sidebar-logo-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #f1f5f9;
+  box-shadow: 0 0 0 2px #3b82f6;
+  flex-shrink: 0;
+}
+
+.sidebar-logo-text {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.sidebar-menu-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.sidebar-logout {
+  padding: 16px 20px;
+  border-top: 1px solid #e2e8f0;
+  margin-top: auto;
+}
+
+.sidebar-logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #ef4444;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.sidebar-logout-btn:hover {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.sidebar-logout-icon {
+  font-size: 1.25rem;
+}

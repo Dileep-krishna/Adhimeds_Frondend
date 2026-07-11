@@ -1,48 +1,35 @@
 // warrantyAPI.js
 import SERVERURL from "./serverURL";
 
-console.log('🔧 SERVERURL loaded as:', SERVERURL);
-
-// Helper to log and handle responses (reuse same logic)
-async function handleResponse(res, endpoint) {
-  console.log(`📡 ${endpoint} - Response status:`, res.status);
-  console.log(`📡 ${endpoint} - Content-Type:`, res.headers.get('content-type'));
-
+// Helper – parse JSON or throw clean error
+async function handleResponse(res) {
   const text = await res.text();
-  console.log(`📄 ${endpoint} - Response body preview (first 300 chars):`, text.substring(0, 300));
-
   try {
     return JSON.parse(text);
-  } catch (e) {
-    console.error(`❌ ${endpoint} - Failed to parse JSON. Response is not valid JSON.`);
-    console.error(`   Full response:`, text);
-    throw new Error(`Server returned HTML instead of JSON. Check if backend route exists at ${SERVERURL}/warranties`);
+  } catch {
+    throw new Error(`Invalid JSON: ${text.substring(0, 200)}`);
   }
 }
 
-// ✅ GET ALL WARRANTIES
+// GET ALL WARRANTIES (with optional query params)
 export const getWarrantiesAPI = async (queryParams = "") => {
-  const url = queryParams ? `${SERVERURL}/warranties?${queryParams}` : `${SERVERURL}/warranties`;
-  console.log(`🔍 GET ${url}`);
-  
+  const url = queryParams
+    ? `${SERVERURL}/api/warranties?${queryParams}`
+    : `${SERVERURL}/api/warranties`;
   const res = await fetch(url);
-  return handleResponse(res, 'GET /warranties');
+  return handleResponse(res);
 };
 
-// ✅ GET SINGLE WARRANTY BY ID
+// GET SINGLE WARRANTY BY ID
 export const getWarrantyByIdAPI = async (id) => {
-  const url = `${SERVERURL}/warranties/${id}`;
-  console.log(`🔍 GET ${url}`);
-  
+  const url = `${SERVERURL}/api/warranties/${id}`;
   const res = await fetch(url);
-  return handleResponse(res, `GET /warranties/${id}`);
+  return handleResponse(res);
 };
 
-// ✅ CREATE WARRANTY – supports both JSON and FormData (for logo file upload)
+// CREATE WARRANTY – accepts FormData (with logo) or plain object
 export const createWarrantyAPI = async (warrantyData) => {
-  const url = `${SERVERURL}/warranties`;
-  console.log(`🚀 POST ${url}`, warrantyData instanceof FormData ? 'FormData with logo file' : warrantyData);
-
+  const url = `${SERVERURL}/api/warranties`;
   const isFormData = warrantyData instanceof FormData;
   const options = {
     method: "POST",
@@ -52,17 +39,13 @@ export const createWarrantyAPI = async (warrantyData) => {
     options.headers = { "Content-Type": "application/json" };
     options.body = JSON.stringify(warrantyData);
   }
-  // If FormData, browser sets correct multipart boundary automatically – do NOT set Content-Type header.
-
   const res = await fetch(url, options);
-  return handleResponse(res, 'POST /warranties');
+  return handleResponse(res);
 };
 
-// ✅ UPDATE WARRANTY – supports both JSON and FormData (for optional logo file)
+// UPDATE WARRANTY – accepts FormData or plain object
 export const updateWarrantyAPI = async (id, warrantyData) => {
-  const url = `${SERVERURL}/warranties/${id}`;
-  console.log(`✏️ PUT ${url}`, warrantyData instanceof FormData ? 'FormData with logo file' : warrantyData);
-
+  const url = `${SERVERURL}/api/warranties/${id}`;
   const isFormData = warrantyData instanceof FormData;
   const options = {
     method: "PUT",
@@ -72,16 +55,13 @@ export const updateWarrantyAPI = async (id, warrantyData) => {
     options.headers = { "Content-Type": "application/json" };
     options.body = JSON.stringify(warrantyData);
   }
-
   const res = await fetch(url, options);
-  return handleResponse(res, `PUT /warranties/${id}`);
+  return handleResponse(res);
 };
 
-// ✅ DELETE WARRANTY
+// DELETE WARRANTY
 export const deleteWarrantyAPI = async (id) => {
-  const url = `${SERVERURL}/warranties/${id}`;
-  console.log(`🗑️ DELETE ${url}`);
-  
+  const url = `${SERVERURL}/api/warranties/${id}`;
   const res = await fetch(url, { method: "DELETE" });
-  return handleResponse(res, `DELETE /warranties/${id}`);
+  return handleResponse(res);
 };

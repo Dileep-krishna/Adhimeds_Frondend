@@ -34,7 +34,7 @@ export default function StoreLoginPage() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${SERVERURL}/store/login`, {
+      const response = await fetch(`${SERVERURL}/api/store/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emailAddress: email, password }),

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { GoogleMap, LoadScript, Marker, Autocomplete } from '@react-google-maps/api';
 import toast, { Toaster } from 'react-hot-toast';
@@ -19,11 +19,12 @@ export default function AddStorePage() {
 
   const [formData, setFormData] = useState({
     storeName: '',
-    shopid: '',               // ✅ Medisoft shop ID
+    shopid: '',
     searchLocation: '',
     address: '',
     latitude: defaultCenter.lat,
     longitude: defaultCenter.lng,
+    district: '',               // auto‑detected
     status: 'pending',
     vendorCategory: '',
     pincode: '',
@@ -42,8 +43,9 @@ export default function AddStorePage() {
   const [saving, setSaving] = useState(false);
   const [shopsList, setShopsList] = useState([]);
   const searchBoxRef = useRef(null);
+  const [isGeocoding, setIsGeocoding] = useState(false);
 
-  // Fetch shops for validation
+  // Fetch shops for shopid validation
   useEffect(() => {
     const fetchShops = async () => {
       try {
@@ -61,10 +63,87 @@ export default function AddStorePage() {
     fetchShops();
   }, []);
 
+  // ---------- District detection using Google Geocode API ----------
+const fetchDistrictFromCoords = useCallback(async (lat, lng) => {
+  if (!googleMapsApiKey) {
+    toast.error('Google Maps API key is missing.');
+    console.error('❌ Missing API key');
+    return;
+  }
+
+  setIsGeocoding(true);
+  try {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${googleMapsApiKey}`;
+    console.log('🔍 Geocoding request URL:', url); // 👈 log the full URL (key partially hidden)
+
+    const response = await fetch(url);
+    console.log('📡 Response status:', response.status);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('📦 Geocoding response:', data); // 👈 log full response
+
+    if (data.status === 'OK' && data.results.length > 0) {
+      const addressComponents = data.results[0].address_components;
+      let district = '';
+
+      for (const component of addressComponents) {
+        if (component.types.includes('administrative_area_level_2')) {
+          district = component.long_name;
+          break;
+        }
+      }
+      if (!district) {
+        for (const component of addressComponents) {
+          if (component.types.includes('administrative_area_level_1')) {
+            district = component.long_name;
+            break;
+          }
+        }
+      }
+
+      if (district) {
+        setFormData(prev => ({ ...prev, district }));
+        toast.success(`District identified: ${district}`);
+        console.log('✅ District found:', district);
+      } else {
+        setFormData(prev => ({ ...prev, district: '' }));
+        toast.warn('Could not determine district from this location.');
+        console.warn('⚠️ No district component found');
+      }
+    } else {
+      // Handle API error statuses
+      let errorMsg = 'Reverse geocoding failed.';
+      if (data.status === 'REQUEST_DENIED') {
+        errorMsg = 'Google Geocoding API is not enabled or API key is invalid.';
+      } else if (data.status === 'ZERO_RESULTS') {
+        errorMsg = 'No address found for these coordinates.';
+      } else if (data.status === 'OVER_QUERY_LIMIT') {
+        errorMsg = 'Geocoding API quota exceeded.';
+      }
+      setFormData(prev => ({ ...prev, district: '' }));
+      toast.error(errorMsg);
+      console.error('❌ Geocoding API error:', data.status, data.error_message || '');
+    }
+  } catch (error) {
+    console.error('🔥 Network/other error:', error);
+    setFormData(prev => ({ ...prev, district: '' }));
+    toast.error('Error fetching district. Check console for details.');
+  } finally {
+    setIsGeocoding(false);
+  }
+}, [googleMapsApiKey]);
+  // ---------- Map & Autocomplete handlers ----------
   const updatePosition = useCallback((lat, lng) => {
     setFormData(prev => ({ ...prev, latitude: lat, longitude: lng }));
     if (map) map.panTo({ lat, lng });
-  }, [map]);
+    if (lat && lng) {
+      fetchDistrictFromCoords(lat, lng);
+    }
+  }, [map, fetchDistrictFromCoords]);
 
   const onMapClick = useCallback((event) => {
     updatePosition(event.latLng.lat(), event.latLng.lng());
@@ -92,6 +171,7 @@ export default function AddStorePage() {
         const lng = place.geometry.location.lng();
         const address = place.formatted_address || place.name || '';
         const searchLocation = searchBoxRef.current?.value || address;
+
         setFormData(prev => ({
           ...prev,
           address,
@@ -103,12 +183,27 @@ export default function AddStorePage() {
           map.panTo({ lat, lng });
           map.setZoom(15);
         }
+
+        // Trigger district detection
+        fetchDistrictFromCoords(lat, lng);
+
+        // Also try direct extraction from place components
+        if (place.address_components) {
+          for (const component of place.address_components) {
+            if (component.types.includes('administrative_area_level_2')) {
+              setFormData(prev => ({ ...prev, district: component.long_name }));
+              toast.success(`District: ${component.long_name}`);
+              break;
+            }
+          }
+        }
       } else {
         toast.error('Could not find coordinates for that place. Try a more specific location.');
       }
     }
-  }, [autocomplete, map]);
+  }, [autocomplete, map, fetchDistrictFromCoords]);
 
+  // ---------- Thumbnail upload ----------
   const handleThumbnailChange = useCallback((e) => {
     const files = Array.from(e.target.files);
     if (files.length > 5) {
@@ -121,7 +216,7 @@ export default function AddStorePage() {
     setThumbnailPreviews(previews);
   }, [thumbnailPreviews]);
 
-  // --- Validation with shopid check ---
+  // ---------- Form validation ----------
   const validateForm = useCallback(() => {
     const requiredFields = [
       'storeName', 'vendorCategory', 'pincode', 'emailAddress',
@@ -134,7 +229,6 @@ export default function AddStorePage() {
         return false;
       }
     }
-    // Additional validations
     if (!/^\d{6}$/.test(formData.pincode)) {
       toast.error('Pincode must be exactly 6 digits');
       return false;
@@ -161,17 +255,18 @@ export default function AddStorePage() {
       return false;
     }
 
-    // ✅ Check shopid (if provided) – now uses toast.error (not warning)
+    // Shop ID warning (non‑blocking)
     if (formData.shopid && formData.shopid.trim() !== '') {
       const exists = shopsList.some(shop => shop.shopid === formData.shopid.trim());
       if (!exists) {
-        toast.error('Shop ID does not match any known store. You can still save, but verify the ID.');
+        toast.warn('Shop ID does not match any known store. Please verify the ID.');
       }
     }
 
     return true;
   }, [formData, thumbnailFiles, shopsList]);
 
+  // ---------- Save store ----------
   const saveStore = useCallback(async () => {
     if (!validateForm()) return;
 
@@ -203,7 +298,7 @@ export default function AddStorePage() {
   }, [formData, thumbnailFiles, validateForm, router]);
 
   // Cleanup object URLs
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       thumbnailPreviews.forEach(url => URL.revokeObjectURL(url));
     };
@@ -240,7 +335,7 @@ export default function AddStorePage() {
               />
             </div>
 
-            {/* Medisoft Shop ID (optional) */}
+            {/* Medisoft Shop ID */}
             <div className="form-group">
               <label>Medisoft Shop ID (optional)</label>
               <input
@@ -317,6 +412,21 @@ export default function AddStorePage() {
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 placeholder="Street, city, etc."
               />
+            </div>
+
+            {/* District (auto‑detected) */}
+            <div className="form-group">
+              <label>District (auto‑detected)</label>
+              <input
+                type="text"
+                value={formData.district}
+                onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                placeholder="Will be detected from location"
+                disabled={isGeocoding}
+                className={isGeocoding ? 'text-muted' : ''}
+              />
+              {isGeocoding && <small className="text-info">Detecting district…</small>}
+              <small className="text-muted">You can manually correct if needed.</small>
             </div>
 
             {/* Vendor Category */}

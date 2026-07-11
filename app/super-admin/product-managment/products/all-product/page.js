@@ -379,7 +379,7 @@ export default function AllProductsPage() {
   const endItem = Math.min(currentPage * itemsPerPage, filteredAndSortedProducts.length);
 
   return (
-    <div className="all-products-container">
+<div className="all-products-container" suppressHydrationWarning>
       <Toaster position="top-right" />
       <div className="top-nav">
         <div className="nav-scroll">

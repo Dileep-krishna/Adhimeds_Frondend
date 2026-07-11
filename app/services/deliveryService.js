@@ -1,96 +1,74 @@
-import commonAPI from "./commonAPI";
+// services/deliveryBoyService.js
 import SERVERURL from "./serverURL";
 
-// ➕ Add Delivery Boy
+// Minimal JSON parser – throws if invalid
+async function handleResponse(res) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('Invalid JSON response');
+  }
+}
+
+// ---------- DELIVERY BOY CRUD ----------
+
 export const addDeliveryBoyAPI = async (data) => {
-  return await commonAPI(
-    "POST",
-    `${SERVERURL}/add`,
-    data,
-    {
-      "Content-Type": "multipart/form-data"
-    }
-  );
+  const res = await fetch(`${SERVERURL}/api/add`, {
+    method: "POST",
+    body: data, // FormData
+  });
+  return handleResponse(res);
 };
 
-// 📥 Get all delivery boys
 export const getDeliveryBoysAPI = async () => {
-  return await commonAPI(
-    "GET",
-    `${SERVERURL}/all`,
-    {}
-  );
+  const res = await fetch(`${SERVERURL}/api/all`);
+  return handleResponse(res);
 };
 
-// 🔄 Update Status
-export const updateDeliveryBoyAPI     = async (id, data) => {
-  return await commonAPI(
-    "PUT",
-    `${SERVERURL}/${id}`, // 👈 different from /status
-    data,
-    {
-      "Content-Type": "multipart/form-data"
-    }
-  );
+export const updateDeliveryBoyAPI = async (id, data) => {
+  const res = await fetch(`${SERVERURL}/api/${id}`, {
+    method: "PUT",
+    body: data, // FormData
+  });
+  return handleResponse(res);
 };
 
-// ❌ Delete Delivery Boy
 export const deleteDeliveryBoyAPI = async (id) => {
-  return await commonAPI(
-    "DELETE",
-    `${SERVERURL}/${id}`,
-    {}
-  );
-};
-//
-// ✅ TOGGLE PUBLISHED
-//
-export const togglePublishedAPI = async (id) => {
-  const url = `${SERVERURL}/medical-products/${id}/toggle-published`;
-  console.log(`🔄 PATCH ${url}`);
-
-  try {
-    const res = await fetch(url, { method: "PATCH" });
-    return await handleResponse(res, `PATCH /medical-products/${id}/toggle-published`);
-  } catch (error) {
-    console.error("❌ togglePublishedAPI Error:", error.message);
-    throw error;
-  }
+  const res = await fetch(`${SERVERURL}/api/${id}`, {
+    method: "DELETE",
+  });
+  return handleResponse(res);
 };
 
-//
-// ✅ TOGGLE FEATURED
-//
-export const toggleFeaturedAPI = async (id) => {
-  const url = `${SERVERURL}/medical-products/${id}/toggle-featured`;
-  console.log(`🔄 PATCH ${url}`);
-
-  try {
-    const res = await fetch(url, { method: "PATCH" });
-    return await handleResponse(res, `PATCH /medical-products/${id}/toggle-featured`);
-  } catch (error) {
-    console.error("❌ toggleFeaturedAPI Error:", error.message);
-    throw error;
-  }
-};
-
-//
-// ✅ TOGGLE TODAY'S DEAL
-//
-export const toggleTodayDealAPI = async (id) => {
-  const url = `${SERVERURL}/medical-products/${id}/toggle-todaydeal`;
-  console.log(`🔄 PATCH ${url}`);
-
-  try {
-    const res = await fetch(url, { method: "PATCH" });
-    return await handleResponse(res, `PATCH /medical-products/${id}/toggle-todaydeal`);
-  } catch (error) {
-    console.error("❌ toggleTodayDealAPI Error:", error.message);
-    throw error;
-  }
-};
-
-// (Optional) assignment API – add when backend is ready
 export const assignOrdersToBoyAPI = async (boyId, orderIds) => {
-  return await commonAPI("POST", `${SERVERURL}/assign`, { boyId, orderIds });
+  const res = await fetch(`${SERVERURL}/api/assign`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ boyId, orderIds }),
+  });
+  return handleResponse(res);
+};
+
+// ---------- (Optional) MEDICAL PRODUCT TOGGLES – remove if not needed ----------
+// If you still need these, they now point to /api/medical-products/...
+export const togglePublishedAPI = async (id) => {
+  const res = await fetch(`${SERVERURL}/api/medical-products/${id}/toggle-published`, {
+    method: "PATCH",
+  });
+  return handleResponse(res);
+};
+
+export const toggleFeaturedAPI = async (id) => {
+  const res = await fetch(`${SERVERURL}/api/medical-products/${id}/toggle-featured`, {
+    method: "PATCH",
+  });
+  return handleResponse(res);
+};
+
+export const toggleTodayDealAPI = async (id) => {
+  const res = await fetch(`${SERVERURL}/api/medical-products/${id}/toggle-todaydeal`, {
+    method: "PATCH",
+  });
+  return handleResponse(res);
 };

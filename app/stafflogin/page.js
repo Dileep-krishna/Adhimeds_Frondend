@@ -44,7 +44,7 @@ export default function StaffLoginPage() {
       try {
         setLoadingRoles(true);
         
-        const response = await fetch(`${SERVERURL}/roles`, {
+        const response = await fetch(`${SERVERURL}/api/roles`, {
           method: "GET",
           headers: { "Content-Type": "application/json" },
           signal: abortControllerRef.current.signal,
@@ -133,7 +133,7 @@ export default function StaffLoginPage() {
     setLoading(true);
     
     try {
-      const response = await fetch(`${SERVERURL}/staff/login`, {
+      const response = await fetch(`${SERVERURL}/api/staff/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -157,6 +157,11 @@ export default function StaffLoginPage() {
           return;
         }
         
+        // ----- START: NEW DISTRICT HANDLING -----
+        // Extract district from response (if available)
+        const staffDistrict = data.data.district || 'Not specified';
+        // ----- END: NEW DISTRICT HANDLING -----
+
         const storage = rememberMe ? localStorage : sessionStorage;
         
         storage.setItem("staffToken", data.data.token);
@@ -164,10 +169,18 @@ export default function StaffLoginPage() {
         storage.setItem("staffName", data.data.fullName);
         storage.setItem("staffId", data.data._id);
         storage.setItem("userRole", userRole);
+        // ----- Store district for later use -----
+        storage.setItem("staffDistrict", staffDistrict);
+        
+        // ----- Console log the district -----
+        console.log(`✅ Staff district: ${staffDistrict}`);
+        // ----- Optionally show a toast with district (for visibility) -----
+        toast.success(`Welcome ${data.data.fullName}! (District: ${staffDistrict})`);
         
         const dashboardRoute = getDashboardRoute(userRole);
         
-        toast.success(`Welcome ${data.data.fullName}! Redirecting to ${userRole} dashboard...`);
+        // Keep the standard welcome toast as well (optional)
+        // toast.success(`Welcome ${data.data.fullName}! Redirecting to ${userRole} dashboard...`);
         
         if (redirectTimeout.current) clearTimeout(redirectTimeout.current);
         
