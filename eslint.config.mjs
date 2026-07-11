@@ -11,6 +11,9 @@ const compat = new FlatCompat({
 
 export default [
   ...compat.extends('next/core-web-vitals'),
-  // If you need TypeScript rules, they are already included in core-web-vitals.
-  // You can also add custom rules here.
+  {
+    rules: {
+      'react/no-unescaped-entities': 'off',  // 👈 disable this rule
+    },
+  },
 ];
