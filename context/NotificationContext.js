@@ -1,3 +1,13 @@
+import React from 'react'
+
+function NotificationContext() {
+  return (
+    <div>NotificationContext</div>
+  )
+}
+
+export default NotificationContext
+
 // "use client";
 
 // import { createContext, useContext, useState, useCallback, useMemo } from "react";
