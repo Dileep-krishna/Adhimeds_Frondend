@@ -1,7 +1,8 @@
-// services/orderService.js
-import SERVERURL from './serverURL';
+// services/orderAPI.js
+// ✅ FRONTEND ONLY – fetch calls, no backend imports
 
-// Minimal JSON parser – throws if invalid
+const SERVERURL = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5001';
+
 async function handleResponse(res) {
   const text = await res.text();
   try {
@@ -10,8 +11,6 @@ async function handleResponse(res) {
     throw new Error('Invalid JSON response');
   }
 }
-
-// ---------- ORDER API FUNCTIONS ----------
 
 export const placeOrder = async (items) => {
   const res = await fetch(`${SERVERURL}/api/orders`, {
@@ -27,6 +26,11 @@ export const getAllOrders = async () => {
   return handleResponse(res);
 };
 
+export const getOrdersByStore = async (storeId) => {
+  const res = await fetch(`${SERVERURL}/api/orders?storeId=${storeId}`);
+  return handleResponse(res);
+};
+
 export const getOrderById = async (orderId) => {
   const res = await fetch(`${SERVERURL}/api/orders/${orderId}`);
   return handleResponse(res);
@@ -34,9 +38,7 @@ export const getOrderById = async (orderId) => {
 
 export const updateItemStatus = async (orderId, itemId, status, assignedTo) => {
   const body = { status };
-  if (assignedTo !== undefined) {
-    body.assignedTo = assignedTo;
-  }
+  if (assignedTo !== undefined) body.assignedTo = assignedTo;
   const res = await fetch(`${SERVERURL}/api/orders/${orderId}/items/${itemId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -51,8 +53,6 @@ export const deleteItem = async (orderId, itemId) => {
   });
   return handleResponse(res);
 };
-
-// ---------- NOTIFICATION API FUNCTIONS ----------
 
 export const getNotifications = async () => {
   const res = await fetch(`${SERVERURL}/api/notifications`);

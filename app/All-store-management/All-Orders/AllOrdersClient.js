@@ -1,6 +1,9 @@
-export const dynamic = 'force-dynamic';
-import AllOrdersClient from './AllOrdersClient';
+import React from 'react'
 
-export default function Page() {
-  return <AllOrdersClient />;
+function AllOrdersClient() {
+  return (
+    <div>AllOrdersClient</div>
+  )
 }
+
+export default AllOrdersClient

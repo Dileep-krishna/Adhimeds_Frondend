@@ -7,6 +7,7 @@ import { useCart } from "@/context/CartContext";
 import { useOrderNotifications } from "@/context/OrderNotificationContext";
 import { toast } from "sonner";
 import { placeOrder } from "../../services/orderAPI";
+import { getShopsForOrderAPI } from "../../services/storeManagementAPI";
 import "./cart.css";
 
 export default function CartPage() {
@@ -16,81 +17,168 @@ export default function CartPage() {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   const handleCheckout = async () => {
+    console.log("🛒 Checkout initiated. Cart items:", cartItems);
+
     if (cartItems.length === 0) {
       toast.error("Your cart is empty.");
+      console.warn("❌ Cart empty – checkout aborted.");
       return;
     }
 
-    // ✅ Get store name from the cart items (all items should have the same store)
-    const storeName = cartItems[0]?.storeName;
-    if (!storeName) {
+    const originalStoreName = cartItems[0]?.storeName;
+    if (!originalStoreName) {
       toast.error("Store name not found in cart. Please add items from a valid store.");
+      console.error("❌ No storeName found in cart items.");
       return;
     }
+    console.log(`🏪 Original store name from cart: ${originalStoreName}`);
 
-    // ✅ Check if all items belong to the same store
-    const allItemsMatch = cartItems.every(item => item.storeName === storeName);
+    const allItemsMatch = cartItems.every(item => item.storeName === originalStoreName);
     if (!allItemsMatch) {
       toast.error("Cart contains items from multiple stores. Please clear and try again.");
+      console.error("❌ Multiple stores in cart:", cartItems.map(i => i.storeName));
       return;
     }
 
-    // ✅ Get shopid from storage, or fetch it using the store name
+    // ✅ Check if pharmacist is logged in
+    const staffDistrict = localStorage.getItem('staffDistrict') || sessionStorage.getItem('staffDistrict');
+    console.log(`👤 Staff district from storage: ${staffDistrict || 'None'}`);
+
     let shopid = localStorage.getItem('shopid') || sessionStorage.getItem('shopid');
-    
-    if (!shopid) {
-      // Auto‑fetch shopid from Medisoft shops API using storeName
+    console.log(`🔑 Current shopid from storage: ${shopid || 'None'}`);
+
+    // ✅ We will create a new items array that may have a different storeName
+    let orderItems = [...cartItems];
+    let finalStoreName = originalStoreName;
+
+    // ✅ If pharmacist district exists, try to find a store in that district
+    if (staffDistrict) {
+      console.log(`🔍 Pharmacist district detected: ${staffDistrict}. Routing order to a store in this district...`);
+
       try {
-        const shopsRes = await fetch('/api/medisoft/shops');
-        if (shopsRes.ok) {
-          const shops = await shopsRes.json();
-          const matchedShop = shops.find(shop => 
-            shop.name?.toUpperCase() === storeName.toUpperCase()
-          );
-          if (matchedShop) {
-            shopid = matchedShop.shopid;
-            // Save it for future use
-            localStorage.setItem('shopid', shopid);
-            console.log(`✅ Auto‑fetched shopid: ${shopid}`);
+        const stores = await getShopsForOrderAPI();
+        console.log(`📦 Full API response:`, JSON.stringify(stores, null, 2));
+        console.log(`📦 Total stores fetched: ${stores.length}`);
+
+        console.log(`📋 Store list with fields:`);
+        stores.forEach(s => {
+          console.log(`   - ${s.name} | district: ${s.district || 'MISSING'} | status: ${s.status || 'MISSING'} | shopid: ${s.shopid || 'EMPTY'}`);
+        });
+
+        // 1st try: active store in the district
+        let matchedStore = stores.find(store => 
+          store.district?.toUpperCase() === staffDistrict.toUpperCase() && 
+          store.status === 'active'
+        );
+
+        if (matchedStore) {
+          // ✅ Check if shopid is not empty
+          if (matchedStore.shopid && matchedStore.shopid.trim() !== '') {
+            shopid = matchedStore.shopid;
+            finalStoreName = matchedStore.name;
+            console.log(`✅ Found ACTIVE store in district ${staffDistrict}: ${finalStoreName} (shopid: ${shopid})`);
+            // Override all cart items to use this store
+            orderItems = cartItems.map(item => ({
+              ...item,
+              storeName: finalStoreName,
+            }));
+            toast.success(`Order will be fulfilled by ${finalStoreName}`);
           } else {
-            toast.error(`Store "${storeName}" not found in the system.`);
-            return;
+            console.warn(`⚠️ Matched store has empty shopid. Falling back to original store.`);
+            // Keep original store
+            finalStoreName = originalStoreName;
+            shopid = shopid || "30";
+            toast.warning(`Store in district has no Shop ID. Using original store.`);
           }
         } else {
-          toast.error("Unable to verify store. Please try again.");
-          return;
+          // 2nd try: any store in the district (ignore status)
+          const anyInDistrict = stores.filter(s => s.district?.toUpperCase() === staffDistrict.toUpperCase());
+          if (anyInDistrict.length > 0) {
+            matchedStore = anyInDistrict[0];
+            if (matchedStore.shopid && matchedStore.shopid.trim() !== '') {
+              shopid = matchedStore.shopid;
+              finalStoreName = matchedStore.name;
+              console.warn(`⚠️ No active store, but using first store in district: ${finalStoreName} (shopid: ${shopid})`);
+              orderItems = cartItems.map(item => ({
+                ...item,
+                storeName: finalStoreName,
+              }));
+              toast.warning(`Using store: ${finalStoreName} (status: ${matchedStore.status})`);
+            } else {
+              console.warn(`⚠️ Store in district has empty shopid. Keeping original store.`);
+              finalStoreName = originalStoreName;
+              shopid = shopid || "30";
+              toast.warning(`Using original store.`);
+            }
+          } else {
+            // No store in district at all – keep original store
+            console.warn(`⚠️ No stores found in district "${staffDistrict}". Keeping original store.`);
+            finalStoreName = originalStoreName;
+            shopid = shopid || "30";
+            toast.warning(`No store in ${staffDistrict}. Using original store.`);
+          }
+        }
+
+        // Save shopid for future use
+        if (shopid && shopid.trim() !== '') {
+          localStorage.setItem('shopid', shopid);
+          console.log(`💾 shopid saved to localStorage: ${shopid}`);
         }
       } catch (err) {
-        console.error("Failed to fetch shops:", err);
+        console.error("🔥 Network error while fetching stores:", err);
         toast.error("Network error. Please try again.");
         return;
       }
-    }
-
-    // ✅ Verify shopid against Medisoft shops (optional but recommended)
-    try {
-      const shopsRes = await fetch('/api/medisoft/shops');
-      if (shopsRes.ok) {
-        const shops = await shopsRes.json();
-        const shopExists = shops.some(shop => shop.shopid === shopid);
-        if (!shopExists) {
-          toast.error("Store ID is invalid. Please contact support.");
+    } else {
+      // 👇 No pharmacist logged in – use original store
+      console.log(`👤 No pharmacist logged in – using store from cart.`);
+      // Ensure we have a shopid for the original store
+      if (!shopid) {
+        try {
+          const shops = await getShopsForOrderAPI();
+          const matchedShop = shops.find(shop => 
+            shop.name?.toUpperCase() === originalStoreName.toUpperCase()
+          );
+          if (matchedShop && matchedShop.shopid && matchedShop.shopid.trim() !== '') {
+            shopid = matchedShop.shopid;
+            localStorage.setItem('shopid', shopid);
+            console.log(`✅ Auto‑fetched shopid: ${shopid} for store: ${matchedShop.name}`);
+          } else {
+            shopid = "30";
+            console.warn(`⚠️ Using default shopid: ${shopid}`);
+          }
+        } catch (err) {
+          console.error("🔥 Network error while fetching shops:", err);
+          toast.error("Network error. Please try again.");
           return;
         }
       }
-    } catch (err) {
-      console.warn("Could not verify shopid, proceeding anyway.");
+      finalStoreName = originalStoreName;
+      orderItems = cartItems; // unchanged
     }
 
-    // ✅ All validations passed – proceed with order
+    // ✅ Ensure shopid is not empty
+    if (!shopid || shopid.trim() === '') {
+      shopid = "30";
+      console.warn(`⚠️ shopid empty, using default: ${shopid}`);
+      localStorage.setItem('shopid', shopid);
+    }
+
+    console.log(`🎯 Final store name: ${finalStoreName}`);
+    console.log(`🎯 Final shopid: ${shopid}`);
+    console.log(`📦 Order items:`, orderItems);
+
+    // ✅ Proceed with order – use the potentially updated orderItems
     const loadingToast = toast.loading("Placing your order...");
     setIsCheckingOut(true);
 
     try {
-      const response = await placeOrder(cartItems);
+      // Pass the updated items (with possibly overridden storeName)
+      const response = await placeOrder(orderItems);
 
       if (response.success) {
         toast.success("✅ Order placed successfully!", { id: loadingToast });
+        console.log(`✅ Order placed successfully. Response:`, response);
 
         let order = response.order || response.data?.order;
 
@@ -98,7 +186,7 @@ export default function CartPage() {
           console.warn("⚠️ No order data in response – building from cart items");
           order = {
             _id: response.orderId || `temp-${Date.now()}`,
-            items: cartItems.map(item => ({
+            items: orderItems.map(item => ({
               _id: item.id,
               productName: item.productName,
               quantity: item.quantity,
@@ -117,15 +205,16 @@ export default function CartPage() {
 
         triggerNewOrder(order);
         clearCart();
-
-        // The order is now saved. The store admin will see it in Order‑Requests.
+        console.log(`🧹 Cart cleared.`);
       } else {
         toast.error(response.message || "Failed to place order.", {
           id: loadingToast,
         });
+        console.error(`❌ Order placement failed:`, response);
       }
     } catch (error) {
       toast.error("Network error. Please try again.", { id: loadingToast });
+      console.error("🔥 Network error during order placement:", error);
     } finally {
       setIsCheckingOut(false);
     }
@@ -136,7 +225,6 @@ export default function CartPage() {
       <Navbar />
       <h5 className="mb-4">My Shopping Cart</h5>
       <div className="row">
-        {/* LEFT SIDE – Cart Items */}
         <div className="col-md-8">
           <div className="cart-card p-3">
             {cartItems.length === 0 ? (
@@ -211,7 +299,6 @@ export default function CartPage() {
           </div>
         </div>
 
-        {/* RIGHT SIDE – Cart Summary */}
         <div className="col-md-4">
           <div className="summary-card p-3 border rounded shadow-sm bg-white">
             <h6 className="mb-3">Cart Value Details</h6>

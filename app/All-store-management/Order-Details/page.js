@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import toast from "react-hot-toast"; // ✅ import for notifications
 
 export default function Page() {
   const order = {
@@ -25,6 +26,14 @@ export default function Page() {
         deliveryType: "-",
       },
     ],
+  };
+
+  // ✅ Handler for sending order to delivery head
+  const handleSendToDelivery = () => {
+    // Replace with your actual API call
+    console.log("📦 Sending order to delivery head:", order.id);
+    toast.success("Order sent to delivery head successfully!");
+    // Example: await fetch('/api/delivery', { method: 'POST', body: JSON.stringify({ orderId: order.id }) });
   };
 
   return (
@@ -248,10 +257,19 @@ export default function Page() {
 
           </div>
 
-          {/* Print */}
+          {/* ✅ Footer with two buttons */}
+          <div className="text-end mt-3 d-flex justify-content-end gap-3">
 
-          <div className="text-end mt-3">
+            {/* ✅ New: Send to Delivery Button */}
+            <button
+              className="btn btn-success shadow-sm rounded-pill px-4 py-2 fw-semibold"
+              onClick={handleSendToDelivery}
+            >
+              <i className="bi bi-send me-2"></i>
+              Send to Delivery
+            </button>
 
+            {/* Existing Print Button */}
             <button
               className="btn btn-light shadow-sm rounded-circle"
               style={{

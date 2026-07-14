@@ -1,32 +1,43 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getAllOrders, updateItemStatus, deleteItem } from "../../services/orderAPI";
+import { getOrdersByStore, updateItemStatus, deleteItem } from "../../services/orderAPI";
 import { toast } from "sonner";
 import { useOrderNotifications } from "@/context/OrderNotificationContext";
-import "./all-orders.css";  
+import { getStoreId } from "../../../utils/jwtHelper";
+import "./all-orders.css";
+
 export default function AllOrdersPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { refreshNotificationsWithSound, stopRinging } = useOrderNotifications();
 
-  // ---------- Fetch all orders ----------
+  const storeId = getStoreId();
+  console.log(`🏪 Current store ID (from token): ${storeId}`);
+
   const {
     data: orders = [],
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["orders"],
+    queryKey: ["orders", storeId],
     queryFn: async () => {
-      const response = await getAllOrders();
+      if (!storeId) return [];
+      const response = await getOrdersByStore(storeId);
       if (!response.success) throw new Error("Failed to load orders");
       return response.data;
     },
+    enabled: !!storeId,
     refetchInterval: 30000,
     staleTime: 10000,
     refetchOnWindowFocus: false,
   });
+
+  // ✅ Force refetch when the page mounts
+  useEffect(() => {
+    refetch();
+  }, []);
 
   // ---------- Mutations ----------
   const acceptMutation = useMutation({
@@ -34,7 +45,7 @@ export default function AllOrdersPage() {
     onSuccess: async (data, variables) => {
       toast.success("Product accepted!");
       stopRinging();
-      queryClient.setQueryData(["orders"], (oldData) =>
+      queryClient.setQueryData(["orders", storeId], (oldData) =>
         oldData?.map(order =>
           order._id === variables.orderId
             ? { ...order, items: order.items.map(item =>
@@ -43,7 +54,7 @@ export default function AllOrdersPage() {
             : order
         )
       );
-      await queryClient.invalidateQueries({ queryKey: ["orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["orders", storeId] });
       await refetch();
       refreshNotificationsWithSound();
     },
@@ -55,7 +66,7 @@ export default function AllOrdersPage() {
     onSuccess: async (data, variables) => {
       toast.success("Product rejected!");
       stopRinging();
-      queryClient.setQueryData(["orders"], (oldData) =>
+      queryClient.setQueryData(["orders", storeId], (oldData) =>
         oldData?.map(order =>
           order._id === variables.orderId
             ? { ...order, items: order.items.map(item =>
@@ -64,7 +75,7 @@ export default function AllOrdersPage() {
             : order
         )
       );
-      await queryClient.invalidateQueries({ queryKey: ["orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["orders", storeId] });
       await refetch();
       refreshNotificationsWithSound();
     },
@@ -76,7 +87,7 @@ export default function AllOrdersPage() {
     onSuccess: async (data, variables) => {
       toast.success(`"${variables.productName}" deleted!`);
       stopRinging();
-      queryClient.setQueryData(["orders"], (oldData) =>
+      queryClient.setQueryData(["orders", storeId], (oldData) =>
         oldData
           ?.map(order =>
             order._id === variables.orderId
@@ -85,7 +96,7 @@ export default function AllOrdersPage() {
           )
           .filter(order => order.items.length > 0)
       );
-      await queryClient.invalidateQueries({ queryKey: ["orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["orders", storeId] });
       await refetch();
       refreshNotificationsWithSound();
     },
@@ -144,10 +155,19 @@ export default function AllOrdersPage() {
     rejectMutation.isPending ||
     deleteMutation.isPending;
 
+  // If no storeId, show a message
+  if (!storeId) {
+    return (
+      <div className="container-fluid py-4">
+        <div className="alert alert-warning">
+          No store ID found. Please log in again.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container-fluid py-4">
-
-
       <div className="card border-0 shadow-sm rounded-4">
 
         {/* Header */}
@@ -160,7 +180,7 @@ export default function AllOrdersPage() {
               </span>
             </h5>
 
-            {/* ✅ FILTER BAR – forced inline with flex */}
+            {/* FILTER BAR */}
             <div className="filter-bar">
               <select className="form-select form-select-sm" style={{ width: 'auto', minWidth: '140px' }}>
                 <option>Bulk Action</option>

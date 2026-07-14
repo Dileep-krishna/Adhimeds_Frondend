@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@googlemaps/react-wrapper": "^1.2.0",
     "@react-google-maps/api": "^2.20.8",
     "@svgr/webpack": "^8.1.0",
     "@tanstack/react-query": "^5.101.0",

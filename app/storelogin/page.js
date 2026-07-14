@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import toast, { Toaster } from "react-hot-toast";
 import "./storelogin.css";
 import SERVERURL from "../services/serverURL";
+import { joinStoreRoom } from "../services/socket.js"; // ✅ Socket helper
 
 export default function StoreLoginPage() {
   const router = useRouter();
@@ -47,9 +48,13 @@ export default function StoreLoginPage() {
         const storage = rememberMe ? localStorage : sessionStorage;
         storage.setItem("token", data.token);
         storage.setItem("storeId", data.storeId);
-        storage.setItem("shopid", data.shopid || "");   // ✅ Store shopid
+        storage.setItem("shopid", data.shopid || "");
         storage.setItem("storeName", data.storeName);
         storage.setItem("storeEmail", email);
+        storage.setItem("district", data.district || "");
+
+        // ✅ Join the store's Socket.IO room – auto‑detects ObjectId from token
+        joinStoreRoom(); // No argument – reads from token
 
         toast.success("Login successful! Redirecting...");
         setTimeout(() => {

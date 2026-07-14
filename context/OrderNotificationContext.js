@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";
-import { getAllOrders, createNotification } from "@/app/services/orderAPI";
+import { getOrdersByStore, createNotification } from "@/app/services/orderAPI";
 import io from "socket.io-client";
 import SERVERURL from "@/app/services/serverURL";
 import { useQueryClient } from "@tanstack/react-query";
@@ -44,6 +44,26 @@ export function OrderNotificationProvider({ children }) {
   const isSyncingRef = useRef(false);
   const syncTimeoutRef = useRef(null);
   const lastSyncTimeRef = useRef(0);
+
+  // ---- Helper: get storeId only if the user is a store (role === 'store') ----
+  const getStoreId = useCallback(() => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        // ✅ Only store users have role 'store' – skip staff/pharmacist
+        if (payload.role === 'store' && payload.id) {
+          return payload.id; // ObjectId
+        }
+      } catch (_) {}
+    }
+    // Fallback to stored storeId if it looks like a valid ObjectId
+    const storeId = localStorage.getItem('storeId') || sessionStorage.getItem('storeId');
+    if (storeId && storeId.match(/^[0-9a-fA-F]{24}$/)) {
+      return storeId;
+    }
+    return null;
+  }, []);
 
   // ---- Preload audio ----
   useEffect(() => {
@@ -144,7 +164,7 @@ export function OrderNotificationProvider({ children }) {
     }
   }, [pathname, notifications, startRinging, stopRinging]);
 
-  // ---- Add new notifications (with path check!) ----
+  // ---- Add new notifications ----
   const addNewNotifications = useCallback((newNotifs) => {
     if (newNotifs.length === 0) return;
 
@@ -167,7 +187,7 @@ export function OrderNotificationProvider({ children }) {
     }
   }, [startRinging, queryClient, pathname]);
 
-  // ---- syncNotifications (debounced + rate limited + path check) ----
+  // ---- syncNotifications – only for store users ----
   const syncNotifications = useCallback(async (silent = false) => {
     const isEnabled = NOTIFICATION_ENABLED_PATHS.some(p => pathname.startsWith(p));
     if (!isEnabled) return;
@@ -177,11 +197,17 @@ export function OrderNotificationProvider({ children }) {
     if (isSyncingRef.current) return;
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
 
+    const storeId = getStoreId();
+    if (!storeId) {
+      console.warn('⚠️ No storeId – skipping sync (user may be staff)');
+      return;
+    }
+
     syncTimeoutRef.current = setTimeout(async () => {
       lastSyncTimeRef.current = Date.now();
       isSyncingRef.current = true;
       try {
-        const response = await getAllOrders();
+        const response = await getOrdersByStore(storeId);
         if (!response.success) {
           isSyncingRef.current = false;
           syncTimeoutRef.current = null;
@@ -264,7 +290,7 @@ export function OrderNotificationProvider({ children }) {
         syncTimeoutRef.current = null;
       }
     }, SYNC_DEBOUNCE);
-  }, [addNewNotifications, stopRinging, notifications, pathname]);
+  }, [addNewNotifications, stopRinging, notifications, pathname, getStoreId]);
 
   // ---- Socket.IO listener ----
   useEffect(() => {
@@ -285,8 +311,17 @@ export function OrderNotificationProvider({ children }) {
         pollingIntervalRef.current = null;
         pollingActiveRef.current = false;
       }
+
+      const storeId = getStoreId();
+      if (storeId) {
+        socket.emit('join-store-room', storeId);
+        console.log(`✅ Socket ${socket.id} joined room: store-${storeId}`);
+      } else {
+        console.warn('⚠️ No storeId – skipping room join (user may be staff)');
+      }
+
       const isEnabled = NOTIFICATION_ENABLED_PATHS.some(p => pathname.startsWith(p));
-      if (isEnabled) {
+      if (isEnabled && storeId) {
         const now = Date.now();
         if (now - lastSyncTimeRef.current > MIN_SYNC_INTERVAL) {
           syncNotifications(true);
@@ -312,6 +347,16 @@ export function OrderNotificationProvider({ children }) {
     socket.on("new_order", async (data) => {
       const { orderId, order } = data;
       if (!order || !order.items) return;
+
+      const currentStoreId = getStoreId();
+      if (!currentStoreId) {
+        console.warn('⚠️ No storeId – ignoring order');
+        return;
+      }
+      if (order.storeId && order.storeId !== currentStoreId) {
+        console.warn(`⚠️ Ignoring order for different store (${order.storeId} vs ${currentStoreId})`);
+        return;
+      }
 
       const pendingItems = order.items.filter(item => item.status === "pending");
       if (pendingItems.length === 0) return;
@@ -360,7 +405,7 @@ export function OrderNotificationProvider({ children }) {
         pollingActiveRef.current = false;
       }
     };
-  }, [pathname, startRinging, addNewNotifications, syncNotifications]);
+  }, [pathname, startRinging, addNewNotifications, syncNotifications, getStoreId]);
 
   // ---- triggerNewOrder ----
   const triggerNewOrder = useCallback(async (order) => {

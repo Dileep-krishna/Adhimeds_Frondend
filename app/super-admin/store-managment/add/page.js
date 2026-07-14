@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { GoogleMap, LoadScript, Marker, Autocomplete } from '@react-google-maps/api';
 import toast, { Toaster } from 'react-hot-toast';
@@ -9,13 +9,21 @@ import '../medical-stores.css';
 import './storeAdd.css';
 
 const mapContainerStyle = { width: '100%', height: '300px', borderRadius: '8px' };
-const defaultCenter = { lat: 9.9312, lng: 76.2673 };
-const mapOptions = { disableDefaultUI: false, zoomControl: true };
+const defaultCenter = { lat: 10.1187, lng: 76.4864 };
+
+const mapOptions = {
+  disableDefaultUI: false,
+  zoomControl: true,
+  mapTypeControl: false,
+  streetViewControl: false,
+  fullscreenControl: true,
+};
+
 const libraries = ['places'];
 
 export default function AddStorePage() {
   const router = useRouter();
-  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
   const [formData, setFormData] = useState({
     storeName: '',
@@ -24,7 +32,7 @@ export default function AddStorePage() {
     address: '',
     latitude: defaultCenter.lat,
     longitude: defaultCenter.lng,
-    district: '',               // auto‑detected
+    district: '',
     status: 'pending',
     vendorCategory: '',
     pincode: '',
@@ -42,10 +50,12 @@ export default function AddStorePage() {
   const [autocomplete, setAutocomplete] = useState(null);
   const [saving, setSaving] = useState(false);
   const [shopsList, setShopsList] = useState([]);
-  const searchBoxRef = useRef(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
+  const [mapLoadError, setMapLoadError] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const searchBoxRef = useRef(null);
 
-  // Fetch shops for shopid validation
+  // Fetch shops
   useEffect(() => {
     const fetchShops = async () => {
       try {
@@ -53,157 +63,150 @@ export default function AddStorePage() {
         if (res.ok) {
           const data = await res.json();
           setShopsList(Array.isArray(data) ? data : []);
-        } else {
-          console.warn('Could not fetch shops');
         }
-      } catch (error) {
-        console.warn('Error fetching shops:', error);
-      }
+      } catch (_) {}
     };
     fetchShops();
   }, []);
 
-  // ---------- District detection using Google Geocode API ----------
-const fetchDistrictFromCoords = useCallback(async (lat, lng) => {
-  if (!googleMapsApiKey) {
-    toast.error('Google Maps API key is missing.');
-    console.error('❌ Missing API key');
-    return;
-  }
-
-  setIsGeocoding(true);
-  try {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${googleMapsApiKey}`;
-    console.log('🔍 Geocoding request URL:', url); // 👈 log the full URL (key partially hidden)
-
-    const response = await fetch(url);
-    console.log('📡 Response status:', response.status);
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  // ---------- District Detection (with detailed logs) ----------
+  const fetchDistrictFromCoords = useCallback(async (lat, lng) => {
+    console.log('📍 fetchDistrictFromCoords called with lat:', lat, 'lng:', lng);
+    if (!apiKey) {
+      console.warn('❌ API key missing');
+      return;
     }
+    setIsGeocoding(true);
+    try {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
+      console.log('🌐 Geocoding URL:', url);
+      const res = await fetch(url);
+      const data = await res.json();
 
-    const data = await response.json();
-    console.log('📦 Geocoding response:', data); // 👈 log full response
+      console.log('📦 Geocoding response status:', data.status);
+      console.log('📦 Full Geocoding response:', JSON.stringify(data, null, 2));
 
-    if (data.status === 'OK' && data.results.length > 0) {
-      const addressComponents = data.results[0].address_components;
-      let district = '';
+      if (data.status === 'OK' && data.results.length > 0) {
+        const components = data.results[0].address_components;
+        console.log('📍 Address components:', components);
+        let district = '';
 
-      for (const component of addressComponents) {
-        if (component.types.includes('administrative_area_level_2')) {
-          district = component.long_name;
-          break;
-        }
-      }
-      if (!district) {
-        for (const component of addressComponents) {
-          if (component.types.includes('administrative_area_level_1')) {
-            district = component.long_name;
+        // 1. Check administrative_area_level_3 (DISTRICT in India)
+        for (const c of components) {
+          console.log(`🔍 Checking component: ${c.long_name}, types:`, c.types);
+          if (c.types.includes('administrative_area_level_3')) {
+            district = c.long_name;
+            console.log('✅ Found district (admin level 3):', district);
             break;
           }
         }
-      }
 
-      if (district) {
-        setFormData(prev => ({ ...prev, district }));
-        toast.success(`District identified: ${district}`);
-        console.log('✅ District found:', district);
-      } else {
-        setFormData(prev => ({ ...prev, district: '' }));
-        toast.warn('Could not determine district from this location.');
-        console.warn('⚠️ No district component found');
-      }
-    } else {
-      // Handle API error statuses
-      let errorMsg = 'Reverse geocoding failed.';
-      if (data.status === 'REQUEST_DENIED') {
-        errorMsg = 'Google Geocoding API is not enabled or API key is invalid.';
-      } else if (data.status === 'ZERO_RESULTS') {
-        errorMsg = 'No address found for these coordinates.';
-      } else if (data.status === 'OVER_QUERY_LIMIT') {
-        errorMsg = 'Geocoding API quota exceeded.';
-      }
-      setFormData(prev => ({ ...prev, district: '' }));
-      toast.error(errorMsg);
-      console.error('❌ Geocoding API error:', data.status, data.error_message || '');
-    }
-  } catch (error) {
-    console.error('🔥 Network/other error:', error);
-    setFormData(prev => ({ ...prev, district: '' }));
-    toast.error('Error fetching district. Check console for details.');
-  } finally {
-    setIsGeocoding(false);
-  }
-}, [googleMapsApiKey]);
-  // ---------- Map & Autocomplete handlers ----------
-  const updatePosition = useCallback((lat, lng) => {
-    setFormData(prev => ({ ...prev, latitude: lat, longitude: lng }));
-    if (map) map.panTo({ lat, lng });
-    if (lat && lng) {
-      fetchDistrictFromCoords(lat, lng);
-    }
-  }, [map, fetchDistrictFromCoords]);
-
-  const onMapClick = useCallback((event) => {
-    updatePosition(event.latLng.lat(), event.latLng.lng());
-  }, [updatePosition]);
-
-  const onMarkerDragEnd = useCallback((event) => {
-    updatePosition(event.latLng.lat(), event.latLng.lng());
-  }, [updatePosition]);
-
-  const onLoadAutocomplete = useCallback((autocompleteInstance) => {
-    setAutocomplete(autocompleteInstance);
-    autocompleteInstance.setComponentRestrictions({ country: 'in' });
-    const ernakulamBounds = new window.google.maps.LatLngBounds(
-      { lat: 9.85, lng: 76.20 },
-      { lat: 10.05, lng: 76.45 }
-    );
-    autocompleteInstance.setBounds(ernakulamBounds);
-  }, []);
-
-  const onPlaceChanged = useCallback(() => {
-    if (autocomplete !== null) {
-      const place = autocomplete.getPlace();
-      if (place.geometry && place.geometry.location) {
-        const lat = place.geometry.location.lat();
-        const lng = place.geometry.location.lng();
-        const address = place.formatted_address || place.name || '';
-        const searchLocation = searchBoxRef.current?.value || address;
-
-        setFormData(prev => ({
-          ...prev,
-          address,
-          latitude: lat,
-          longitude: lng,
-          searchLocation,
-        }));
-        if (map) {
-          map.panTo({ lat, lng });
-          map.setZoom(15);
-        }
-
-        // Trigger district detection
-        fetchDistrictFromCoords(lat, lng);
-
-        // Also try direct extraction from place components
-        if (place.address_components) {
-          for (const component of place.address_components) {
-            if (component.types.includes('administrative_area_level_2')) {
-              setFormData(prev => ({ ...prev, district: component.long_name }));
-              toast.success(`District: ${component.long_name}`);
+        // 2. Check administrative_area_level_2 (DIVISION – fallback)
+        if (!district) {
+          for (const c of components) {
+            if (c.types.includes('administrative_area_level_2')) {
+              district = c.long_name;
+              console.log('✅ Found district (admin level 2):', district);
               break;
             }
           }
         }
+
+        // 3. Check locality
+        if (!district) {
+          for (const c of components) {
+            if (c.types.includes('locality')) {
+              district = c.long_name;
+              console.log('✅ Found district (locality):', district);
+              break;
+            }
+          }
+        }
+
+        // 4. Fallback to administrative_area_level_1 (state)
+        if (!district) {
+          for (const c of components) {
+            if (c.types.includes('administrative_area_level_1')) {
+              district = c.long_name;
+              console.log('✅ Found district (state):', district);
+              break;
+            }
+          }
+        }
+
+        console.log('🏷️ Final district detected:', district || 'none');
+        setFormData(prev => ({ ...prev, district }));
+        if (district) toast.success(`District: ${district}`);
+        else toast.warn('Could not determine district. You can type it manually.');
       } else {
-        toast.error('Could not find coordinates for that place. Try a more specific location.');
+        setFormData(prev => ({ ...prev, district: '' }));
+        console.warn('⚠️ Geocoding failed:', data.status);
+        if (data.status === 'REQUEST_DENIED') toast.error('Geocoding API not enabled or key invalid.');
+        else if (data.status === 'ZERO_RESULTS') toast.error('No address found.');
+        else if (data.status === 'OVER_QUERY_LIMIT') toast.error('Quota exceeded.');
+        else toast.error('Reverse geocoding failed.');
       }
+    } catch (error) {
+      console.error('🔥 Geocoding error:', error);
+      setFormData(prev => ({ ...prev, district: '' }));
+      toast.error('Network error fetching district.');
+    } finally {
+      setIsGeocoding(false);
+    }
+  }, [apiKey]);
+
+  const updatePosition = useCallback((lat, lng) => {
+    console.log('🔄 Updating position to:', lat, lng);
+    setFormData(prev => ({ ...prev, latitude: lat, longitude: lng }));
+    if (map) map.panTo({ lat, lng });
+    if (lat && lng) fetchDistrictFromCoords(lat, lng);
+  }, [map, fetchDistrictFromCoords]);
+
+  // ---------- Map handlers ----------
+  const onMapClick = useCallback((e) => {
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+    console.log('🖱️ Map clicked at:', lat, lng);
+    updatePosition(lat, lng);
+  }, [updatePosition]);
+
+  const onMarkerDragEnd = useCallback((e) => {
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+    console.log('🔹 Dragged marker to:', lat, lng);
+    updatePosition(lat, lng);
+  }, [updatePosition]);
+
+  const onLoadAutocomplete = useCallback((instance) => {
+    setAutocomplete(instance);
+    instance.setComponentRestrictions({ country: 'in' });
+  }, []);
+
+  const onPlaceChanged = useCallback(() => {
+    if (!autocomplete) return;
+    const place = autocomplete.getPlace();
+    console.log('📍 Place selected:', place);
+    if (place.geometry?.location) {
+      const lat = place.geometry.location.lat();
+      const lng = place.geometry.location.lng();
+      const address = place.formatted_address || place.name || '';
+      const searchLocation = searchBoxRef.current?.value || address;
+
+      setFormData(prev => ({
+        ...prev,
+        address,
+        latitude: lat,
+        longitude: lng,
+        searchLocation,
+      }));
+      if (map) { map.panTo({ lat, lng }); map.setZoom(15); }
+      fetchDistrictFromCoords(lat, lng);
+    } else {
+      toast.error('Could not find coordinates. Try a more specific location.');
     }
   }, [autocomplete, map, fetchDistrictFromCoords]);
 
-  // ---------- Thumbnail upload ----------
+  // ---------- Thumbnails ----------
   const handleThumbnailChange = useCallback((e) => {
     const files = Array.from(e.target.files);
     if (files.length > 5) {
@@ -211,21 +214,21 @@ const fetchDistrictFromCoords = useCallback(async (lat, lng) => {
       return;
     }
     setThumbnailFiles(files);
-    const previews = files.map(file => URL.createObjectURL(file));
-    thumbnailPreviews.forEach(url => URL.revokeObjectURL(url));
+    const previews = files.map(f => URL.createObjectURL(f));
+    thumbnailPreviews.forEach(u => URL.revokeObjectURL(u));
     setThumbnailPreviews(previews);
   }, [thumbnailPreviews]);
 
-  // ---------- Form validation ----------
+  useEffect(() => () => thumbnailPreviews.forEach(u => URL.revokeObjectURL(u)), [thumbnailPreviews]);
+
+  // ---------- Validation & Save ----------
   const validateForm = useCallback(() => {
-    const requiredFields = [
-      'storeName', 'vendorCategory', 'pincode', 'emailAddress',
+    const required = ['storeName', 'vendorCategory', 'pincode', 'emailAddress',
       'password', 'drugLicenseNumber', 'gstNumber', 'contactNumber',
-      'pharmacistName', 'address', 'searchLocation'
-    ];
-    for (let field of requiredFields) {
-      if (!formData[field]?.trim()) {
-        toast.error(`${field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())} is required`);
+      'pharmacistName', 'address', 'searchLocation'];
+    for (const f of required) {
+      if (!formData[f]?.trim()) {
+        toast.error(`${f.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())} is required`);
         return false;
       }
     }
@@ -237,79 +240,91 @@ const fetchDistrictFromCoords = useCallback(async (lat, lng) => {
       toast.error('Contact number must be 10 digits');
       return false;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.emailAddress)) {
-      toast.error('Valid email address is required');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.emailAddress)) {
+      toast.error('Valid email required');
       return false;
     }
     if (formData.password.length < 6) {
       toast.error('Password must be at least 6 characters');
       return false;
     }
-    if (formData.latitude < -90 || formData.latitude > 90 || formData.longitude < -180 || formData.longitude > 180) {
-      toast.error('Invalid latitude/longitude coordinates');
-      return false;
-    }
     if (thumbnailFiles.length === 0) {
-      toast.error('At least one thumbnail image is required');
+      toast.error('At least one thumbnail is required');
       return false;
     }
-
-    // Shop ID warning (non‑blocking)
-    if (formData.shopid && formData.shopid.trim() !== '') {
-      const exists = shopsList.some(shop => shop.shopid === formData.shopid.trim());
-      if (!exists) {
-        toast.warn('Shop ID does not match any known store. Please verify the ID.');
-      }
-    }
-
     return true;
-  }, [formData, thumbnailFiles, shopsList]);
+  }, [formData, thumbnailFiles]);
 
-  // ---------- Save store ----------
   const saveStore = useCallback(async () => {
     if (!validateForm()) return;
-
     setSaving(true);
     try {
       const payload = new FormData();
-      Object.keys(formData).forEach(key => {
-        if (formData[key] !== undefined && formData[key] !== null) {
-          payload.append(key, formData[key]);
-        }
+      Object.keys(formData).forEach(k => {
+        if (formData[k] !== undefined && formData[k] !== null) payload.append(k, formData[k]);
       });
-      thumbnailFiles.forEach(file => {
-        payload.append('thumbnailImages', file);
-      });
-
-      const response = await createStoreAPI(payload);
-      if (response.success) {
+      thumbnailFiles.forEach(f => payload.append('thumbnailImages', f));
+      const resp = await createStoreAPI(payload);
+      if (resp.success) {
         toast.success('Store added successfully');
         router.push('/super-admin/store-managment');
       } else {
-        toast.error(response.message || 'Creation failed');
+        toast.error(resp.message || 'Creation failed');
       }
     } catch (error) {
       console.error(error);
-      toast.error('Server error while saving store');
+      toast.error('Server error');
     } finally {
       setSaving(false);
     }
   }, [formData, thumbnailFiles, validateForm, router]);
 
-  // Cleanup object URLs
-  useEffect(() => {
-    return () => {
-      thumbnailPreviews.forEach(url => URL.revokeObjectURL(url));
-    };
-  }, [thumbnailPreviews]);
+  // ---------- Map load callbacks ----------
+  const handleMapLoad = useCallback((mapInstance) => {
+    setMap(mapInstance);
+    setMapLoaded(true);
+    setMapLoadError(false);
+  }, []);
 
-  if (!googleMapsApiKey) {
-    return <div className="medical-stores-container"><div className="alert alert-warning">Missing API key</div></div>;
+  const handleMapError = useCallback((error) => {
+    console.error('Google Maps load error:', error);
+    setMapLoadError(true);
+    toast.error('Google Maps failed to load. Check console.');
+  }, []);
+
+  const mapComponent = useMemo(() => (
+    <GoogleMap
+      mapContainerStyle={mapContainerStyle}
+      center={{ lat: formData.latitude, lng: formData.longitude }}
+      zoom={14}
+      options={mapOptions}
+      onClick={onMapClick}
+      onLoad={handleMapLoad}
+    >
+      <Marker
+        position={{ lat: formData.latitude, lng: formData.longitude }}
+        draggable
+        onDragEnd={onMarkerDragEnd}
+      />
+    </GoogleMap>
+  ), [formData.latitude, formData.longitude, onMapClick, onMarkerDragEnd, handleMapLoad]);
+
+  if (!apiKey) {
+    return (
+      <div className="medical-stores-container">
+        <div className="alert alert-danger">
+          <strong>Missing API Key:</strong> Please set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in .env.local
+        </div>
+      </div>
+    );
   }
 
   return (
-    <LoadScript googleMapsApiKey={googleMapsApiKey} libraries={libraries}>
+    <LoadScript
+      googleMapsApiKey={apiKey}
+      libraries={libraries}
+      onError={handleMapError}
+    >
       <Toaster position="top-right" />
       <div className="medical-stores-container">
         <div className="stores-hero">
@@ -344,7 +359,7 @@ const fetchDistrictFromCoords = useCallback(async (lat, lng) => {
                 onChange={(e) => setFormData({ ...formData, shopid: e.target.value })}
                 placeholder="e.g., 30, 3743, 3783, 3752"
               />
-              <small className="text-muted">If provided, it will be validated against existing shops.</small>
+              <small className="text-muted">If provided, it will be validated.</small>
             </div>
 
             {/* Search Location */}
@@ -362,26 +377,59 @@ const fetchDistrictFromCoords = useCallback(async (lat, lng) => {
               </Autocomplete>
             </div>
 
-            {/* Map */}
-            <div className="form-group">
+            {/* Map Section */}
+            <div className="form-group" style={{ position: 'relative' }}>
               <label>Exact Location * (click or drag marker)</label>
-              <GoogleMap
-                mapContainerStyle={mapContainerStyle}
-                center={{ lat: formData.latitude, lng: formData.longitude }}
-                zoom={14}
-                options={mapOptions}
-                onClick={onMapClick}
-                onLoad={setMap}
-              >
-                <Marker
-                  position={{ lat: formData.latitude, lng: formData.longitude }}
-                  draggable={true}
-                  onDragEnd={onMarkerDragEnd}
-                />
-              </GoogleMap>
+              <div style={{ position: 'relative', width: '100%' }}>
+                <div style={mapContainerStyle}>
+                  {mapComponent}
+                </div>
+
+                {!mapLoaded && !mapLoadError && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(255,255,255,0.7)',
+                    borderRadius: '8px',
+                    pointerEvents: 'none',
+                  }}>
+                    <span>Loading map…</span>
+                  </div>
+                )}
+
+                {mapLoadError && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(255,255,255,0.9)',
+                    borderRadius: '8px',
+                    padding: '20px',
+                    textAlign: 'center',
+                  }}>
+                    <p><strong>⚠️ Google Maps failed to load.</strong></p>
+                    <p style={{ fontSize: '0.9rem', color: '#666' }}>Check browser console (F12) for details.</p>
+                    <button className="btn-secondary" onClick={() => window.location.reload()}>
+                      Refresh Page
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Lat/Lng inputs */}
+            {/* Lat/Lng */}
             <div className="latlng-inputs">
               <div className="lat-input">
                 <label>Latitude *</label>
@@ -414,7 +462,7 @@ const fetchDistrictFromCoords = useCallback(async (lat, lng) => {
               />
             </div>
 
-            {/* District (auto‑detected) */}
+            {/* District */}
             <div className="form-group">
               <label>District (auto‑detected)</label>
               <input

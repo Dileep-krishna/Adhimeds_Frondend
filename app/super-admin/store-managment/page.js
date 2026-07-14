@@ -54,7 +54,7 @@ const StatsRow = React.memo(({ activeCount, inactiveCount, pendingCount }) => (
 ));
 StatsRow.displayName = 'StatsRow';
 
-// Memoized store row component
+// Memoized store row component – now includes District
 const StoreRow = React.memo(({ store, onView, onDelete, getThumbnail }) => {
   const thumbnail = useMemo(() => getThumbnail(store), [store, getThumbnail]);
   return (
@@ -81,6 +81,7 @@ const StoreRow = React.memo(({ store, onView, onDelete, getThumbnail }) => {
         </div>
       </td>
       <td><span className="vendor-badge">{store.vendorCategory || '—'}</span></td>
+      <td><span className="district-badge">{store.district || '—'}</span></td>
       <td>{store.emailAddress || '—'}</td>
       <td>
         <span className={`status-badge ${store.status}`}>
@@ -108,11 +109,12 @@ const StoreRow = React.memo(({ store, onView, onDelete, getThumbnail }) => {
 });
 StoreRow.displayName = 'StoreRow';
 
-// Skeleton loader row (fixed – no JSX syntax errors)
+// Skeleton loader row (updated to match new column count)
 const SkeletonRow = () => (
   <tr className="skeleton-row">
     <td><div className="skeleton" style={{ width: '200px', height: '50px' }} /></td>
     <td><div className="skeleton" style={{ width: '100px' }} /></td>
+    <td><div className="skeleton" style={{ width: '120px' }} /></td>
     <td><div className="skeleton" style={{ width: '150px' }} /></td>
     <td><div className="skeleton" style={{ width: '80px' }} /></td>
     <td><div className="skeleton" style={{ width: '90px' }} /></td>
@@ -167,7 +169,8 @@ export default function MedicalStoreManagement() {
       const term = debouncedSearch.toLowerCase();
       result = result.filter(store =>
         store.storeName?.toLowerCase().includes(term) ||
-        store.address?.toLowerCase().includes(term)
+        store.address?.toLowerCase().includes(term) ||
+        store.district?.toLowerCase().includes(term)
       );
     }
     if (statusFilter !== 'all') {
@@ -268,7 +271,7 @@ export default function MedicalStoreManagement() {
           <input
             type="text"
             className="search-input"
-            placeholder="Search by name or address..."
+            placeholder="Search by name, address, or district..."
             value={searchTerm}
             onChange={handleSearchChange}
           />
@@ -278,7 +281,15 @@ export default function MedicalStoreManagement() {
           {loading ? (
             <table className="stores-table">
               <thead>
-                <tr><th>Store</th><th>Vendor Category</th><th>Email</th><th>Status</th><th>Added Date</th><th>Actions</th></tr>
+                <tr>
+                  <th>Store</th>
+                  <th>Vendor Category</th>
+                  <th>District</th>
+                  <th>Email</th>
+                  <th>Status</th>
+                  <th>Added Date</th>
+                  <th>Actions</th>
+                </tr>
               </thead>
               <tbody>
                 {Array(itemsPerPage).fill().map((_, i) => <SkeletonRow key={i} />)}
@@ -291,6 +302,7 @@ export default function MedicalStoreManagement() {
                   <tr>
                     <th>Store</th>
                     <th>Vendor Category</th>
+                    <th>District</th>
                     <th>Email</th>
                     <th>Status</th>
                     <th>Added Date</th>
@@ -309,7 +321,7 @@ export default function MedicalStoreManagement() {
                   ))}
                   {paginatedStores.length === 0 && (
                     <tr>
-                      <td colSpan="6" className="empty-state">
+                      <td colSpan="7" className="empty-state">
                         <i className="bi bi-inbox"></i>
                         <p>No medical stores found</p>
                       </td>
@@ -365,7 +377,7 @@ export default function MedicalStoreManagement() {
           </div>
         )}
 
-        {/* View Details Side Drawer */}
+        {/* View Details Side Drawer – now includes District */}
         <AnimatePresence>
           {viewStore && (
             <>
@@ -402,6 +414,7 @@ export default function MedicalStoreManagement() {
                       )}
                       <div className="detail-row"><strong>Store Name:</strong> {viewStore.storeName}</div>
                       <div className="detail-row"><strong>Vendor Category:</strong> {viewStore.vendorCategory || '—'}</div>
+                      <div className="detail-row"><strong>District:</strong> {viewStore.district || '—'}</div>
                       <div className="detail-row"><strong>Email:</strong> {viewStore.emailAddress || '—'}</div>
                       <div className="detail-row"><strong>Contact Number:</strong> {viewStore.contactNumber || '—'}</div>
                       <div className="detail-row"><strong>Pharmacist Name:</strong> {viewStore.pharmacistName || '—'}</div>
@@ -432,8 +445,6 @@ export default function MedicalStoreManagement() {
           )}
         </AnimatePresence>
       </div>
-
- 
     </>
   );
 }
