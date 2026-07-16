@@ -12,6 +12,7 @@ async function handleResponse(res) {
   }
 }
 
+// ---------- ORDER CRUD ----------
 export const placeOrder = async (items) => {
   const res = await fetch(`${SERVERURL}/api/orders`, {
     method: 'POST',
@@ -36,9 +37,11 @@ export const getOrderById = async (orderId) => {
   return handleResponse(res);
 };
 
-export const updateItemStatus = async (orderId, itemId, status, assignedTo) => {
+// ---------- UPDATE ITEM STATUS (with optional billUrl) ----------
+export const updateItemStatus = async (orderId, itemId, status, assignedTo, billUrl) => {
   const body = { status };
   if (assignedTo !== undefined) body.assignedTo = assignedTo;
+  if (billUrl !== undefined) body.billUrl = billUrl;
   const res = await fetch(`${SERVERURL}/api/orders/${orderId}/items/${itemId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -47,6 +50,7 @@ export const updateItemStatus = async (orderId, itemId, status, assignedTo) => {
   return handleResponse(res);
 };
 
+// ---------- DELETE ITEM ----------
 export const deleteItem = async (orderId, itemId) => {
   const res = await fetch(`${SERVERURL}/api/orders/${orderId}/items/${itemId}`, {
     method: 'DELETE',
@@ -54,6 +58,19 @@ export const deleteItem = async (orderId, itemId) => {
   return handleResponse(res);
 };
 
+// ---------- BILL UPLOAD ----------
+export const uploadBill = async (orderId, itemId, file) => {
+  const formData = new FormData();
+  formData.append('bill', file);
+  const res = await fetch(`${SERVERURL}/api/orders/${orderId}/items/${itemId}/upload-bill`, {
+    method: 'POST',
+    body: formData,
+    // No Content-Type – FormData sets it automatically
+  });
+  return handleResponse(res);
+};
+
+// ---------- NOTIFICATIONS ----------
 export const getNotifications = async () => {
   const res = await fetch(`${SERVERURL}/api/notifications`);
   return handleResponse(res);
@@ -80,6 +97,15 @@ export const markNotificationRead = async (notificationId) => {
 export const clearAllNotifications = async () => {
   const res = await fetch(`${SERVERURL}/api/notifications`, {
     method: 'DELETE',
+  });
+  return handleResponse(res);
+};
+
+export const updateOrderStatus = async (orderId, status) => {
+  const res = await fetch(`${SERVERURL}/api/orders/${orderId}/status`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
   });
   return handleResponse(res);
 };

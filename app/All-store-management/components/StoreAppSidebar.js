@@ -76,7 +76,7 @@ export default function StoreAppSidebar() {
 
   const orderTabs = [
     { label: "All Orders", href: "/All-store-management/All-Orders" },
-    { label: "Requests", href: "/All-store-management/Order-Requests" },
+
   ];
 
   const isTabActive = (tab) => {
