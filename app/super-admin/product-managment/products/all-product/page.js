@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
@@ -27,7 +26,6 @@ function usePagination(totalItems, itemsPerPage = 10) {
   const [currentPage, setCurrentPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
   
-  // Reset to first page when total items changes significantly
   useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(1);
@@ -47,7 +45,6 @@ function usePagination(totalItems, itemsPerPage = 10) {
 
 // Memoized product row component
 const ProductRow = memo(({ product, onTogglePublished, onToggleFeatured, onToggleTodayDeal, onEdit, onDelete, onInfo, getImageUrl }) => {
-  // Optimize image rendering with decoding="async"
   const thumbnailUrl = getImageUrl(product.thumbnail);
   
   return (
@@ -87,7 +84,7 @@ const ProductRow = memo(({ product, onTogglePublished, onToggleFeatured, onToggl
       <td>₹{product.unitPrice}</td>
       <td>{product.discount > 0 ? `${product.discount}%` : '—'}</td>
       <td>
-        <button className="btn-icon info" onClick={() => onInfo(product)} title="View Details">
+        <button className="btn-icon info" onClick={() => onInfo(product._id)} title="View Details">
           <i className="bi bi-info-circle"></i>
         </button>
       </td>
@@ -118,7 +115,7 @@ const ProductRow = memo(({ product, onTogglePublished, onToggleFeatured, onToggl
 });
 ProductRow.displayName = 'ProductRow';
 
-// Skeleton loader row for better perceived performance
+// Skeleton loader row
 const SkeletonRow = memo(() => (
   <tr className="skeleton-row">
     <td><div className="skeleton" style={{ width: '120px', height: '40px' }}></div></td>
@@ -139,14 +136,7 @@ SkeletonRow.displayName = 'SkeletonRow';
 export const dynamic = "force-dynamic";
 
 export default function AllProductsPage() {
-  const pathname = usePathname();
   const router = useRouter();
-
-  const navItems = [
-    { id: 'all-products', label: 'All products', icon: 'bi-grid-3x3-gap-fill', path: '/super-admin/product-managment/all-products' },
-    { id: 'inhouse', label: 'Inhouse Products', icon: 'bi-house-door-fill', path: '/super-admin/product-managment/inhouse-product' },
-    { id: 'seller', label: 'Seller Products', icon: 'bi-people-fill', path: '/super-admin/product-managment/all-seller-product' },
-  ];
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -158,10 +148,6 @@ export default function AllProductsPage() {
   
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [isPending, startTransition] = useTransition();
-
-  // Side modal state
-  const [showInfoModal, setShowInfoModal] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
 
   const dropdownRef = useRef(null);
 
@@ -194,7 +180,6 @@ export default function AllProductsPage() {
       const productsData = productsRes.data;
       const allReviews = reviewsRes.success ? reviewsRes.data : [];
 
-      // Group reviews by productId and calculate average rating
       const reviewsByProduct = {};
       allReviews.forEach(review => {
         const pid = review.productId?._id || review.productId;
@@ -254,19 +239,16 @@ export default function AllProductsPage() {
   // Pagination logic
   const { currentPage, totalPages, goToPage, nextPage, prevPage, setCurrentPage } = usePagination(filteredAndSortedProducts.length, itemsPerPage);
   
-  // Reset to page 1 when filters or search change
   useEffect(() => {
     setCurrentPage(1);
   }, [debouncedSearchTerm, filterOption, sortOption, setCurrentPage]);
 
-  // Get current page items
   const paginatedProducts = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     return filteredAndSortedProducts.slice(startIndex, endIndex);
   }, [filteredAndSortedProducts, currentPage, itemsPerPage]);
 
-  // Generate page numbers for pagination
   const pageNumbers = useMemo(() => {
     const pages = [];
     const maxVisible = 5;
@@ -344,10 +326,10 @@ export default function AllProductsPage() {
     router.push(`/super-admin/product-managment/products/edit-product/${id}`);
   }, [router]);
 
-  const openInfoModal = useCallback((product) => {
-    setSelectedProduct(product);
-    setShowInfoModal(true);
-  }, []);
+  // ✅ NEW: Navigate to product details page
+  const handleInfoClick = useCallback((productId) => {
+    router.push(`/super-admin/product-managment/products/product-details/${productId}`);
+  }, [router]);
 
   const toggleDropdown = useCallback(() => setDropdownOpen(prev => !prev), []);
   const closeDropdown = useCallback(() => setDropdownOpen(false), []);
@@ -359,14 +341,12 @@ export default function AllProductsPage() {
     setCurrentPage(1);
   }, [setCurrentPage]);
 
-  // Handle items per page change
   const handleItemsPerPageChange = useCallback((e) => {
     const newValue = parseInt(e.target.value, 10);
     setItemsPerPage(newValue);
     setCurrentPage(1);
   }, [setCurrentPage]);
 
-  // Handle search with transition for smoother UI
   const handleSearchChange = useCallback((e) => {
     const value = e.target.value;
     startTransition(() => {
@@ -374,66 +354,41 @@ export default function AllProductsPage() {
     });
   }, []);
 
-  // Calculate range display
   const startItem = filteredAndSortedProducts.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, filteredAndSortedProducts.length);
 
   return (
-<div className="all-products-container" suppressHydrationWarning>
+    <div className="all-products-container" suppressHydrationWarning>
       <Toaster position="top-right" />
-      <div className="top-nav">
-        <div className="nav-scroll">
-          {navItems.map(item => (
-            <Link key={item.id} href={item.path} className={`nav-link ${pathname === item.path ? 'active' : ''}`}>
-              <i className={`bi ${item.icon} me-2`}></i>{item.label}
-            </Link>
-          ))}
-        </div>
-      </div>
 
+      {/* Header */}
       <div className="header-actions">
-        <h4 className="page-title">All Products</h4>
-        <div className="transparent-dropdown" ref={dropdownRef}>
-          <button className="transparent-add-btn" onClick={toggleDropdown}>
-            <i className="bi bi-plus-circle"></i> Add New
-          </button>
-          {dropdownOpen && (
-            <ul className="transparent-dropdown-menu">
-              <li>
-                <Link href="/super-admin/product-managment/products/add-product" className="dropdown-item" onClick={closeDropdown}>
-                  <i className="bi bi-box-seam me-2"></i> New Product
-                </Link>
-              </li>
-              <li>
-                <Link href="/super-admin/product-managment/product-setup/category" className="dropdown-item" onClick={closeDropdown}>
-                  <i className="bi bi-tags me-2"></i> New Category
-                </Link>
-              </li>
-              <li>
-                <Link href="/super-admin/product-managment/draft-products" className="dropdown-item" onClick={closeDropdown}>
-                  <i className="bi bi-file-earmark-text me-2"></i> Draft
-                </Link>
-              </li>
-              <li>
-                <Link href="/super-admin/product-managment/product-setup/Brand" className="dropdown-item" onClick={closeDropdown}>
-                  <i className="bi bi-building me-2"></i> New Brand
-                </Link>
-              </li>
-            </ul>
-          )}
+        <div className="header-left">
+          <h4 className="page-title">📦 All Products</h4>
+          <p className="page-subtitle">Manage your product inventory and listings</p>
+        </div>
+        <div className="header-right">
+          <div className="transparent-dropdown" ref={dropdownRef}>
+            <button className="transparent-add-btn" onClick={toggleDropdown}>
+              <i className="bi bi-plus-circle"></i> Add New
+            </button>
+            {dropdownOpen && (
+              <ul className="transparent-dropdown-menu">
+                <li><Link href="/super-admin/product-managment/products/add-product" className="dropdown-item" onClick={closeDropdown}><i className="bi bi-box-seam me-2"></i> New Product</Link></li>
+                <li><Link href="/super-admin/product-managment/product-setup/category" className="dropdown-item" onClick={closeDropdown}><i className="bi bi-tags me-2"></i> New Category</Link></li>
+                <li><Link href="/super-admin/product-managment/draft-products" className="dropdown-item" onClick={closeDropdown}><i className="bi bi-file-earmark-text me-2"></i> Draft</Link></li>
+                <li><Link href="/super-admin/product-managment/product-setup/Brand" className="dropdown-item" onClick={closeDropdown}><i className="bi bi-building me-2"></i> New Brand</Link></li>
+              </ul>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Filter Bar */}
       <div className="filter-bar">
         <div className="row g-2 align-items-end">
           <div className="col-md-4">
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Search products..."
-              value={searchTerm}
-              onChange={handleSearchChange}
-            />
+            <input type="text" className="form-control" placeholder="Search products..." value={searchTerm} onChange={handleSearchChange} />
           </div>
           <div className="col-md-3">
             <select className="form-select" value={filterOption} onChange={(e) => setFilterOption(e.target.value)}>
@@ -478,9 +433,7 @@ export default function AllProductsPage() {
               </tr>
             </thead>
             <tbody>
-              {Array(itemsPerPage).fill(null).map((_, idx) => (
-                <SkeletonRow key={idx} />
-              ))}
+              {Array(itemsPerPage).fill(null).map((_, idx) => <SkeletonRow key={idx} />)}
             </tbody>
           </table>
         ) : (
@@ -511,7 +464,7 @@ export default function AllProductsPage() {
                     onToggleTodayDeal={toggleTodayDeal}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
-                    onInfo={openInfoModal}
+                    onInfo={handleInfoClick}
                     getImageUrl={getImageUrl}
                   />
                 ))}
@@ -521,43 +474,31 @@ export default function AllProductsPage() {
               </tbody>
             </table>
             
-            {/* Pagination Controls */}
+            {/* Pagination */}
             {filteredAndSortedProducts.length > 0 && (
               <div className="pagination-controls">
                 <div className="pagination-info">
                   Showing {startItem} to {endItem} of {filteredAndSortedProducts.length} products
                 </div>
                 <div className="pagination-actions">
-                  <select 
-                    className="form-select per-page-select" 
-                    value={itemsPerPage} 
-                    onChange={handleItemsPerPageChange}
-                    aria-label="Items per page"
-                  >
+                  <select className="form-select per-page-select" value={itemsPerPage} onChange={handleItemsPerPageChange}>
                     <option value={10}>10 per page</option>
                     <option value={25}>25 per page</option>
                     <option value={50}>50 per page</option>
                     <option value={100}>100 per page</option>
                   </select>
-                  
                   <nav aria-label="Page navigation">
                     <ul className="pagination mb-0">
                       <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                        <button className="page-link" onClick={prevPage} disabled={currentPage === 1}>
-                          <i className="bi bi-chevron-left"></i>
-                        </button>
+                        <button className="page-link" onClick={prevPage} disabled={currentPage === 1}><i className="bi bi-chevron-left"></i></button>
                       </li>
                       {pageNumbers.map(pageNum => (
                         <li key={pageNum} className={`page-item ${currentPage === pageNum ? 'active' : ''}`}>
-                          <button className="page-link" onClick={() => goToPage(pageNum)}>
-                            {pageNum}
-                          </button>
+                          <button className="page-link" onClick={() => goToPage(pageNum)}>{pageNum}</button>
                         </li>
                       ))}
                       <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-                        <button className="page-link" onClick={nextPage} disabled={currentPage === totalPages}>
-                          <i className="bi bi-chevron-right"></i>
-                        </button>
+                        <button className="page-link" onClick={nextPage} disabled={currentPage === totalPages}><i className="bi bi-chevron-right"></i></button>
                       </li>
                     </ul>
                   </nav>
@@ -568,83 +509,7 @@ export default function AllProductsPage() {
         )}
       </div>
 
-      {/* SIDE MODAL for Product Details */}
-      <AnimatePresence>
-        {showInfoModal && selectedProduct && (
-          <>
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'tween', duration: 0.3 }}
-              className="side-modal info-modal"
-            >
-              <div className="side-modal-header">
-                <h5>Product Details</h5>
-                <button className="close-modal" onClick={() => setShowInfoModal(false)}>×</button>
-              </div>
-              <div className="side-modal-body">
-                <div className="product-detail-card">
-                  {selectedProduct.thumbnail && (
-                    <div className="text-center mb-3">
-                      <img
-                        src={getImageUrl(selectedProduct.thumbnail)}
-                        alt={selectedProduct.productName}
-                        className="product-detail-image"
-                        style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '1rem' }}
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </div>
-                  )}
-                  <h4>{selectedProduct.productName}</h4>
-                  <p><strong>Brand:</strong> {selectedProduct.brand}</p>
-                  <p><strong>Category:</strong> {selectedProduct.mainCategory}</p>
-                  <p><strong>Unit:</strong> {selectedProduct.unit || 'N/A'}</p>
-                  <p><strong>Weight:</strong> {selectedProduct.weight} kg</p>
-                  <p><strong>Minimum Qty:</strong> {selectedProduct.minPurchaseQty}</p>
-                  <p><strong>Price:</strong> ₹{selectedProduct.unitPrice}</p>
-                  <p><strong>Discount:</strong> {selectedProduct.discount > 0 ? `${selectedProduct.discount}%` : 'None'}</p>
-                  <p><strong>Stock:</strong> {selectedProduct.stock}</p>
-                  <p><strong>SKU:</strong> {selectedProduct.sku || 'N/A'}</p>
-                  <p><strong>Barcode:</strong> {selectedProduct.barcode || 'N/A'}</p>
-                  <p><strong>HSN Code:</strong> {selectedProduct.hsnCode || 'N/A'}</p>
-                  <p><strong>GST Rate:</strong> {selectedProduct.gstRate || 0}%</p>
-                  <p><strong>Rating:</strong> {selectedProduct.avgRating > 0 ? `${selectedProduct.avgRating}/5 (${selectedProduct.reviewCount} reviews)` : 'No reviews yet'}</p>
-                  {selectedProduct.description && (
-                    <div className="mt-3">
-                      <strong>Description:</strong>
-                      <p className="mt-1">{selectedProduct.description}</p>
-                    </div>
-                  )}
-                  {selectedProduct.galleryImages?.length > 0 && (
-                    <div className="mt-3">
-                      <strong>Gallery Images:</strong>
-                      <div className="d-flex flex-wrap gap-2 mt-2">
-                        {selectedProduct.galleryImages.map((img, idx) => (
-                          <img 
-                            key={idx} 
-                            src={getImageUrl(img)} 
-                            alt="gallery" 
-                            width="60" 
-                            height="60" 
-                            loading="lazy" 
-                            decoding="async"
-                            style={{ objectFit: 'cover', borderRadius: '8px' }} 
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-            <div className="side-overlay" onClick={() => setShowInfoModal(false)} />
-          </>
-        )}
-      </AnimatePresence>
 
-     
     </div>
   );
 }

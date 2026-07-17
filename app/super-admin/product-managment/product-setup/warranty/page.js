@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "react-toastify/dist/ReactToastify.css";
 import { toast, ToastContainer } from "react-toastify";
+import { motion, AnimatePresence } from "framer-motion";
 
 import "./warranty.css";
 import { createWarrantyAPI, deleteWarrantyAPI, getWarrantiesAPI, updateWarrantyAPI } from "../../../../services/warrentyAPI";
@@ -90,12 +91,10 @@ export default function WarrantyPage() {
     resetForm();
   };
 
-  // ✅ No dimension validation – accept any image size
   const handleLogoChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Revoke previous preview URL if any
     if (previewUrlRef.current) {
       URL.revokeObjectURL(previewUrlRef.current);
     }
@@ -171,29 +170,41 @@ export default function WarrantyPage() {
   return (
     <div className="warranty-container">
       <ToastContainer position="top-right" autoClose={3000} />
+      
+      {/* Header */}
       <div className="header-actions">
-        <h4 className="page-title">All Warranties</h4>
+        <div className="header-left">
+          <h4 className="page-title">🛡️ All Warranties</h4>
+          <p className="page-subtitle">Manage warranty terms and their logos</p>
+        </div>
         <button className="btn-add" onClick={openAddModal}>
-          + Add New Warranty
+          <i className="bi bi-plus-circle"></i> Add New Warranty
         </button>
       </div>
 
+      {/* Table */}
       <div className="table-responsive">
         {loading ? (
-          <div className="text-center py-4">Loading warranties...</div>
+          <div className="loading-state">
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+          </div>
         ) : (
           <table className="med-table">
             <thead>
               <tr>
                 <th>Warranty Text</th>
                 <th>Logo</th>
-                <th>Options</th>
+                <th className="text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {warranties.map((w) => (
                 <tr key={w._id}>
-                  <td><strong>{w.text}</strong></td>
+                  <td>
+                    <span className="warranty-text">{w.text}</span>
+                  </td>
                   <td>
                     {w.logo ? (
                       <img
@@ -201,75 +212,116 @@ export default function WarrantyPage() {
                         alt="logo"
                         className="warranty-logo"
                         onError={(e) => {
-                          console.error(`Failed to load logo: ${getLogoUrl(w.logo)}`);
                           e.target.style.display = "none";
                         }}
                       />
                     ) : (
-                      <span className="text-muted">No logo</span>
+                      <span className="text-muted">—</span>
                     )}
                   </td>
-                  <td>
-                    <button className="btn-icon edit" onClick={() => openEditModal(w)}>
+                  <td className="text-center">
+                    <button className="btn-icon edit" onClick={() => openEditModal(w)} title="Edit">
                       <i className="bi bi-pencil"></i>
                     </button>
-                    <button className="btn-icon delete" onClick={() => deleteWarranty(w._id)}>
+                    <button className="btn-icon delete" onClick={() => deleteWarranty(w._id)} title="Delete">
                       <i className="bi bi-trash"></i>
                     </button>
                   </td>
                 </tr>
               ))}
               {warranties.length === 0 && !loading && (
-                <tr><td colSpan="3" className="text-center">No warranties added yet.</td></tr>
+                <tr>
+                  <td colSpan="3" className="empty-state">
+                    <i className="bi bi-inbox"></i>
+                    <p>No warranties added yet.</p>
+                    <button className="btn-add-small" onClick={openAddModal}>
+                      + Add Your First Warranty
+                    </button>
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         )}
       </div>
 
-      {showModal && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h5>{isEditMode ? "Edit Warranty" : "Add New Warranty"}</h5>
-              <button className="close-modal" onClick={closeModal}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label>Warranty Text</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={warrantyText}
-                  onChange={(e) => setWarrantyText(e.target.value)}
-                  placeholder="e.g., 1 Year, Lifetime"
-                />
-              </div>
-              <div className="form-group">
-                <label>Logo (any size)</label>
-                <input
-                  type="file"
-                  className="form-control"
-                  accept="image/*"
-                  onChange={handleLogoChange}
-                />
-                <small className="text-muted">Upload an image (any dimensions).</small>
-                {logoPreview && (
-                  <div className="mt-2">
-                    <img src={logoPreview} alt="preview" className="logo-preview" />
+      {/* Modal */}
+      <AnimatePresence>
+        {showModal && (
+          <>
+            <div className="modal-overlay" onClick={closeModal}>
+              <motion.div 
+                className="modal-container"
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                transition={{ duration: 0.25 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="modal-header">
+                  <h5>{isEditMode ? "✏️ Edit Warranty" : "➕ Add New Warranty"}</h5>
+                  <button className="close-modal" onClick={closeModal}>×</button>
+                </div>
+                <div className="modal-body">
+                  <div className="form-group">
+                    <label>Warranty Text <span className="required">*</span></label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={warrantyText}
+                      onChange={(e) => setWarrantyText(e.target.value)}
+                      placeholder="e.g., 1 Year, Lifetime, 5 Years"
+                    />
                   </div>
-                )}
-              </div>
+                  <div className="form-group">
+                    <label>Logo</label>
+                    <div className="file-upload-wrapper">
+                      <input
+                        type="file"
+                        className="file-input"
+                        accept="image/*"
+                        onChange={handleLogoChange}
+                        id="logo-upload"
+                      />
+                      <label htmlFor="logo-upload" className="file-label">
+                        <i className="bi bi-cloud-upload"></i> Choose Image
+                      </label>
+                      <span className="file-name">{logoFile ? logoFile.name : "No file chosen"}</span>
+                    </div>
+                    <small className="text-muted">Upload an image (any size). Recommended: 100×100px.</small>
+                    {logoPreview && (
+                      <div className="logo-preview-wrapper">
+                        <img src={logoPreview} alt="preview" className="logo-preview" />
+                        <button className="remove-preview" onClick={() => {
+                          if (previewUrlRef.current) {
+                            URL.revokeObjectURL(previewUrlRef.current);
+                            previewUrlRef.current = null;
+                          }
+                          setLogoPreview(null);
+                          setLogoFile(null);
+                        }}>×</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn-cancel" onClick={closeModal}>Cancel</button>
+                  <button className="btn-save" onClick={saveWarranty} disabled={isSaving}>
+                    {isSaving ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>{isEditMode ? "Update" : "Save"}</>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
             </div>
-            <div className="modal-footer">
-              <button className="btn-cancel" onClick={closeModal}>Cancel</button>
-              <button className="btn-save" onClick={saveWarranty} disabled={isSaving}>
-                {isSaving ? "Saving..." : (isEditMode ? "Update" : "Save")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
