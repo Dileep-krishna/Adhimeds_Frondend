@@ -5,7 +5,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import "./delivery-boys.css";
 import { getDeliveryBoysAPI } from "@/app/services/deliveryService";
-import { getAllOrders, updateItemStatus } from "@/app/services/orderAPI";
+import { getOrdersByStore, updateItemStatus } from "@/app/services/orderAPI";
+import { getStoreId } from "@/utils/jwtHelper";
 
 export default function DeliveryBoysPage() {
   const queryClient = useQueryClient();
@@ -16,7 +17,21 @@ export default function DeliveryBoysPage() {
   const [assignedModalOpen, setAssignedModalOpen] = useState(false);
   const [viewingBoy, setViewingBoy] = useState(null);
 
-  // Fetch boys
+  // ✅ Get store ID (ObjectId) and district from storage
+  let storeId = getStoreId();
+  if (!storeId) {
+    storeId = localStorage.getItem('storeId') || sessionStorage.getItem('storeId');
+  }
+  const storeDistrict = 
+    localStorage.getItem('district') || 
+    sessionStorage.getItem('district') ||
+    localStorage.getItem('staffDistrict') || 
+    sessionStorage.getItem('staffDistrict') || 
+    null;
+
+  console.log(`🏪 Store ID: ${storeId}, District: ${storeDistrict}`);
+
+  // ─── Fetch boys ───
   const {
     data: boys = [],
     isLoading: boysLoading,
@@ -37,43 +52,62 @@ export default function DeliveryBoysPage() {
           if (Array.isArray(response[key])) { boysData = response[key]; break; }
         }
       }
-      return boysData;
+      // Normalize district field (fallback to zone)
+      return boysData.map((boy) => ({
+        ...boy,
+        district: boy.district || boy.zone || '',
+      }));
     },
     staleTime: 60000,
     refetchInterval: 30000,
     placeholderData: (prev) => prev,
   });
 
-  // Fetch orders
+  // ─── Fetch orders for this store only ───
   const {
     data: orders = [],
     isLoading: ordersLoading,
     refetch: refetchOrders,
   } = useQuery({
-    queryKey: ["orders"],
+    queryKey: ["orders", storeId],
     queryFn: async () => {
-      const response = await getAllOrders();
-      let ordersData = [];
-      if (Array.isArray(response)) ordersData = response;
-      else if (response?.data && Array.isArray(response.data)) ordersData = response.data;
-      else if (response?.body && Array.isArray(response.body)) ordersData = response.body;
-      else {
-        for (const key of Object.keys(response || {})) {
-          if (Array.isArray(response[key])) { ordersData = response[key]; break; }
-        }
-      }
+      if (!storeId) return [];
+      const response = await getOrdersByStore(storeId);
+      let ordersData = response.data || [];
       return ordersData;
     },
+    enabled: !!storeId,
     staleTime: 10000,
     refetchInterval: 30000,
     placeholderData: (prev) => prev,
   });
 
-  // Filter orders ready for assignment
+  // ─── Filter boys by district ───
+  const filteredBoys = useMemo(() => {
+    let result = boys;
+    if (storeDistrict) {
+      result = boys.filter(
+        (b) => b.district?.toLowerCase() === storeDistrict.toLowerCase()
+      );
+    }
+    // Apply search filter
+    if (searchTerm.trim()) {
+      result = result.filter(
+        (b) =>
+          b.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          b.phone?.includes(searchTerm) ||
+          b.email?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    return result;
+  }, [boys, storeDistrict, searchTerm]);
+
+  // ─── Orders ready for assignment (status = "assigned" but no assignedTo) ───
   const assignableOrders = useMemo(() => {
     const items = [];
     orders.forEach(order => {
       (order.items || []).forEach(item => {
+        // Only show items that are assigned but not yet assigned to a specific boy
         if (item.status === "assigned" && !item.assignedTo) {
           items.push({ order, item });
         }
@@ -82,7 +116,7 @@ export default function DeliveryBoysPage() {
     return items;
   }, [orders]);
 
-  // Get orders assigned to a specific boy
+  // ─── Orders assigned to a specific boy ───
   const getAssignedOrdersForBoy = (boyId) => {
     const items = [];
     orders.forEach(order => {
@@ -95,7 +129,7 @@ export default function DeliveryBoysPage() {
     return items;
   };
 
-  // Assign mutation
+  // ─── Assign mutation ───
   const assignMutation = useMutation({
     mutationFn: async ({ boyId, orderIds }) => {
       const results = [];
@@ -115,7 +149,7 @@ export default function DeliveryBoysPage() {
       setAssignModalOpen(false);
       setSelectedBoy(null);
       setSelectedOrders([]);
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["orders", storeId] });
       refetchOrders();
       queryClient.invalidateQueries({ queryKey: ["deliveryBoys"] });
       refetchBoys();
@@ -126,29 +160,18 @@ export default function DeliveryBoysPage() {
     },
   });
 
-  // Stats
+  // ─── Stats (based on filtered boys) ───
   const stats = useMemo(() => {
-    const total = boys.length;
-    const active = boys.filter((b) => b.status === "active").length;
-    const offline = boys.filter((b) => b.status === "offline").length;
-    const totalDeliveries = boys.reduce((sum, b) => sum + (b.totalDeliveries || 0), 0);
+    const total = filteredBoys.length;
+    const active = filteredBoys.filter((b) => b.status === "active").length;
+    const offline = filteredBoys.filter((b) => b.status === "offline").length;
+    const totalDeliveries = filteredBoys.reduce((sum, b) => sum + (b.totalDeliveries || 0), 0);
     const avgRating =
-      boys.reduce((sum, b) => sum + (b.rating || 0), 0) / (total || 1);
+      filteredBoys.reduce((sum, b) => sum + (b.rating || 0), 0) / (total || 1);
     return { total, active, offline, totalDeliveries, avgRating: avgRating.toFixed(1) };
-  }, [boys]);
+  }, [filteredBoys]);
 
-  // Filtered boys
-  const filteredBoys = useMemo(() => {
-    if (!searchTerm.trim()) return boys;
-    return boys.filter(
-      (b) =>
-        b.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        b.phone?.includes(searchTerm) ||
-        b.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [boys, searchTerm]);
-
-  // Handlers
+  // ─── Handlers ───
   const handleAssignClick = (boy) => {
     setSelectedBoy(boy);
     setSelectedOrders([]);
@@ -169,7 +192,7 @@ export default function DeliveryBoysPage() {
       toast.error("Please select at least one order");
       return;
     }
-    assignMutation.mutate({ boyId: selectedBoy.id, orderIds: selectedOrders });
+    assignMutation.mutate({ boyId: selectedBoy.id || selectedBoy._id, orderIds: selectedOrders });
   };
 
   const handleViewAssigned = (boy) => {
@@ -179,13 +202,24 @@ export default function DeliveryBoysPage() {
 
   const isLoading = boysLoading || ordersLoading;
 
+  // If no district, show a message
+  if (!storeDistrict) {
+    return (
+      <div className="container-fluid px-4 py-4">
+        <div className="alert alert-warning">No store district found. Please log in again.</div>
+      </div>
+    );
+  }
+
   return (
     <div className="delivery-boys-container container-fluid px-4 py-4">
       {/* Page Header */}
       <div className="d-flex flex-wrap justify-content-between align-items-center mb-4">
         <div>
           <h4 className="fw-bold mb-1">👥 Delivery Boys</h4>
-          <p className="text-muted small">Manage your delivery team and assign orders</p>
+          <p className="text-muted small">
+            Manage your delivery team in <strong>{storeDistrict}</strong>
+          </p>
         </div>
         <button className="btn btn-dark rounded-pill px-4" onClick={() => refetchBoys()}>
           <i className="bi bi-arrow-clockwise me-2"></i>Refresh
@@ -266,7 +300,7 @@ export default function DeliveryBoysPage() {
         </div>
         <div>
           <span className="badge bg-light text-dark p-2">
-            {filteredBoys.length} of {boys.length} boys
+            {filteredBoys.length} of {boys.length} boys in {storeDistrict}
           </span>
         </div>
       </div>
@@ -283,7 +317,10 @@ export default function DeliveryBoysPage() {
       ) : filteredBoys.length === 0 ? (
         <div className="text-center py-5 text-muted">
           <i className="bi bi-person-x fs-1"></i>
-          <p className="mt-2">No delivery boys found</p>
+          <p className="mt-2">
+            No delivery boys found in <strong>{storeDistrict}</strong>
+          </p>
+          <p className="small">Please add delivery boys in this district.</p>
         </div>
       ) : (
         <div className="row g-4">
@@ -326,6 +363,7 @@ export default function DeliveryBoysPage() {
                       <p className="small text-muted mb-0">
                         <i className="bi bi-envelope me-1"></i>{boy.email || "N/A"}
                       </p>
+                      <span className="badge bg-secondary mt-1">{boy.district}</span>
                     </div>
                     <span className={`badge ${boy.status === "active" ? "bg-success" : "bg-secondary"}`}>
                       {boy.status || "offline"}

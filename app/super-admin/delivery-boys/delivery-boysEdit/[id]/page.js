@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getDeliveryBoysAPI, updateDeliveryBoyAPI } from '../../../../services/deliveryService';
@@ -17,39 +17,53 @@ export default function EditDeliveryBoyPage() {
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
   };
 
-  // Fetch the single delivery boy data
-  const { data: deliveryBoys = [], isLoading } = useQuery({
+  // ✅ Force refetch on mount to get fresh data
+  const { data: deliveryBoys = [], isLoading, error, refetch } = useQuery({
     queryKey: ['deliveryBoys'],
     queryFn: async () => {
       const result = await getDeliveryBoysAPI();
+      console.log('📦 API result:', result);
       let data = [];
       if (Array.isArray(result)) data = result;
       else if (result?.data && Array.isArray(result.data)) data = result.data;
       else if (result?.success && Array.isArray(result?.data)) data = result.data;
       else if (result?.boys && Array.isArray(result.boys)) data = result.boys;
-      else data = [];
+      else {
+        console.warn('⚠️ Unexpected format:', result);
+        data = [];
+      }
+      // ✅ Map ALL fields, including image URLs
       return data.map((boy) => ({
         id: boy._id,
         name: boy.name,
         email: boy.email || '',
         phone: boy.phone,
-        district: boy.district || boy.zone,
+        district: boy.district || boy.zone || '',
         status: boy.status,
         aadharNumber: boy.aadharNumber || '',
         licenseNumber: boy.licenseNumber || '',
         bikeNumber: boy.bikeNumber || '',
+        aadharImage: boy.aadharImage || '',
+        licenseImage: boy.licenseImage || '',
       }));
     },
-    staleTime: 0,
+    staleTime: 0, // ✅ Always fetch fresh
+    refetchOnMount: true,
   });
 
+  // ✅ Force refetch when component mounts
+  useEffect(() => {
+    refetch();
+  }, []);
+
   const boy = deliveryBoys.find((b) => b.id === id);
+  console.log('🔎 Found boy:', boy);
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => updateDeliveryBoyAPI(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deliveryBoys'] });
       showToast('Delivery boy updated successfully!', 'success');
+      queryClient.invalidateQueries({ queryKey: ['deliveryBoys'] });
       router.push('/super-admin/delivery-boys');
     },
     onError: (err) => {
@@ -68,13 +82,19 @@ export default function EditDeliveryBoyPage() {
     form.append('bikeNumber', formData.bikeNumber || '');
     form.append('district', formData.district);
     form.append('status', formData.status);
-    if (formData.aadharImage) form.append('aadharImage', formData.aadharImage);
-    if (formData.licenseImage) form.append('licenseImage', formData.licenseImage);
+    if (formData.aadharImage instanceof File) {
+      form.append('aadharImage', formData.aadharImage);
+    }
+    if (formData.licenseImage instanceof File) {
+      form.append('licenseImage', formData.licenseImage);
+    }
+
     updateMutation.mutate({ id, data: form });
   };
 
   if (isLoading) return <div className="loading-state"><div className="spinner"></div><p>Loading...</p></div>;
-  if (!boy) return <div className="error-state"><p>Delivery boy not found</p></div>;
+  if (error) return <div className="error-state"><p>Error: {error.message}</p></div>;
+  if (!boy) return <div className="error-state"><p>Delivery boy not found. Please check the ID.</p></div>;
 
   return (
     <div className="delivery-form-page">
@@ -85,6 +105,7 @@ export default function EditDeliveryBoyPage() {
         </div>
       )}
       <DeliveryBoyForm
+        key={boy.id} // ✅ Forces re‑mount when boy changes
         title="Edit Delivery Boy"
         initialData={boy}
         onSubmit={handleSubmit}

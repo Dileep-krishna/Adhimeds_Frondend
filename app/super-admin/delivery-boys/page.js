@@ -10,17 +10,6 @@ import {
   updateDeliveryBoyAPI,
 } from '../../services/deliveryService';
 
-// Skeleton loader component
-const CardSkeleton = () => (
-  <div className="delivery-card skeleton">
-    <div className="card-header skeleton-header"></div>
-    <div className="card-avatar skeleton-avatar"></div>
-    <div className="card-name skeleton-text"></div>
-    <div className="card-details skeleton-details"></div>
-    <div className="card-actions skeleton-actions"></div>
-  </div>
-);
-
 export default function DeliveryBoysPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -29,8 +18,6 @@ export default function DeliveryBoysPage() {
   const [districtFilter, setDistrictFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [selectedBoy, setSelectedBoy] = useState(null);
-  const [showOffcanvas, setShowOffcanvas] = useState(false);
 
   const keralaDistricts = [
     'Thiruvananthapuram', 'Kollam', 'Pathanamthitta', 'Alappuzha',
@@ -48,7 +35,6 @@ export default function DeliveryBoysPage() {
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
   };
 
-  // Fetch delivery boys with caching and faster loading
   const { data: deliveryBoys = [], isLoading, error, refetch } = useQuery({
     queryKey: ['deliveryBoys'],
     queryFn: async () => {
@@ -80,11 +66,10 @@ export default function DeliveryBoysPage() {
           .slice(0, 2),
       }));
     },
-    staleTime: 5 * 60 * 1000, // cache for 5 minutes
+    staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
-  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: (id) => deleteDeliveryBoyAPI(id),
     onMutate: async (id) => {
@@ -103,7 +88,6 @@ export default function DeliveryBoysPage() {
     },
   });
 
-  // Toggle status
   const toggleStatusMutation = useMutation({
     mutationFn: ({ id, status }) => {
       const form = new FormData();
@@ -131,11 +115,6 @@ export default function DeliveryBoysPage() {
     if (deleteConfirm) deleteMutation.mutate(deleteConfirm);
   };
 
-  const openViewOffcanvas = (boy) => {
-    setSelectedBoy(boy);
-    setShowOffcanvas(true);
-  };
-
   const totalBoys = deliveryBoys.length;
   const activeBoys = deliveryBoys.filter((b) => b.status === 'active').length;
   const topDeliveries = deliveryBoys.length ? Math.max(...deliveryBoys.map((b) => b.deliveries)) : 0;
@@ -151,9 +130,21 @@ export default function DeliveryBoysPage() {
     });
   }, [deliveryBoys, searchTerm, districtFilter, statusFilter]);
 
+  // Skeleton rows for loading state
+  const SkeletonRow = () => (
+    <tr className="skeleton-row">
+      <td><div className="skeleton-text" style={{ width: '100px' }}></div></td>
+      <td><div className="skeleton-text" style={{ width: '120px' }}></div></td>
+      <td><div className="skeleton-text" style={{ width: '80px' }}></div></td>
+      <td><div className="skeleton-text" style={{ width: '100px' }}></div></td>
+      <td><div className="skeleton-text" style={{ width: '60px' }}></div></td>
+      <td><div className="skeleton-text" style={{ width: '60px' }}></div></td>
+      <td><div className="skeleton-text" style={{ width: '100px' }}></div></td>
+    </tr>
+  );
+
   return (
     <div className="delivery-page-full">
-      {/* Toast */}
       {toast.show && (
         <div className={`toast-notification ${toast.type}`}>
           <i className={`bi ${toast.type === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'}`}></i>
@@ -221,58 +212,91 @@ export default function DeliveryBoysPage() {
         </div>
       </div>
 
-      {/* Cards Grid with Skeleton Loader */}
-      <div className="delivery-grid-full">
-        {isLoading ? (
-          Array(6).fill(0).map((_, i) => <CardSkeleton key={i} />)
-        ) : error ? (
-          <div className="error-state-full">
-            <i className="bi bi-exclamation-triangle-fill"></i>
-            <p>{error.message}</p>
-            <button className="btn-retry" onClick={() => refetch()}>Retry</button>
-          </div>
-        ) : filteredBoys.length === 0 ? (
-          <div className="empty-state-full">
-            <i className="bi bi-emoji-frown"></i>
-            <p>No delivery boys found</p>
-          </div>
-        ) : (
-          filteredBoys.map((boy) => (
-            <div className="delivery-card" key={boy.id}>
-              <div className="card-header">
-                <span className={`status-badge ${boy.status}`}>
-                  {boy.status === 'active' ? 'Active' : boy.status === 'inactive' ? 'Inactive' : 'Pending'}
-                </span>
-                <div className="card-actions-top">
-                  <button className="icon-btn view" onClick={() => openViewOffcanvas(boy)} title="View Details">
-                    <i className="bi bi-eye-fill"></i>
-                  </button>
-                </div>
-              </div>
-              <div className="card-avatar">
-                <div className="avatar-circle">{boy.avatar}</div>
-                <button className="status-toggle" onClick={() => toggleStatusMutation.mutate({ id: boy.id, status: boy.status === 'active' ? 'inactive' : 'active' })}>
-                  <i className={`bi ${boy.status === 'active' ? 'bi-toggle-on' : 'bi-toggle-off'}`}></i>
-                </button>
-              </div>
-              <h3 className="card-name">{boy.name}</h3>
-              <div className="card-details">
-                <p><i className="bi bi-telephone-fill"></i> {boy.phone}</p>
-                <p><i className="bi bi-pin-map-fill"></i> {boy.district}</p>
-                <p><i className="bi bi-truck"></i> <strong>{boy.deliveries}</strong> deliveries</p>
-                <p className="rating"><i className="bi bi-star-fill"></i> {boy.rating} ★</p>
-              </div>
-              <div className="card-actions">
-                <button className="action-btn edit" onClick={() => router.push(`/super-admin/delivery-boys/delivery-boysEdit/${boy.id}`)}>
-                  <i className="bi bi-pencil"></i> Edit
-                </button>
-                <button className="action-btn delete" onClick={() => setDeleteConfirm(boy.id)}>
-                  <i className="bi bi-trash"></i> Delete
-                </button>
-              </div>
-            </div>
-          ))
-        )}
+      {/* Table */}
+      <div className="delivery-table-wrapper">
+        <div className="table-responsive">
+          <table className="delivery-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>District</th>
+                <th>Status</th>
+                <th>Deliveries</th>
+                <th className="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                Array(5).fill(0).map((_, i) => <SkeletonRow key={i} />)
+              ) : error ? (
+                <tr>
+                  <td colSpan="7" className="text-center py-4 text-danger">
+                    <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                    {error.message}
+                  </td>
+                </tr>
+              ) : filteredBoys.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="text-center py-4 text-muted">
+                    <i className="bi bi-emoji-frown me-2"></i>
+                    No delivery boys found
+                  </td>
+                </tr>
+              ) : (
+                filteredBoys.map((boy) => (
+                  <tr key={boy.id}>
+                    <td>
+                      <div className="d-flex align-items-center">
+                        <div className="avatar-sm me-2">{boy.avatar}</div>
+                        <span className="fw-semibold">{boy.name}</span>
+                      </div>
+                    </td>
+                    <td>{boy.email || '—'}</td>
+                    <td>{boy.phone}</td>
+                    <td>{boy.district}</td>
+                    <td>
+                      <span className={`status-badge ${boy.status}`}>
+                        {boy.status === 'active' ? 'Active' : boy.status === 'inactive' ? 'Inactive' : 'Pending'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="deliveries-count">
+                        <i className="bi bi-truck me-1"></i> {boy.deliveries}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="d-flex gap-1 justify-content-center">
+                        <button
+                          className="btn btn-light rounded-circle shadow-sm"
+                          onClick={() => router.push(`/super-admin/delivery-boys/delivery-boysEdit/${boy.id}`)}
+                          title="Edit"
+                        >
+                          <i className="bi bi-pencil text-primary"></i>
+                        </button>
+                        <button
+                          className="btn btn-light rounded-circle shadow-sm"
+                          onClick={() => setDeleteConfirm(boy.id)}
+                          title="Delete"
+                        >
+                          <i className="bi bi-trash text-danger"></i>
+                        </button>
+                        <button
+                          className="btn btn-light rounded-circle shadow-sm"
+                          onClick={() => toggleStatusMutation.mutate({ id: boy.id, status: boy.status === 'active' ? 'inactive' : 'active' })}
+                          title="Toggle Status"
+                        >
+                          <i className={`bi ${boy.status === 'active' ? 'bi-toggle-on text-success' : 'bi-toggle-off text-secondary'}`}></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Delete Confirmation Modal */}
@@ -293,66 +317,6 @@ export default function DeliveryBoysPage() {
           </div>
         </div>
       )}
-
-      {/* Offcanvas Side Modal with clear heading */}
-      <div className={`offcanvas ${showOffcanvas ? 'show' : ''}`}>
-        <div className="offcanvas-header">
-          <h5 className="offcanvas-title">
-            <i className="bi bi-person-badge me-2"></i>Delivery Boy Details
-          </h5>
-          <button type="button" className="btn-close" onClick={() => setShowOffcanvas(false)}></button>
-        </div>
-        <div className="offcanvas-body">
-          {selectedBoy && (
-            <div className="details-container">
-              <div className="detail-avatar">
-                <div className="avatar-large">{selectedBoy.avatar}</div>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Full Name:</span>
-                <span className="detail-value">{selectedBoy.name}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Email:</span>
-                <span className="detail-value">{selectedBoy.email || 'Not provided'}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Phone:</span>
-                <span className="detail-value">{selectedBoy.phone}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">District:</span>
-                <span className="detail-value">{selectedBoy.district}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Status:</span>
-                <span className={`status-badge ${selectedBoy.status}`}>{selectedBoy.status}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Deliveries:</span>
-                <span className="detail-value">{selectedBoy.deliveries}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Rating:</span>
-                <span className="detail-value">{selectedBoy.rating} ★</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Aadhar Number:</span>
-                <span className="detail-value">{selectedBoy.aadharNumber || 'Not provided'}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">License Number:</span>
-                <span className="detail-value">{selectedBoy.licenseNumber || 'Not provided'}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Bike Number:</span>
-                <span className="detail-value">{selectedBoy.bikeNumber || 'Not provided'}</span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-      {showOffcanvas && <div className="offcanvas-backdrop" onClick={() => setShowOffcanvas(false)}></div>}
     </div>
   );
 }

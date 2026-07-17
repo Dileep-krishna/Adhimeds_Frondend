@@ -1,14 +1,21 @@
 // services/deliveryBoyService.js
 import SERVERURL from "./serverURL";
 
-// Minimal JSON parser – throws if invalid
+// Helper: parse JSON and check for success flag
 async function handleResponse(res) {
   const text = await res.text();
+  let json;
   try {
-    return JSON.parse(text);
+    json = JSON.parse(text);
   } catch {
     throw new Error('Invalid JSON response');
   }
+  // If the response indicates failure, throw an error with the message
+  if (json.success === false) {
+    throw new Error(json.message || 'Request failed');
+  }
+  // Otherwise, return the parsed JSON
+  return json;
 }
 
 // ---------- DELIVERY BOY CRUD ----------
@@ -50,8 +57,7 @@ export const assignOrdersToBoyAPI = async (boyId, orderIds) => {
   return handleResponse(res);
 };
 
-// ---------- (Optional) MEDICAL PRODUCT TOGGLES – remove if not needed ----------
-// If you still need these, they now point to /api/medical-products/...
+// ---------- (Optional) MEDICAL PRODUCT TOGGLES ----------
 export const togglePublishedAPI = async (id) => {
   const res = await fetch(`${SERVERURL}/api/medical-products/${id}/toggle-published`, {
     method: "PATCH",

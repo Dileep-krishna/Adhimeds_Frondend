@@ -5,14 +5,26 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { getOrdersByStore, updateItemStatus } from "@/app/services/orderAPI";
 import { getDeliveryBoysAPI } from "@/app/services/deliveryService";
-import { getStoreId } from "@/utils/jwtHelper"; // ✅ Import helper
+import { getStoreId } from "@/utils/jwtHelper";
 
 export default function DeliveryHeadAllOrdersPage() {
   const queryClient = useQueryClient();
 
-  // ✅ Use getStoreId() to get the correct ObjectId
-  const storeId = getStoreId();
-  console.log(`🏪 Assign page store ID (ObjectId): ${storeId}`);
+  // ✅ Get storeId from token (via helper) – fallback to storage
+  let storeId = getStoreId();
+  if (!storeId) {
+    storeId = localStorage.getItem('storeId') || sessionStorage.getItem('storeId');
+  }
+  console.log(`🏪 Assign page store ID: ${storeId}`);
+
+  // ✅ Get district from both storage types
+  const storeDistrict = 
+    localStorage.getItem('district') || 
+    sessionStorage.getItem('district') ||
+    localStorage.getItem('staffDistrict') || 
+    sessionStorage.getItem('staffDistrict') || 
+    null;
+  console.log(`📍 Store district: ${storeDistrict}`);
 
   // Fetch orders for this store
   const { data: orders = [], isLoading: ordersLoading, refetch } = useQuery({
@@ -22,7 +34,6 @@ export default function DeliveryHeadAllOrdersPage() {
       const res = await getOrdersByStore(storeId);
       if (!res.success) throw new Error("Failed to load orders");
       console.log("📦 Raw orders from API:", res.data);
-      // Log each item status for debugging
       res.data.forEach(order => {
         console.log(`🔎 Order ${order._id}:`);
         order.items.forEach(item => {
@@ -45,6 +56,7 @@ export default function DeliveryHeadAllOrdersPage() {
       if (Array.isArray(response)) boys = response;
       else if (response?.data && Array.isArray(response.data)) boys = response.data;
       else console.warn("Unexpected format:", response);
+      console.log("📦 Delivery boys:", boys.map(b => ({ name: b.name, district: b.district })));
       return boys;
     },
     staleTime: 60000,
@@ -80,7 +92,7 @@ export default function DeliveryHeadAllOrdersPage() {
     assignMutation.mutate({ orderId, itemId, boyId: String(boyId) });
   };
 
-  // ✅ Filter items with status "processing"
+  // Filter items with status "processing"
   const assignableItems = [];
   orders.forEach(order => {
     (order.items || []).forEach(item => {
@@ -97,6 +109,12 @@ export default function DeliveryHeadAllOrdersPage() {
   });
 
   const isLoading = ordersLoading || boysLoading;
+
+  // If no district, show a warning but still render the page
+  // We can't filter by district if we don't have one.
+  const filteredBoys = storeDistrict 
+    ? deliveryBoys.filter(boy => boy.district?.toLowerCase() === storeDistrict.toLowerCase())
+    : deliveryBoys; // show all boys if no district
 
   if (!storeId) {
     return <div className="alert alert-warning">No store ID found. Please log in again.</div>;
@@ -133,10 +151,8 @@ export default function DeliveryHeadAllOrdersPage() {
                   {assignableItems.map(({ order, item }) => {
                     const selectedBoyId = selectedBoyMap[item._id] || "";
                     const isMutating = assignMutation.isPending && assignMutation.variables?.itemId === item._id;
-                    const storeDistrict = item.storeDistrict || order.storeDistrict || "N/A";
-                    const filteredBoys = deliveryBoys.filter(boy => 
-                      boy.district?.toLowerCase() === storeDistrict?.toLowerCase()
-                    );
+                    // ✅ Use filtered boys (by district)
+                    const displayBoys = filteredBoys;
 
                     return (
                       <tr key={`${order._id}-${item._id}`}>
@@ -150,7 +166,7 @@ export default function DeliveryHeadAllOrdersPage() {
                         </td>
                         <td>
                           <div className="fw-semibold">{item.storeName || "N/A"}</div>
-                          <small className="text-muted"><i className="bi bi-geo-alt me-1"></i>{storeDistrict}</small>
+                          <small className="text-muted"><i className="bi bi-geo-alt me-1"></i>{storeDistrict || "All"}</small>
                         </td>
                         <td>Guest</td>
                         <td><span className="badge bg-primary text-white">Processing</span></td>
@@ -169,10 +185,12 @@ export default function DeliveryHeadAllOrdersPage() {
                               disabled={isMutating}
                             >
                               <option value="">Select boy</option>
-                              {filteredBoys.length === 0 ? (
-                                <option value="" disabled>No boys in this district</option>
+                              {displayBoys.length === 0 ? (
+                                <option value="" disabled>
+                                  {storeDistrict ? `No boys in ${storeDistrict}` : 'No boys available'}
+                                </option>
                               ) : (
-                                filteredBoys.map((boy) => (
+                                displayBoys.map((boy) => (
                                   <option key={boy.id || boy._id} value={boy.id || boy._id}>
                                     {boy.name} ({boy.district || "N/A"})
                                   </option>
@@ -182,12 +200,12 @@ export default function DeliveryHeadAllOrdersPage() {
                             <button
                               className="btn btn-sm btn-primary"
                               onClick={() => handleAssign(order._id, item._id, selectedBoyId)}
-                              disabled={!selectedBoyId || isMutating || filteredBoys.length === 0}
+                              disabled={!selectedBoyId || isMutating || displayBoys.length === 0}
                             >
                               {isMutating ? <span className="spinner-border spinner-border-sm" /> : "Assign"}
                             </button>
                           </div>
-                          {filteredBoys.length === 0 && storeDistrict !== "N/A" && (
+                          {displayBoys.length === 0 && storeDistrict && (
                             <small className="text-danger d-block mt-1">
                               ⚠️ No delivery boys in {storeDistrict} district
                             </small>

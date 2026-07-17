@@ -1,146 +1,328 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import Select from 'react-select';
+import SERVERURL from '@/app/services/serverURL';
+import './delivery-boy-form.css';
 
-const keralaDistricts = [
-  'Thiruvananthapuram', 'Kollam', 'Pathanamthitta', 'Alappuzha',
-  'Kottayam', 'Idukki', 'Ernakulam', 'Thrissur', 'Palakkad',
-  'Malappuram', 'Kozhikode', 'Wayanad', 'Kannur', 'Kasaragod',
+const districtOptions = [
+  { value: 'Thiruvananthapuram', label: 'Thiruvananthapuram' },
+  { value: 'Kollam', label: 'Kollam' },
+  { value: 'Pathanamthitta', label: 'Pathanamthitta' },
+  { value: 'Alappuzha', label: 'Alappuzha' },
+  { value: 'Kottayam', label: 'Kottayam' },
+  { value: 'Idukki', label: 'Idukki' },
+  { value: 'Ernakulam', label: 'Ernakulam' },
+  { value: 'Thrissur', label: 'Thrissur' },
+  { value: 'Palakkad', label: 'Palakkad' },
+  { value: 'Malappuram', label: 'Malappuram' },
+  { value: 'Kozhikode', label: 'Kozhikode' },
+  { value: 'Wayanad', label: 'Wayanad' },
+  { value: 'Kannur', label: 'Kannur' },
+  { value: 'Kasaragod', label: 'Kasaragod' },
 ];
 
-export default function DeliveryBoyForm({ title, initialData = {}, onSubmit, isSubmitting, submitLabel }) {
-  const router = useRouter();
+export default function DeliveryBoyForm({
+  title,
+  initialData,
+  onSubmit,
+  isSubmitting,
+  submitLabel = 'Save',
+}) {
   const [formData, setFormData] = useState({
-    name: initialData.name || '',
-    email: initialData.email || '',
-    phone: initialData.phone || '',
+    name: '',
+    email: '',
+    phone: '',
     password: '',
-    aadharNumber: initialData.aadharNumber || '',
+    aadharNumber: '',
+    licenseNumber: '',
+    bikeNumber: '',
+    district: '',
+    status: 'active',
     aadharImage: null,
-    licenseNumber: initialData.licenseNumber || '',
     licenseImage: null,
-    bikeNumber: initialData.bikeNumber || '',
-    district: initialData.district || 'Thiruvananthapuram',
-    status: initialData.status || 'active',
   });
 
-  const handleChange = (e) => {
-    const { name, value, files } = e.target;
-    if (files) {
-      setFormData({ ...formData, [name]: files[0] });
-    } else {
-      setFormData({ ...formData, [name]: value });
+  const [aadharPreview, setAadharPreview] = useState(null);
+  const [licensePreview, setLicensePreview] = useState(null);
+
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        name: initialData.name || '',
+        email: initialData.email || '',
+        phone: initialData.phone || '',
+        password: '',
+        aadharNumber: initialData.aadharNumber || '',
+        licenseNumber: initialData.licenseNumber || '',
+        bikeNumber: initialData.bikeNumber || '',
+        district: initialData.district || '',
+        status: initialData.status || 'active',
+        aadharImage: null,
+        licenseImage: null,
+      });
+
+      const baseUrl = SERVERURL;
+      if (initialData.aadharImage) {
+        setAadharPreview(`${baseUrl}/imgUploads/${initialData.aadharImage}`);
+      } else {
+        setAadharPreview(null);
+      }
+      if (initialData.licenseImage) {
+        setLicensePreview(`${baseUrl}/imgUploads/${initialData.licenseImage}`);
+      } else {
+        setLicensePreview(null);
+      }
     }
+  }, [initialData]);
+
+  useEffect(() => {
+    return () => {
+      if (aadharPreview?.startsWith('blob:')) URL.revokeObjectURL(aadharPreview);
+      if (licensePreview?.startsWith('blob:')) URL.revokeObjectURL(licensePreview);
+    };
+  }, [aadharPreview, licensePreview]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleFileChange = (e) => {
+    const { name, files } = e.target;
+    const file = files[0];
+    if (!file) return;
+    setFormData(prev => ({ ...prev, [name]: file }));
+    const url = URL.createObjectURL(file);
+    if (name === 'aadharImage') {
+      if (aadharPreview?.startsWith('blob:')) URL.revokeObjectURL(aadharPreview);
+      setAadharPreview(url);
+    } else {
+      if (licensePreview?.startsWith('blob:')) URL.revokeObjectURL(licensePreview);
+      setLicensePreview(url);
+    }
+  };
+
+  const handleDistrictChange = (option) => {
+    setFormData(prev => ({ ...prev, district: option ? option.value : '' }));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.phone) {
-      alert('Please fill in Name and Phone Number');
-      return;
+    if (typeof onSubmit === 'function') {
+      onSubmit(formData);
+    } else {
+      console.error('❌ onSubmit is not a function');
     }
-    onSubmit(formData);
   };
 
+  const selectedDistrict = districtOptions.find(opt => opt.value === formData.district);
+
   return (
-    <div className="container-fluid p-0 bg-light min-vh-100">
-      <div className="container py-4">
-        {/* Header */}
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <h2 className="h3 mb-0">
-            <i className="bi bi-person-badge text-success me-2"></i>
-            {title}
-          </h2>
-          <button className="btn btn-outline-secondary" onClick={() => router.back()}>
-            <i className="bi bi-arrow-left me-1"></i> Back
-          </button>
+    <div className="delivery-boy-form-wrapper">
+      <div className="form-card">
+        <div className="form-header">
+          <h2>{title}</h2>
         </div>
-
-        {/* Form Card */}
-        <div className="card shadow-sm border-0">
-          <div className="card-body p-4">
-            <form onSubmit={handleSubmit}>
-              {/* Two‑column grid starts here */}
-              <div className="row g-3">
-                <div className="col-md-6">
-                  <label className="form-label fw-semibold">Full Name <span className="text-danger">*</span></label>
-                  <input type="text" className="form-control" name="name" value={formData.name} onChange={handleChange} placeholder="e.g., Rajesh Kumar" required />
-                </div>
-                <div className="col-md-6">
-                  <label className="form-label fw-semibold">Email</label>
-                  <input type="email" className="form-control" name="email" value={formData.email} onChange={handleChange} placeholder="example@gmail.com" />
-                </div>
-
-                <div className="col-md-6">
-                  <label className="form-label fw-semibold">Phone Number <span className="text-danger">*</span></label>
-                  <input type="tel" className="form-control" name="phone" value={formData.phone} onChange={handleChange} placeholder="+91 98765 43210" required />
-                </div>
-                <div className="col-md-6">
-                  <label className="form-label fw-semibold">
-                    Password {!initialData.name && <span className="text-danger">*</span>}
-                  </label>
-                  <input type="password" className="form-control" name="password" value={formData.password} onChange={handleChange} placeholder={initialData.name ? 'Leave blank to keep unchanged' : 'Enter password'} />
-                </div>
-
-                <div className="col-md-6">
-                  <label className="form-label fw-semibold">Aadhar Number</label>
-                  <input type="text" className="form-control" name="aadharNumber" value={formData.aadharNumber} onChange={handleChange} placeholder="1234 1234 1234" />
-                </div>
-                <div className="col-md-6">
-                  <label className="form-label fw-semibold">Aadhar Image</label>
-                  <input type="file" className="form-control" name="aadharImage" onChange={handleChange} accept="image/*" />
-                </div>
-
-                <div className="col-md-6">
-                  <label className="form-label fw-semibold">License Number</label>
-                  <input type="text" className="form-control" name="licenseNumber" value={formData.licenseNumber} onChange={handleChange} placeholder="KL123456" />
-                </div>
-                <div className="col-md-6">
-                  <label className="form-label fw-semibold">License Image</label>
-                  <input type="file" className="form-control" name="licenseImage" onChange={handleChange} accept="image/*" />
-                </div>
-
-                <div className="col-md-6">
-                  <label className="form-label fw-semibold">Bike Number</label>
-                  <input type="text" className="form-control" name="bikeNumber" value={formData.bikeNumber} onChange={handleChange} placeholder="KL07AB1234" />
-                </div>
-                <div className="col-md-6">
-                  <label className="form-label fw-semibold">District</label>
-                  <select className="form-select" name="district" value={formData.district} onChange={handleChange}>
-                    {keralaDistricts.map((d) => <option key={d}>{d}</option>)}
-                  </select>
-                </div>
-
-                <div className="col-md-6">
-                  <label className="form-label fw-semibold">Status</label>
-                  <select className="form-select" name="status" value={formData.status} onChange={handleChange}>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="blocked">Blocked</option>
-                  </select>
-                </div>
-              </div> {/* end row */}
-
-              {/* Buttons */}
-              <div className="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                <button type="button" className="btn btn-secondary" onClick={() => router.back()}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-success" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                      Saving...
-                    </>
-                  ) : (
-                    submitLabel
-                  )}
-                </button>
+        <form onSubmit={handleSubmit} className="form-body">
+          <div className="form-grid">
+            {/* Left Column */}
+            <div className="form-column">
+              <div className="form-group">
+                <label>Full Name *</label>
+                <input
+                  type="text"
+                  name="name"
+                  className="form-control"
+                  value={formData.name}
+                  onChange={handleChange}
+                  placeholder="e.g., Rajesh Kumar"
+                  required
+                />
               </div>
-            </form>
+
+              <div className="form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  name="email"
+                  className="form-control"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="example@gmail.com"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Phone Number *</label>
+                <input
+                  type="tel"
+                  name="phone"
+                  className="form-control"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="+91 98765 43210"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Password {!initialData && '*'}</label>
+                <input
+                  type="password"
+                  name="password"
+                  className="form-control"
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder={initialData ? 'Leave blank to keep unchanged' : 'Enter password'}
+                  required={!initialData}
+                />
+                {initialData && (
+                  <small className="text-muted">Leave blank to keep current password</small>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label>Aadhar Number *</label>
+                <input
+                  type="text"
+                  name="aadharNumber"
+                  className="form-control"
+                  value={formData.aadharNumber}
+                  onChange={handleChange}
+                  placeholder="1234 1234 1234"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="form-column">
+              <div className="form-group">
+                <label>License Number *</label>
+                <input
+                  type="text"
+                  name="licenseNumber"
+                  className="form-control"
+                  value={formData.licenseNumber}
+                  onChange={handleChange}
+                  placeholder="KL123456"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Bike Number *</label>
+                <input
+                  type="text"
+                  name="bikeNumber"
+                  className="form-control"
+                  value={formData.bikeNumber}
+                  onChange={handleChange}
+                  placeholder="KL07AB1234"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>District *</label>
+                <Select
+                  options={districtOptions}
+                  value={selectedDistrict}
+                  onChange={handleDistrictChange}
+                  placeholder="Select district"
+                  isClearable={false}
+                  className="react-select-container"
+                  classNamePrefix="react-select"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Status</label>
+                <select
+                  name="status"
+                  className="form-control"
+                  value={formData.status}
+                  onChange={handleChange}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="blocked">Blocked</option>
+                </select>
+              </div>
+            </div>
           </div>
-        </div>
+
+          {/* Image Uploads Section */}
+          <div className="image-uploads">
+            <div className="image-group">
+              <label>Aadhar Image</label>
+              {aadharPreview && (
+                <div className="preview-wrapper">
+                  <img
+                    src={aadharPreview}
+                    alt="Aadhar"
+                    className="preview-thumb"
+                    onClick={() => aadharPreview && window.open(aadharPreview, '_blank')}
+                  />
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                name="aadharImage"
+                className="file-input"
+                onChange={handleFileChange}
+                id="aadharImage"
+              />
+              <label htmlFor="aadharImage" className="file-label">
+                Choose File
+              </label>
+            </div>
+
+            <div className="image-group">
+              <label>License Image</label>
+              {licensePreview && (
+                <div className="preview-wrapper">
+                  <img
+                    src={licensePreview}
+                    alt="License"
+                    className="preview-thumb"
+                    onClick={() => licensePreview && window.open(licensePreview, '_blank')}
+                  />
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                name="licenseImage"
+                className="file-input"
+                onChange={handleFileChange}
+                id="licenseImage"
+              />
+              <label htmlFor="licenseImage" className="file-label">
+                Choose File
+              </label>
+            </div>
+          </div>
+
+          <div className="form-actions">
+            <button type="button" className="btn-cancel" onClick={() => window.history.back()}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  Saving...
+                </>
+              ) : (
+                <>{submitLabel}</>
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
