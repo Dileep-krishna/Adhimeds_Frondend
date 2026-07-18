@@ -3,60 +3,34 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
-
 import './staff.css';
-import { createStaffAPI, deleteStaffAPI, getAllDistricts, getStaffAPI, updateStaffAPI } from '../../services/staffService';
-import { getAllRoles } from '../../services/permissionService';
+import { getAllRoles } from '@/app/services/permissionService';
+import { deleteStaffAPI, getStaffAPI, updateStaffAPI } from '@/app/services/staffService';
 
 
 export default function StaffManagement() {
   const router = useRouter();
 
-  // State
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [showModal, setShowModal] = useState(false);
-  const [editingStaff, setEditingStaff] = useState(null);
+
   const [viewingStaff, setViewingStaff] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Dynamic roles from API
   const [roles, setRoles] = useState([]);
   const [loadingRoles, setLoadingRoles] = useState(true);
 
-  // Districts state
-  const [districts, setDistricts] = useState([]);
-  const [loadingDistricts, setLoadingDistricts] = useState(true);
-
-  // Form data – added district field
-  const [formData, setFormData] = useState({
-    name: '',
-    role: '',
-    password: '',
-    confirmPassword: '',
-    email: '',
-    phone: '',
-    district: '',
-    status: 'active',
-    joinDate: new Date().toISOString().split('T')[0],
-  });
-
-  // Fetch roles from API
+  // Fetch roles for filter
   useEffect(() => {
     const fetchRoles = async () => {
       try {
         const res = await getAllRoles();
         if (res.success && res.data) {
-          const roleNames = res.data.map(r => r.name);
-          setRoles(roleNames);
-          if (roleNames.length > 0) {
-            setFormData(prev => ({ ...prev, role: roleNames[0] }));
-          }
+          setRoles(res.data.map(r => r.name));
         } else {
           toast.error('Failed to load roles');
         }
@@ -70,30 +44,6 @@ export default function StaffManagement() {
     fetchRoles();
   }, []);
 
-  // Fetch districts from API
-  useEffect(() => {
-    const fetchDistricts = async () => {
-      try {
-        const res = await getAllDistricts();
-        if (res.success && res.data) {
-          setDistricts(res.data);
-          if (res.data.length > 0) {
-            setFormData(prev => ({ ...prev, district: res.data[0] }));
-          }
-        } else {
-          toast.error('Failed to load districts');
-        }
-      } catch (error) {
-        console.error('Error fetching districts:', error);
-        toast.error('Server error while loading districts');
-      } finally {
-        setLoadingDistricts(false);
-      }
-    };
-    fetchDistricts();
-  }, []);
-
-  // Fetch staff
   const fetchStaff = async () => {
     setLoading(true);
     try {
@@ -115,7 +65,6 @@ export default function StaffManagement() {
     fetchStaff();
   }, []);
 
-  // Filter staff
   const filteredStaff = staff.filter(member => {
     const matchesSearch =
       member.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -126,92 +75,6 @@ export default function StaffManagement() {
     const matchesStatus = statusFilter === 'all' || member.status === statusFilter;
     return matchesSearch && matchesRole && matchesStatus;
   });
-
-  // Open modal for add/edit
-  const openModal = (member = null) => {
-    if (member) {
-      setEditingStaff(member);
-      setFormData({
-        name: member.fullName,
-        role: member.role?.name || (roles.length ? roles[0] : ''),
-        password: '',
-        confirmPassword: '',
-        email: member.email,
-        phone: member.phone,
-        district: member.district || (districts.length ? districts[0] : ''),
-        status: member.status,
-        joinDate: member.joiningDate
-          ? new Date(member.joiningDate).toISOString().split('T')[0]
-          : new Date().toISOString().split('T')[0],
-      });
-    } else {
-      setEditingStaff(null);
-      setFormData({
-        name: '',
-        role: roles.length ? roles[0] : '',
-        password: '',
-        confirmPassword: '',
-        email: '',
-        phone: '',
-        district: districts.length ? districts[0] : '',
-        status: 'active',
-        joinDate: new Date().toISOString().split('T')[0],
-      });
-    }
-    setShowModal(true);
-  };
-
-  // Save staff (create or update)
-  const saveStaff = async () => {
-    if (!formData.name || !formData.email || !formData.phone || !formData.district) {
-      toast.error('Name, email, phone, and district are required');
-      return;
-    }
-    if (!editingStaff && !formData.password) {
-      toast.error('Password is required for new staff');
-      return;
-    }
-    if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const payload = {
-        fullName: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        role: formData.role,
-        district: formData.district,
-        status: formData.status,
-        joiningDate: formData.joinDate,
-      };
-      if (formData.password) {
-        payload.password = formData.password;
-      }
-
-      let response;
-      if (editingStaff) {
-        response = await updateStaffAPI(editingStaff._id, payload);
-      } else {
-        response = await createStaffAPI(payload);
-      }
-
-      if (response.success) {
-        toast.success(editingStaff ? 'Staff updated successfully' : 'Staff added successfully');
-        fetchStaff();
-        setShowModal(false);
-      } else {
-        toast.error(response.message || 'Operation failed');
-      }
-    } catch (error) {
-      console.error('Error saving staff:', error);
-      toast.error('Server error while saving staff');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const deleteStaff = async (id) => {
     setDeleting(true);
@@ -248,159 +111,166 @@ export default function StaffManagement() {
     }
   };
 
-  if (loadingRoles || loadingDistricts) return <div className="staff-page"><div className="loading-spinner">Loading...</div></div>;
+  if (loadingRoles) return <div className="staff-page"><div className="loading-spinner">Loading...</div></div>;
 
   return (
     <div className="staff-page">
       <Toaster position="top-right" />
 
-      <div className="hero-section staff-hero">
+      <div className="staff-hero">
         <div>
-          <h1 className="hero-title"><i className="bi bi-people-fill"></i> Staff Management</h1>
-          <p className="hero-subtitle">Manage your team members, roles, and assignments.</p>
+          <div className="hero-title">
+            <i className="bi bi-people-fill"></i> Staff Management
+          </div>
+          <div className="hero-subtitle">Manage your team members, roles, and assignments.</div>
         </div>
         <div className="hero-buttons">
           <button className="btn-glow roles-perms" onClick={() => router.push('/super-admin/staff/RoleAdd')}>
             <i className="bi bi-shield-lock-fill"></i> Roles & Permissions
           </button>
-          <button className="btn-glow" onClick={() => openModal()}>
+          <button className="btn-glow" onClick={() => router.push('/super-admin/staff/add')}>
             <i className="bi bi-person-plus"></i> Add Staff Member
           </button>
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="staff-stats">
-        <div className="stat-card"><i className="bi bi-person-badge"></i><div><span className="stat-number">{staff.length}</span><span>Total Staff</span></div></div>
-        <div className="stat-card"><i className="bi bi-check-circle-fill"></i><div><span className="stat-number">{staff.filter(s => s.status === 'active').length}</span><span>Active</span></div></div>
-        <div className="stat-card"><i className="bi bi-briefcase-fill"></i><div><span className="stat-number">{new Set(staff.map(s => s.role?.name)).size}</span><span>Roles</span></div></div>
-        <div className="stat-card"><i className="bi bi-geo-alt-fill"></i><div><span className="stat-number">{new Set(staff.map(s => s.district).filter(Boolean)).size}</span><span>Districts</span></div></div>
+        <div className="stat-card">
+          <i className="bi bi-person-badge"></i>
+          <div>
+            <span className="stat-number">{staff.length}</span>
+            <span>Total Staff</span>
+          </div>
+        </div>
+        <div className="stat-card">
+          <i className="bi bi-check-circle-fill"></i>
+          <div>
+            <span className="stat-number">{staff.filter(s => s.status === 'active').length}</span>
+            <span>Active</span>
+          </div>
+        </div>
+        <div className="stat-card">
+          <i className="bi bi-briefcase-fill"></i>
+          <div>
+            <span className="stat-number">{new Set(staff.map(s => s.role?.name)).size}</span>
+            <span>Roles</span>
+          </div>
+        </div>
+        <div className="stat-card">
+          <i className="bi bi-geo-alt-fill"></i>
+          <div>
+            <span className="stat-number">{new Set(staff.map(s => s.district).filter(Boolean)).size}</span>
+            <span>Districts</span>
+          </div>
+        </div>
       </div>
 
-      {/* Filters */}
       <div className="filter-bar">
-        <div className="search-group"><i className="bi bi-search"></i><input type="text" placeholder="Search by name, email, role or district..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
-        <div className="filter-group"><label><i className="bi bi-briefcase"></i> Role</label><select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}><option value="all">All Roles</option>{roles.map(r => <option key={r} value={r}>{r}</option>)}</select></div>
-        <div className="filter-group"><label><i className="bi bi-flag"></i> Status</label><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}><option value="all">All</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="pending">Pending</option></select></div>
+        <div className="search-group">
+          <i className="bi bi-search"></i>
+          <input
+            type="text"
+            placeholder="Search by name, email, role or district..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="filter-group">
+          <label><i className="bi bi-briefcase"></i> Role</label>
+          <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
+            <option value="all">All Roles</option>
+            {roles.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        <div className="filter-group">
+          <label><i className="bi bi-flag"></i> Status</label>
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="pending">Pending</option>
+          </select>
+        </div>
       </div>
 
-      {/* Staff Grid */}
       {loading ? (
         <div className="loading-spinner">Loading staff...</div>
       ) : (
-        <div className="staff-grid">
-          {filteredStaff.map(member => (
-            <div className="staff-card" key={member._id}>
-              <div className="card-status-badge" data-status={member.status}>
-                {member.status === 'active' ? 'Active' : member.status === 'inactive' ? 'Inactive' : 'Pending'}
-              </div>
-              <div className="staff-avatar">{member.fullName.charAt(0)}{member.fullName.split(' ')[1]?.charAt(0) || ''}</div>
-              <h3 className="staff-name">{member.fullName}</h3>
-              <div className="staff-role">{member.role?.name}</div>
-              <div className="staff-details">
-                <p><i className="bi bi-envelope"></i> {member.email}</p>
-                <p><i className="bi bi-telephone"></i> {member.phone}</p>
-                <p><i className="bi bi-geo-alt"></i> {member.district || 'N/A'}</p>
-                <p><i className="bi bi-calendar"></i> Joined: {member.joiningDate ? new Date(member.joiningDate).toLocaleDateString() : 'N/A'}</p>
-              </div>
-              <div className="staff-actions">
-                <button className="action-icon view" onClick={() => setViewingStaff(member)}><i className="bi bi-eye"></i></button>
-                <button className="action-icon edit" onClick={() => openModal(member)}><i className="bi bi-pencil"></i></button>
-                <button className="action-icon delete" onClick={() => setDeleteConfirm(member._id)}><i className="bi bi-trash"></i></button>
-                <button className={`status-toggle ${member.status}`} onClick={() => toggleStatus(member._id, member.status)}>
-                  <i className={`bi ${member.status === 'active' ? 'bi-toggle-on' : 'bi-toggle-off'}`}></i>
-                </button>
-              </div>
-            </div>
-          ))}
-          {filteredStaff.length === 0 && (
-            <div className="empty-state">
-              <i className="bi bi-person-x"></i>
-              <p>No staff members found. Click "Add Staff Member" to get started.</p>
-            </div>
-          )}
+        <div className="staff-table-wrapper">
+          <table className="staff-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Role</th>
+                <th>District</th>
+                <th>Status</th>
+                <th>Joined</th>
+                <th className="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredStaff.map((member, index) => (
+                <tr key={member._id}>
+                  <td>{index + 1}</td>
+                  <td>
+                    <div className="staff-name-cell">
+                      <span className="staff-avatar-sm">
+                        {member.fullName.charAt(0)}{member.fullName.split(' ')[1]?.charAt(0) || ''}
+                      </span>
+                      <span className="fw-semibold">{member.fullName}</span>
+                    </div>
+                  </td>
+                  <td>{member.email}</td>
+                  <td>{member.phone}</td>
+                  <td><span className="role-badge">{member.role?.name}</span></td>
+                  <td>{member.district || '—'}</td>
+                  <td>
+                    <span className={`status-badge ${member.status}`}>
+                      {member.status.charAt(0).toUpperCase() + member.status.slice(1)}
+                    </span>
+                  </td>
+                  <td>{member.joiningDate ? new Date(member.joiningDate).toLocaleDateString() : '—'}</td>
+                  <td>
+                    <div className="actions-group">
+                      <button className="action-btn view-btn" onClick={() => setViewingStaff(member)} title="View">
+                        <i className="bi bi-eye"></i>
+                      </button>
+                      <button className="action-btn edit-btn" onClick={() => router.push(`/super-admin/staff/edit/${member._id}`)} title="Edit">
+                        <i className="bi bi-pencil"></i>
+                      </button>
+                      <button className="action-btn delete-btn" onClick={() => setDeleteConfirm(member._id)} title="Delete">
+                        <i className="bi bi-trash"></i>
+                      </button>
+                      <button className="action-btn toggle-btn" onClick={() => toggleStatus(member._id, member.status)} title="Toggle Status">
+                        <i className={`bi ${member.status === 'active' ? 'bi-toggle-on text-success' : 'bi-toggle-off text-secondary'}`}></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredStaff.length === 0 && (
+                <tr>
+                  <td colSpan="9" className="text-center py-4 text-muted">
+                    <i className="bi bi-person-x me-2"></i> No staff members found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* Add/Edit Modal with district field */}
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3><i className="bi bi-person-plus"></i> {editingStaff ? 'Edit Staff' : 'Add Staff Member'}</h3>
-              <button className="close" onClick={() => setShowModal(false)}>&times;</button>
-            </div>
-            <div className="modal-body">
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Full Name</label>
-                  <input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Full name" />
-                </div>
-                <div className="form-group">
-                  <label>Email</label>
-                  <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="email@example.com" />
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Phone</label>
-                  <input type="tel" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="+91 XXXXX XXXXX" />
-                </div>
-                <div className="form-group">
-                  <label>Role</label>
-                  <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>
-                    {roles.map(r => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>District</label>
-                  <select value={formData.district} onChange={e => setFormData({...formData, district: e.target.value})}>
-                    {districts.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Status</label>
-                  <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="pending">Pending</option>
-                  </select>
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Password {!editingStaff && <span className="required">*</span>}</label>
-                  <input type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} placeholder={editingStaff ? 'Leave blank to keep current' : 'Enter password'} />
-                </div>
-                <div className="form-group">
-                  <label>Confirm Password</label>
-                  <input type="password" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} placeholder="Confirm password" />
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Joining Date</label>
-                  <input type="date" value={formData.joinDate} onChange={e => setFormData({...formData, joinDate: e.target.value})} />
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-              <button className="btn-primary" onClick={saveStaff} disabled={saving}>
-                {saving ? 'Saving...' : (editingStaff ? 'Update' : 'Add')} Staff
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* View Modal with district */}
+      {/* View Modal */}
       {viewingStaff && (
         <div className="modal-overlay" onClick={() => setViewingStaff(null)}>
           <div className="modal-content view-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header"><h3><i className="bi bi-person-circle"></i> Staff Details</h3><button className="close" onClick={() => setViewingStaff(null)}>&times;</button></div>
+            <div className="modal-header">
+              <h3><i className="bi bi-person-circle"></i> Staff Details</h3>
+              <button className="close" onClick={() => setViewingStaff(null)}>&times;</button>
+            </div>
             <div className="modal-body view-body">
               <div className="detail-row"><span>Name:</span><strong>{viewingStaff.fullName}</strong></div>
               <div className="detail-row"><span>Role:</span><strong>{viewingStaff.role?.name}</strong></div>
@@ -410,18 +280,30 @@ export default function StaffManagement() {
               <div className="detail-row"><span>Status:</span><span className={`status-badge ${viewingStaff.status}`}>{viewingStaff.status}</span></div>
               <div className="detail-row"><span>Joined:</span><strong>{viewingStaff.joiningDate ? new Date(viewingStaff.joiningDate).toLocaleDateString() : 'N/A'}</strong></div>
             </div>
-            <div className="modal-footer"><button className="btn-secondary" onClick={() => setViewingStaff(null)}>Close</button></div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setViewingStaff(null)}>Close</button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Delete Confirm */}
+      {/* Delete Confirmation */}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="modal-content delete-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header"><h3><i className="bi bi-exclamation-triangle"></i> Confirm Delete</h3><button className="close" onClick={() => setDeleteConfirm(null)}>&times;</button></div>
-            <div className="modal-body"><p>Are you sure you want to delete this staff member? This action cannot be undone.</p></div>
-            <div className="modal-footer"><button className="btn-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button><button className="btn-danger" onClick={() => deleteStaff(deleteConfirm)} disabled={deleting}>{deleting ? 'Deleting...' : 'Delete'}</button></div>
+            <div className="modal-header">
+              <h3><i className="bi bi-exclamation-triangle"></i> Confirm Delete</h3>
+              <button className="close" onClick={() => setDeleteConfirm(null)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <p>Are you sure you want to delete this staff member? This action cannot be undone.</p>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="btn-danger" onClick={() => deleteStaff(deleteConfirm)} disabled={deleting}>
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}

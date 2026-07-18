@@ -7,6 +7,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { getAllRoles, deleteRole } from '../../../services/permissionService';
 import './roles-all.css';
+
 export default function AllRolesPage() {
   const router = useRouter();
   const [roles, setRoles] = useState([]);
@@ -56,87 +57,101 @@ export default function AllRolesPage() {
   };
 
   return (
-    <div className="container-fluid py-4 roles-page">
+    <div className="roles-page">
       <Toaster position="top-right" />
 
-      {/* Header */}
-      <div className="d-flex flex-wrap justify-content-between align-items-center mb-4">
+      {/* ===== HERO SECTION (matching staff page) ===== */}
+      <div className="roles-hero">
         <div>
-          <h1 className="display-6 fw-bold text-dark mb-0">
-            <i className="bi bi-person-badge me-2 text-primary"></i> All Roles
-          </h1>
-          <p className="text-muted mt-1">Manage system roles and permissions</p>
+          <div className="hero-title">
+            <i className="bi bi-person-badge"></i> All Roles
+          </div>
+          <div className="hero-subtitle">Manage system roles and permissions</div>
         </div>
-        <Link href="/super-admin/staff/RoleAdd" className="btn btn-primary rounded-pill px-4 shadow-sm">
-          <i className="bi bi-plus-circle me-2"></i> Add New Role
-        </Link>
+        <div className="hero-buttons">
+          <Link href="/super-admin/staff/RoleAdd" className="btn-glow">
+            <i className="bi bi-plus-circle"></i> Add New Role
+          </Link>
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="card border-0 shadow-sm">
-        <div className="card-body p-0">
-          <div className="table-responsive">
-            <table className="table table-hover align-middle mb-0">
-              <thead className="bg-light">
-                <tr>
-                  <th scope="col" style={{ width: '80px' }}>#</th>
-                  <th scope="col">Name</th>
-                  <th scope="col" style={{ width: '120px' }}>Options</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan="3" className="text-center py-5">
-                      <div className="spinner-border text-primary" role="status">
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : roles.length === 0 ? (
-                  <tr>
-                    <td colSpan="3" className="text-center py-5 text-muted">
-                      <i className="bi bi-inbox fs-1"></i>
-                      <p className="mt-2">No roles found. Click “Add New Role” to create one.</p>
-                    </td>
-                  </tr>
-                ) : (
-                  roles.map((role, idx) => (
-                    <tr key={role._id}>
-                      <td className="fw-semibold">{idx + 1}</td>
-                      <td className="fw-medium">{role.name}</td>
-                      <td>
-                        <div className="d-flex gap-2">
-                          <Link
-                            href={`/super-admin/staff/rolesEdit/${role._id}`}
-                            className="btn btn-sm btn-outline-warning rounded-circle"
-                            style={{ width: '32px', height: '32px', lineHeight: '1' }}
-                            title="Edit Role"
-                          >
-                            <i className="bi bi-pencil-square"></i>
-                          </Link>
-                          <button
-                            className="btn btn-sm btn-outline-danger rounded-circle"
-                            style={{ width: '32px', height: '32px', lineHeight: '1' }}
-                            onClick={() => handleDelete(role._id, role.name)}
-                            disabled={deletingId === role._id}
-                            title="Delete Role"
-                          >
-                            {deletingId === role._id ? (
-                              <span className="spinner-border spinner-border-sm" style={{ width: '1rem', height: '1rem' }}></span>
-                            ) : (
-                              <i className="bi bi-trash3"></i>
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+      {/* ===== STATS CARDS ===== */}
+      <div className="roles-stats">
+        <div className="stat-card">
+          <i className="bi bi-person-badge"></i>
+          <div>
+            <span className="stat-number">{roles.length}</span>
+            <span>Total Roles</span>
           </div>
         </div>
+        <div className="stat-card">
+          <i className="bi bi-shield-check"></i>
+          <div>
+            <span className="stat-number">{roles.length}</span>
+            <span>Active Roles</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ===== TABLE ===== */}
+      <div className="roles-table-wrapper">
+        <table className="roles-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Role Name</th>
+              <th className="text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan="3" className="text-center py-5">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                </td>
+              </tr>
+            ) : roles.length === 0 ? (
+              <tr>
+                <td colSpan="3" className="text-center py-5 text-muted">
+                  <i className="bi bi-inbox fs-1"></i>
+                  <p className="mt-2">No roles found. Click “Add New Role” to create one.</p>
+                </td>
+              </tr>
+            ) : (
+              roles.map((role, idx) => (
+                <tr key={role._id}>
+                  <td>{idx + 1}</td>
+                  <td className="fw-medium">{role.name}</td>
+                  <td>
+                    <div className="actions-group">
+                      <Link
+                        href={`/super-admin/staff/rolesEdit/${role._id}`}
+                        className="action-btn edit-btn"
+                        title="Edit Role"
+                      >
+                        <i className="bi bi-pencil-square"></i>
+                      </Link>
+                      <button
+                        className="action-btn delete-btn"
+                        onClick={() => handleDelete(role._id, role.name)}
+                        disabled={deletingId === role._id}
+                        title="Delete Role"
+                      >
+                        {deletingId === role._id ? (
+                          <span className="spinner-border spinner-border-sm" style={{ width: '0.8rem', height: '0.8rem' }}></span>
+                        ) : (
+                          <i className="bi bi-trash3"></i>
+                        )}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
