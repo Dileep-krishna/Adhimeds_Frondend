@@ -3,17 +3,31 @@
 import AppHeader from "@/layout/AppHeader";
 import AppSidebar from "@/layout/AppSidebar";
 import Backdrop from "@/layout/Backdrop";
-import StoreAppHeader from "../All-store-management/components/StoreAppHeader";
+import { useSidebar } from "@/context/SidebarContext";
+
+import "./super-admin.css";
 
 export default function AdminLayout({ children }) {
+  const { isExpanded } = useSidebar();
+
   return (
-    <div className="super-layout-wrapper">
+    <div
+      className={`super-layout-wrapper ${
+        isExpanded ? "sidebar-expanded" : "sidebar-collapsed"
+      }`}
+    >
       <AppSidebar />
+
       <Backdrop />
+
       <div className="super-main-content">
         <AppHeader />
-      
-        <div className="container-fluid p-4">{children}</div>
+
+        <main className="super-page-content">
+          <div className="container-fluid px-4 py-3">
+            {children}
+          </div>
+        </main>
       </div>
     </div>
   );

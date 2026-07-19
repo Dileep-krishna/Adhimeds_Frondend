@@ -1,66 +1,69 @@
-/* custom-review.css – shared for Add/Edit pages */
+/* ===== CUSTOM REVIEW – SHARED FOR ADD/EDIT PAGES (THEME‑AWARE) ===== */
 
 .custom-review-page {
-  background-color: #f8fafc;
+  background-color: var(--bg-secondary);
   min-height: 100vh;
+  color: var(--text-primary);
 }
 
-/* Star rating container */
+/* ─── Star Rating ─── */
 .rating-stars {
   display: flex;
   gap: 0.5rem;
   align-items: center;
 }
 
-/* Star button */
 .star-btn {
   background: none;
   border: none;
   font-size: 2rem;
   cursor: pointer;
-  color: #cbd5e1;
+  color: var(--border-color);      /* inactive stars use border colour */
   transition: all 0.2s ease;
   padding: 0;
   line-height: 1;
 }
 
-/* Active (selected) star */
 .star-btn.active {
-  color: #fbbf24;
-  text-shadow: 0 0 2px rgba(0,0,0,0.1);
+  color: #fbbf24;                  /* keep gold for active state */
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.1);
 }
 
-/* Hover effect */
 .star-btn:hover {
-  color: #f59e0b;
+  color: #f59e0b;                  /* keep hover gold */
   transform: scale(1.05);
 }
 
-/* Form labels */
+/* ─── Form Labels ─── */
 .form-label {
   font-weight: 600;
   margin-bottom: 0.5rem;
+  color: var(--text-primary);
 }
 
-/* Card styling */
+/* ─── Card ─── */
 .card {
   border-radius: 1rem;
   overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow);
 }
 
-/* Image previews */
+/* ─── Image Previews ─── */
 .preview-img {
   object-fit: cover;
   border-radius: 0.25rem;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--border-color);
 }
-/* Save / Update button for Edit page */
+
+/* ─── Primary Button (Save/Update) ─── */
 .btn-save-update {
-  background: linear-gradient(135deg, #2a7f6e, #1e5a4f);
+  background: var(--accent);
   border: none;
   padding: 0.6rem 1.8rem;
   border-radius: 2rem;
-  color: white;
+  color: #fff;
   font-weight: 500;
   font-size: 1rem;
   display: inline-flex;
@@ -68,16 +71,19 @@
   gap: 0.5rem;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
+
 .btn-save-update:hover:not(:disabled) {
-  background: linear-gradient(135deg, #1e5a4f, #154a3d);
+  background: var(--accent-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
 }
+
 .btn-save-update:active:not(:disabled) {
   transform: translateY(1px);
 }
+
 .btn-save-update:disabled {
   opacity: 0.6;
   cursor: not-allowed;

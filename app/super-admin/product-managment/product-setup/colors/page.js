@@ -6,10 +6,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import { createColorAPI, deleteColorAPI, getColorsAPI, updateColorAPI } from '../../../../services/colorAPI';
-
-
-// API service functions (create these in services/colorAPI.js)
-
+import './colors.css'; // ✅ Import theme-aware CSS
 
 export default function ColorsPage() {
   const router = useRouter();
@@ -20,7 +17,7 @@ export default function ColorsPage() {
   const [selectedColor, setSelectedColor] = useState(null);
   const [formData, setFormData] = useState({ name: '', code: '#000000' });
   const [saving, setSaving] = useState(false);
-  const [filterEnabled, setFilterEnabled] = useState(false); // toggle for "Activate Color Filter"
+  const [filterEnabled, setFilterEnabled] = useState(false);
 
   const fetchColors = async () => {
     setLoading(true);
@@ -111,21 +108,27 @@ export default function ColorsPage() {
   };
 
   return (
-    <div className="container-fluid py-4">
+    <div className="colors-page-container">
       <Toaster position="top-right" />
 
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2 className="h3 mb-0">All Colors</h2>
+        <h2 className="h3 mb-0">
+          <i className="bi bi-palette me-2" style={{ color: 'var(--accent)' }}></i>
+          All Colors
+        </h2>
         <button className="btn btn-success" onClick={openAddModal}>
           <i className="bi bi-plus-circle me-1"></i> Add New Color
         </button>
       </div>
 
+      {/* Filter Toggle Card */}
       <div className="card mb-4">
         <div className="card-body d-flex justify-content-between align-items-center">
           <div>
-            <i className="bi bi-funnel me-2"></i>
-            <span className="fw-semibold">Activate Color Filter for Product Listing Page</span>
+            <i className="bi bi-funnel me-2" style={{ color: 'var(--text-secondary)' }}></i>
+            <span className="fw-semibold" style={{ color: 'var(--text-primary)' }}>
+              Activate Color Filter for Product Listing Page
+            </span>
           </div>
           <div className="form-check form-switch">
             <input
@@ -136,23 +139,24 @@ export default function ColorsPage() {
               checked={filterEnabled}
               onChange={(e) => setFilterEnabled(e.target.checked)}
             />
-            <label className="form-check-label" htmlFor="colorFilterSwitch">
+            <label className="form-check-label" htmlFor="colorFilterSwitch" style={{ color: 'var(--text-primary)' }}>
               {filterEnabled ? 'ON' : 'OFF'}
             </label>
           </div>
         </div>
       </div>
 
+      {/* Colors Table */}
       <div className="card shadow-sm">
         <div className="card-body">
           {loading ? (
             <div className="text-center py-5">
               <div className="spinner-border text-success" role="status"></div>
-              <p className="mt-2">Loading colors...</p>
+              <p className="mt-2" style={{ color: 'var(--text-secondary)' }}>Loading colors...</p>
             </div>
           ) : colors.length === 0 ? (
-            <div className="text-center py-5 text-muted">
-              <i className="bi bi-palette fs-1"></i>
+            <div className="text-center py-5" style={{ color: 'var(--text-secondary)' }}>
+              <i className="bi bi-palette fs-1" style={{ color: 'var(--text-secondary)' }}></i>
               <p className="mt-2">No colors added yet. Click "Add New Color" to start.</p>
             </div>
           ) : (
@@ -161,6 +165,7 @@ export default function ColorsPage() {
                 <thead className="table-light">
                   <tr>
                     <th>Name</th>
+                    <th>Color Code</th>
                     <th>Options</th>
                   </tr>
                 </thead>
@@ -174,12 +179,15 @@ export default function ColorsPage() {
                               width: '30px',
                               height: '30px',
                               backgroundColor: color.code || '#cccccc',
-                              border: '1px solid #dee2e6',
+                              border: '1px solid var(--border-color)',
                               borderRadius: '4px',
                             }}
                           ></div>
-                          <span>{color.name}</span>
+                          <span style={{ color: 'var(--text-primary)' }}>{color.name}</span>
                         </div>
+                      </td>
+                      <td style={{ color: 'var(--text-primary)' }}>
+                        <code>{color.code || '—'}</code>
                       </td>
                       <td>
                         <button
@@ -206,12 +214,17 @@ export default function ColorsPage() {
 
       {/* Modal for Add/Edit */}
       {showModal && (
-        <div className="modal fade show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog">
+        <div
+          className="modal fade show d-block"
+          tabIndex="-1"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={() => setShowModal(false)}
+        >
+          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">
-                  <i className="bi bi-palette me-2"></i>
+                <h5 className="modal-title" style={{ color: 'var(--text-primary)' }}>
+                  <i className="bi bi-palette me-2" style={{ color: 'var(--accent)' }}></i>
                   {isEdit ? 'Edit Color' : 'Color Information'}
                 </h5>
                 <button type="button" className="btn-close" onClick={() => setShowModal(false)}></button>

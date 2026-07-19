@@ -44,11 +44,11 @@
 
 /* ========== MAIN DASHBOARD CONTAINER ========== */
 .super-admin-dashboard {
-  width:100%;
+  width: 100%;
   margin: 0 auto;
   padding: 1.5rem;
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  background: var(--bg-secondary);
   min-height: 100vh;
   animation: fadeInUp 0.6s ease-out;
 }
@@ -62,17 +62,17 @@
   gap: 1rem;
   margin-bottom: 2.5rem;
   padding: 1.5rem 2rem;
-  background: linear-gradient(135deg, #ffffff 0%, #fefefe 100%);
+  background: var(--bg-card);
   border-radius: 2rem;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.03), 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow);
   backdrop-filter: blur(2px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--border-color);
 }
 
 .dashboard-title {
   font-size: 2rem;
   font-weight: 800;
-  background: linear-gradient(135deg, #1e293b, #3b82f6);
+  background: linear-gradient(135deg, var(--text-primary), var(--accent));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -81,7 +81,7 @@
 }
 
 .dashboard-subtitle {
-  color: #64748b;
+  color: var(--text-secondary);
   margin: 0;
   font-size: 0.95rem;
 }
@@ -91,25 +91,25 @@
   align-items: center;
   gap: 0.6rem;
   padding: 0.6rem 1.2rem;
-  background: #ffffffcc;
+  background: var(--bg-card);
   backdrop-filter: blur(4px);
   border-radius: 2rem;
   font-size: 0.9rem;
   font-weight: 500;
-  color: #1e293b;
+  color: var(--text-primary);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-color);
   transition: all 0.2s;
 }
 
 .date-badge i {
-  color: #3b82f6;
+  color: var(--accent);
   font-size: 1.1rem;
 }
 
 .date-badge:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px var(--shadow);
 }
 
 /* ========== STATS GRID (4 cards) ========== */
@@ -121,7 +121,7 @@
 }
 
 .premium-stat-card {
-  background: white;
+  background: var(--bg-card);
   border-radius: 1.5rem;
   padding: 1.5rem;
   display: flex;
@@ -129,7 +129,7 @@
   gap: 1.2rem;
   transition: all 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
   box-shadow: 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 10px 15px -3px rgba(0, 0, 0, 0.02);
-  border: 1px solid rgba(203, 213, 225, 0.3);
+  border: 1px solid var(--border-color);
   position: relative;
   overflow: hidden;
 }
@@ -147,10 +147,10 @@
 
 .premium-stat-card:hover {
   transform: translateY(-6px);
-  box-shadow: 0 20px 25px -12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 20px 25px -12px var(--shadow);
 }
 
-/* Individual card hover accents */
+/* Individual card hover accents (keep as is) */
 .premium-stat-card.customers:hover { border-color: #3b82f6; }
 .premium-stat-card.products:hover { border-color: #10b981; }
 .premium-stat-card.sales:hover { border-color: #f59e0b; }
@@ -194,14 +194,14 @@
 .stat-label {
   font-size: 0.85rem;
   font-weight: 500;
-  color: #64748b;
+  color: var(--text-secondary);
   letter-spacing: 0.02em;
 }
 
 .stat-number {
   font-size: 2.2rem;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--text-primary);
   line-height: 1;
   animation: countUp 0.4s ease-out;
 }
@@ -231,10 +231,10 @@
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--bg-card);
   backdrop-filter: blur(8px);
   border-radius: 1.5rem;
-  border: 1px solid rgba(226, 232, 240, 0.6);
+  border: 1px solid var(--border-color);
   overflow: hidden;
   transition: all 0.3s;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.02);
@@ -242,8 +242,8 @@
 
 .glass-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 20px 25px -12px rgba(0, 0, 0, 0.1);
-  border-color: #cbd5e1;
+  box-shadow: 0 20px 25px -12px var(--shadow);
+  border-color: var(--border-color);
 }
 
 .card-header-premium {
@@ -251,20 +251,20 @@
   justify-content: space-between;
   align-items: center;
   padding: 1.2rem 1.5rem;
-  background: #ffffffaa;
-  border-bottom: 1px solid #eef2ff;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-primary);
 }
 
 .card-header-premium i {
   margin-right: 0.5rem;
-  color: #3b82f6;
+  color: var(--accent);
 }
 
 .badge-modern {
-  background: #eef2ff;
-  color: #3b82f6;
+  background: var(--bg-secondary);
+  color: var(--accent);
   padding: 0.3rem 0.8rem;
   border-radius: 2rem;
   font-size: 0.7rem;
@@ -278,7 +278,7 @@
 .big-number {
   font-size: 3rem;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--text-primary);
   margin-bottom: 1rem;
   animation: countUp 0.4s ease;
 }
@@ -287,12 +287,12 @@
   display: flex;
   justify-content: space-between;
   font-size: 0.75rem;
-  color: #475569;
+  color: var(--text-secondary);
   margin-bottom: 0.4rem;
 }
 
 .progress-bar-modern {
-  background: #e2e8f0;
+  background: var(--bg-secondary);
   border-radius: 2rem;
   height: 8px;
   overflow: hidden;
@@ -300,7 +300,7 @@
 }
 
 .progress-fill-modern {
-  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  background: linear-gradient(90deg, var(--accent), #8b5cf6);
   width: 0%;
   height: 100%;
   border-radius: 2rem;
@@ -309,11 +309,11 @@
 
 .btn-outline-glass {
   background: transparent;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border-color);
   border-radius: 2rem;
   padding: 0.5rem 1.2rem;
   font-weight: 500;
-  color: #1e293b;
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s;
   display: inline-flex;
@@ -323,8 +323,8 @@
 }
 
 .btn-outline-glass:hover {
-  background: #3b82f6;
-  border-color: #3b82f6;
+  background: var(--accent);
+  border-color: var(--accent);
   color: white;
   transform: translateX(4px);
 }
@@ -335,6 +335,7 @@
   justify-content: space-between;
   margin: 1rem 0 0.3rem 0;
   font-size: 0.9rem;
+  color: var(--text-primary);
 }
 
 .status-left {
@@ -366,8 +367,9 @@
   justify-content: space-between;
   margin-top: 1rem;
   padding-top: 0.8rem;
-  border-top: 1px dashed #e2e8f0;
+  border-top: 1px dashed var(--border-color);
   font-size: 0.85rem;
+  color: var(--text-secondary);
 }
 
 /* ========== RECENT ORDERS SECTION ========== */
@@ -378,7 +380,7 @@
 .section-title {
   font-size: 1.3rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
   margin-bottom: 1.2rem;
   display: flex;
   align-items: center;
@@ -386,16 +388,16 @@
 }
 
 .section-title i {
-  color: #3b82f6;
+  color: var(--accent);
   font-size: 1.4rem;
 }
 
 .recent-table-container {
-  background: white;
+  background: var(--bg-card);
   border-radius: 1.5rem;
   overflow-x: auto;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-  border: 1px solid #eef2ff;
+  border: 1px solid var(--border-color);
 }
 
 .recent-table {
@@ -407,20 +409,20 @@
 .recent-table th {
   text-align: left;
   padding: 1rem 1.2rem;
-  background: #f8fafc;
-  color: #475569;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
   font-weight: 600;
-  border-bottom: 1px solid #eef2ff;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .recent-table td {
   padding: 0.9rem 1.2rem;
-  border-bottom: 1px solid #f1f5f9;
-  color: #334155;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
 }
 
 .recent-table tr:hover {
-  background: #fafbff;
+  background: var(--bg-secondary);
   transition: background 0.2s;
 }
 
@@ -437,9 +439,6 @@
 .status-badge.cancelled { background: #ef444410; color: #ef4444; }
 
 /* ========== RESPONSIVE TOUCHES ========== */
-/* ========== RESPONSIVE ENHANCEMENTS ========== */
-
-/* Tablet & small desktop (1024px and below) */
 @media (max-width: 1024px) {
   .super-admin-dashboard {
     padding: 1.2rem;
@@ -452,13 +451,10 @@
   }
 }
 
-/* Mobile landscape & large phones (768px and below) */
 @media (max-width: 768px) {
   .super-admin-dashboard {
     padding: 1rem;
   }
-
-  /* Hero */
   .dashboard-hero {
     flex-direction: column;
     align-items: stretch;
@@ -473,10 +469,8 @@
     width: 100%;
     padding: 0.5rem 1rem;
   }
-
-  /* Stats grid - force single column if needed */
   .stats-grid {
-    grid-template-columns: 1fr;      /* stack all cards vertically */
+    grid-template-columns: 1fr;
     gap: 1rem;
   }
   .premium-stat-card {
@@ -494,8 +488,6 @@
   .stat-change {
     font-size: 0.7rem;
   }
-
-  /* Two-column row becomes single column (already does due to minmax, but ensure padding) */
   .dashboard-row {
     gap: 1.2rem;
   }
@@ -511,8 +503,6 @@
   .big-number {
     font-size: 2rem;
   }
-
-  /* Progress bars - keep same height, but adjust labels */
   .progress-label-sm {
     font-size: 0.7rem;
   }
@@ -524,16 +514,12 @@
   .status-right {
     font-size: 0.8rem;
   }
-
-  /* Button */
   .btn-outline-glass {
     padding: 0.5rem 1rem;
     font-size: 0.85rem;
     width: 100%;
     justify-content: center;
   }
-
-  /* Recent orders table */
   .section-title {
     font-size: 1.1rem;
   }
@@ -548,7 +534,6 @@
   }
 }
 
-/* Small phones (480px and below) */
 @media (max-width: 480px) {
   .super-admin-dashboard {
     padding: 0.8rem;
@@ -593,10 +578,8 @@
     padding: 0.5rem;
     font-size: 0.75rem;
   }
-  /* Make table cells stack on extreme small screens? Not needed due to overflow-auto, but we keep readable */
 }
 
-/* Touch-friendly improvements (mobile) */
 @media (hover: none) and (pointer: coarse) {
   .btn-outline-glass,
   .premium-stat-card,
@@ -605,6 +588,6 @@
     transition: transform 0.1s ease;
   }
   .btn-outline-glass {
-    min-height: 44px;  /* better tap target */
+    min-height: 44px;
   }
 }

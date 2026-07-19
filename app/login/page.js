@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import toast, { Toaster } from "react-hot-toast";
-import "./animations.css";
+import "./login.css";
 import SERVERURL from "../services/serverURL";
 
 export default function LoginPage() {
@@ -20,37 +20,20 @@ export default function LoginPage() {
       return;
     }
     setIsLoading(true);
-    
-    // Log start
-    console.log("🔍 Starting login attempt");
-    console.log("   Email:", email);
-    console.log("   Password length:", password.length);
-    
-    // Use the backend login route (adjust URL if needed)
-  const backendUrl = `${SERVERURL}/api/login`;
-console.log("🌐 Fetching URL:", backendUrl)
-    
+
+    const backendUrl = `${SERVERURL}/api/login`;
+    console.log("🌐 Fetching URL:", backendUrl);
+
     try {
       const response = await fetch(backendUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      
-      console.log("📡 Response received:");
-      console.log("   Status:", response.status);
-      console.log("   Status text:", response.statusText);
-      console.log("   Content-Type:", response.headers.get("content-type"));
-      
-      // Get raw text for debugging
+
       const rawText = await response.text();
-      console.log("📄 Raw response body (first 500 chars):", rawText.substring(0, 500));
-      
-      // Try to parse JSON
       try {
         const data = JSON.parse(rawText);
-        console.log("✅ Parsed JSON:", data);
-        
         if (data.success) {
           if (rememberMe) {
             localStorage.setItem("adminToken", data.data.token);
@@ -65,15 +48,12 @@ console.log("🌐 Fetching URL:", backendUrl)
           toast.error(data.message || "Invalid credentials");
         }
       } catch (jsonError) {
-        console.error("❌ Failed to parse JSON. Response is not JSON.");
-        toast.error("Server returned invalid response. Check backend.");
+        toast.error("Server returned invalid response.");
       }
     } catch (error) {
-      console.error("🔥 Network or fetch error:", error);
-      toast.error("Cannot connect to backend. Is the server running?");
+      toast.error("Cannot connect to backend.");
     } finally {
       setIsLoading(false);
-      console.log("🏁 Login attempt finished");
     }
   };
 
@@ -85,7 +65,7 @@ console.log("🌐 Fetching URL:", backendUrl)
     "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?q=80&w=2053&auto=format";
 
   return (
-    <div className="container-fluid vh-100 p-0 overflow-hidden">
+    <div className="login-page container-fluid vh-100 p-0 overflow-hidden">
       <Toaster position="top-right" />
       <div className="row g-0 h-100">
         {/* LEFT SIDE */}

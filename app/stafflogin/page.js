@@ -250,7 +250,7 @@ export default function StaffLoginPage() {
   const backgroundImageUrl = "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?q=80&w=2053&auto=format";
 
   return (
-    <div className="container-fluid vh-100 p-0 overflow-hidden">
+<div className="staff-login-page container-fluid vh-100 p-0 overflow-hidden">
       <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
       <div className="row g-0 h-100">
         {/* LEFT SIDE – Branding */}

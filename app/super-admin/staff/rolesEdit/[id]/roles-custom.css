@@ -1,23 +1,25 @@
 /* ========== CONTAINER ========== */
 .roles-design-page {
-    background-color: #f8fafc;
+    background-color: var(--bg-secondary);
     min-height: 100vh;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: var(--text-primary);
 }
 
 /* ========== ROLE INFORMATION CARD ========== */
 .role-info-card {
-    background: white;
+    background: var(--bg-card);
     border-radius: 1rem;
     padding: 1.5rem;
     margin-bottom: 2rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-color);
 }
 .role-info-card .card-title {
     font-size: 1.2rem;
     font-weight: 600;
     margin-bottom: 1rem;
-    color: #0f172a;
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -29,21 +31,23 @@
     display: block;
     font-weight: 500;
     margin-bottom: 0.5rem;
-    color: #1e293b;
+    color: var(--text-secondary);
 }
 .role-info-card .form-control {
     width: 100%;
     max-width: 400px;
     padding: 0.6rem 1rem;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--input-border);
     border-radius: 0.75rem;
     font-size: 0.95rem;
     transition: 0.2s;
+    background: var(--input-bg);
+    color: var(--text-primary);
 }
 .role-info-card .form-control:focus {
-    border-color: #3b82f6;
+    border-color: var(--accent);
     outline: none;
-    box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb, 59, 130, 246), 0.1);
 }
 
 /* ========== PERMISSIONS SECTION ========== */
@@ -54,18 +58,19 @@
     font-size: 1.25rem;
     font-weight: 600;
     margin-bottom: 1.25rem;
-    color: #0f172a;
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
 .role-highlight {
-    background: #e0f2fe;
-    color: #0284c7;
+    background: var(--bg-secondary);
+    color: var(--accent);
     padding: 0.2rem 0.6rem;
     border-radius: 1rem;
     font-size: 0.9rem;
     font-weight: 500;
+    border: 1px solid var(--border-color);
 }
 
 .permissions-grid {
@@ -74,24 +79,25 @@
     gap: 1.25rem;
 }
 .permission-card {
-    background: white;
+    background: var(--bg-card);
     border-radius: 1rem;
     overflow: hidden;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-color);
     transition: box-shadow 0.2s;
 }
 .permission-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 .permission-header {
-    background: #f1f5f9;
+    background: var(--bg-secondary);
     padding: 0.75rem 1rem;
     font-weight: 600;
-    color: #0f172a;
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--border-color);
 }
 .permission-body {
     padding: 0.75rem 1rem;
@@ -105,11 +111,11 @@
     gap: 0.75rem;
     cursor: pointer;
     font-size: 0.9rem;
-    color: #334155;
+    color: var(--text-primary);
     transition: color 0.2s;
 }
 .permission-item:hover {
-    color: #0f172a;
+    color: var(--text-primary);
 }
 
 /* ✨ TOGGLE SWITCH STYLES – replaces native checkbox */
@@ -135,7 +141,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #cbd5e1;
+    background-color: var(--border-color);
     transition: 0.3s;
     border-radius: 34px;
 }
@@ -147,13 +153,13 @@
     width: 20px;
     left: 3px;
     bottom: 3px;
-    background-color: white;
+    background-color: #fff;
     transition: 0.3s;
     border-radius: 50%;
 }
 
 .permission-item input:checked + .toggle-slider {
-    background-color: #2a7f6e;
+    background-color: var(--accent);
 }
 
 .permission-item input:checked + .toggle-slider:before {
@@ -169,13 +175,14 @@
 .permission-hint {
     margin: 1.5rem 0 1rem;
     font-size: 0.85rem;
-    color: #64748b;
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    background: #f1f5f9;
+    background: var(--bg-secondary);
     padding: 0.75rem 1rem;
     border-radius: 0.75rem;
+    border: 1px solid var(--border-color);
 }
 
 /* ========== SAVE BUTTON FOOTER ========== */
@@ -184,14 +191,14 @@
     justify-content: flex-end;
     margin-top: 2rem;
     padding-top: 1rem;
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid var(--border-color);
 }
 .btn-save-all {
-    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    background: var(--accent);
     border: none;
     padding: 0.7rem 1.8rem;
     border-radius: 2rem;
-    color: white;
+    color: #fff;
     font-weight: 500;
     font-size: 0.95rem;
     display: inline-flex;
@@ -199,10 +206,10 @@
     gap: 0.5rem;
     cursor: pointer;
     transition: all 0.2s;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 .btn-save-all:hover:not(:disabled) {
-    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    background: var(--accent-hover);
     transform: translateY(-1px);
 }
 .btn-save-all:disabled {

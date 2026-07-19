@@ -1,37 +1,62 @@
 "use client";
 
 import NotificationDropdown from "@/components/header/NotificationDropdown";
-import UserDropdown from "@/components/header/UserDropdown";   // ← now using the updated component
+import UserDropdown from "@/components/header/UserDropdown";
 import { useSidebar } from "@/context/SidebarContext";
+import { useTheme } from "@/context/ThemeContext";
 import Image from "next/image";
 import Link from "next/link";
-import React, { useState } from "react";
+import { useState } from "react";
+import "./AppHeader.css";
 
-const AppHeader = () => {
+export default function AppHeader() {
   const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
-  const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
+
+  const {
+    isExpanded,
+    isMobileOpen,
+    toggleSidebar,
+    toggleMobileSidebar,
+  } = useSidebar();
+
+  const { theme, toggleTheme, THEMES } = useTheme();
 
   const handleToggle = () => {
-    if (window.innerWidth >= 1024) {
+    if (window.innerWidth >= 992) {
       toggleSidebar();
     } else {
       toggleMobileSidebar();
     }
   };
 
-  const toggleApplicationMenu = () => {
-    setApplicationMenuOpen(!isApplicationMenuOpen);
+  const getThemeIcon = () => {
+    if (theme === THEMES.DARK) return "bi-moon-fill";
+    if (theme === THEMES.GREEN) return "bi-tree-fill";
+    return "bi-sun-fill";
   };
 
   return (
-    <header className="sticky-top bg-white border-bottom shadow-sm">
+<header
+  className="app-header"
+  style={{
+    left: window.innerWidth >= 992
+      ? (isExpanded ? "280px" : "90px")
+      : "0",
+    width: window.innerWidth >= 992
+      ? `calc(100% - ${isExpanded ? "280px" : "90px"})`
+      : "100%",
+  }}
+>
+    
       <div className="container-fluid px-3 px-lg-4">
-        <div className="d-flex align-items-center justify-content-between py-2 py-lg-3">
+
+        <div className="d-flex justify-content-between align-items-center h-100">
+
           <div className="d-flex align-items-center gap-2">
+
             <button
-              className="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center"
+              className="btn app-header-btn"
               onClick={handleToggle}
-              style={{ width: "2.5rem", height: "2.5rem" }}
             >
               {isMobileOpen ? (
                 <i className="bi bi-x-lg fs-5"></i>
@@ -39,37 +64,53 @@ const AppHeader = () => {
                 <i className="bi bi-list fs-5"></i>
               )}
             </button>
+
             <Link href="/" className="d-lg-none">
-              <Image width={154} height={32} src="/images/logo.webp" alt="Logo" />
+              <Image
+                src="/images/logo.webp"
+                width={150}
+                height={32}
+                alt="Logo"
+              />
             </Link>
+
           </div>
 
           <div className="d-flex align-items-center gap-2">
+
             <button
-              onClick={toggleApplicationMenu}
-              className="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center d-lg-none"
-              style={{ width: "2.5rem", height: "2.5rem" }}
+              className="btn app-header-btn d-lg-none"
+              onClick={() =>
+                setApplicationMenuOpen(!isApplicationMenuOpen)
+              }
             >
-              <i className="bi bi-three-dots-vertical fs-5"></i>
+              <i className="bi bi-three-dots-vertical"></i>
             </button>
 
             <div className="d-none d-lg-flex align-items-center gap-2">
               <NotificationDropdown />
             </div>
+
+            <button
+              className="btn app-header-btn theme-toggle-btn"
+              onClick={toggleTheme}
+            >
+              <i className={`bi ${getThemeIcon()} fs-5`} />
+            </button>
+
             <UserDropdown />
+
           </div>
+
         </div>
 
         {isApplicationMenuOpen && (
-          <div className="d-lg-none mt-2 pb-2 border-top pt-2">
-            <div className="d-flex justify-content-end">
-              <NotificationDropdown />
-            </div>
+          <div className="d-lg-none border-top pt-2 pb-2">
+            <NotificationDropdown />
           </div>
         )}
+
       </div>
     </header>
   );
-};
-
-export default AppHeader;
+}

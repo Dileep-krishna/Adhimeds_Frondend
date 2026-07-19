@@ -35,7 +35,7 @@ export default function DeliveryBoysPage() {
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
   };
 
-  const { data: deliveryBoys = [], isLoading, error, refetch } = useQuery({
+  const { data: deliveryBoys = [], isLoading, error } = useQuery({
     queryKey: ['deliveryBoys'],
     queryFn: async () => {
       const result = await getDeliveryBoysAPI();
@@ -130,16 +130,17 @@ export default function DeliveryBoysPage() {
     });
   }, [deliveryBoys, searchTerm, districtFilter, statusFilter]);
 
-  // Skeleton rows for loading state
   const SkeletonRow = () => (
     <tr className="skeleton-row">
-      <td><div className="skeleton-text" style={{ width: '100px' }}></div></td>
+      <td><div className="skeleton-text" style={{ width: '30px' }}></div></td>
       <td><div className="skeleton-text" style={{ width: '120px' }}></div></td>
-      <td><div className="skeleton-text" style={{ width: '80px' }}></div></td>
+      <td><div className="skeleton-text" style={{ width: '140px' }}></div></td>
       <td><div className="skeleton-text" style={{ width: '100px' }}></div></td>
+      <td><div className="skeleton-text" style={{ width: '90px' }}></div></td>
+      <td><div className="skeleton-text" style={{ width: '70px' }}></div></td>
+      <td><div className="skeleton-text" style={{ width: '50px' }}></div></td>
       <td><div className="skeleton-text" style={{ width: '60px' }}></div></td>
-      <td><div className="skeleton-text" style={{ width: '60px' }}></div></td>
-      <td><div className="skeleton-text" style={{ width: '100px' }}></div></td>
+      <td><div className="skeleton-text" style={{ width: '150px' }}></div></td>
     </tr>
   );
 
@@ -152,18 +153,15 @@ export default function DeliveryBoysPage() {
         </div>
       )}
 
-      {/* Hero Section */}
-      <div className="hero-section-full">
-        <div className="hero-text">
-          <h1 className="hero-title"><i className="bi bi-bicycle"></i> Delivery Fleet</h1>
-          <p className="hero-subtitle">Manage your delivery partners, track performance, and optimise routes.</p>
+      {/* ─── Page Title ─── */}
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Delivery Boys</h1>
+          <p className="page-subtitle">Manage your delivery partners and track their performance</p>
         </div>
-        <button className="btn-glow" onClick={() => router.push('/super-admin/delivery-boys/delivery-boysAdd')}>
-          <i className="bi bi-plus-circle"></i> Add Delivery Boy
-        </button>
       </div>
 
-      {/* Stats Cards */}
+      {/* ─── Stats Cards ─── */}
       <div className="stats-row-full">
         <div className="stat-card">
           <div className="stat-icon"><i className="bi bi-people-fill"></i></div>
@@ -186,9 +184,17 @@ export default function DeliveryBoysPage() {
             <span className="stat-label">Top Deliveries</span>
           </div>
         </div>
+        <div className="stat-card">
+          <div className="stat-icon"><i className="bi bi-plus-circle-fill"></i></div>
+          <div className="stat-info">
+            <button className="btn-glow" onClick={() => router.push('/super-admin/delivery-boys/delivery-boysAdd')}>
+              <i className="bi bi-plus-circle"></i> Add Delivery Boy
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Filter Bar */}
+      {/* ─── Filter Bar ─── */}
       <div className="filter-bar-full">
         <div className="search-group">
           <i className="bi bi-search"></i>
@@ -212,94 +218,120 @@ export default function DeliveryBoysPage() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* ─── Table ─── */}
       <div className="delivery-table-wrapper">
-        <div className="table-responsive">
-          <table className="delivery-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>District</th>
-                <th>Status</th>
-                <th>Deliveries</th>
-                <th className="text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                Array(5).fill(0).map((_, i) => <SkeletonRow key={i} />)
-              ) : error ? (
+        <div className="delivery-table-card">
+          <div className="table-responsive">
+            <table className="delivery-table">
+              <thead>
                 <tr>
-                  <td colSpan="7" className="text-center py-4 text-danger">
-                    <i className="bi bi-exclamation-triangle-fill me-2"></i>
-                    {error.message}
-                  </td>
+                  <th>#</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>District</th>
+                  <th>Status</th>
+                  <th>Deliveries</th>
+                  <th>Rating</th>
+                  <th className="text-center">Actions</th>
                 </tr>
-              ) : filteredBoys.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="text-center py-4 text-muted">
-                    <i className="bi bi-emoji-frown me-2"></i>
-                    No delivery boys found
-                  </td>
-                </tr>
-              ) : (
-                filteredBoys.map((boy) => (
-                  <tr key={boy.id}>
-                    <td>
-                      <div className="d-flex align-items-center">
-                        <div className="avatar-sm me-2">{boy.avatar}</div>
-                        <span className="fw-semibold">{boy.name}</span>
-                      </div>
-                    </td>
-                    <td>{boy.email || '—'}</td>
-                    <td>{boy.phone}</td>
-                    <td>{boy.district}</td>
-                    <td>
-                      <span className={`status-badge ${boy.status}`}>
-                        {boy.status === 'active' ? 'Active' : boy.status === 'inactive' ? 'Inactive' : 'Pending'}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="deliveries-count">
-                        <i className="bi bi-truck me-1"></i> {boy.deliveries}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="d-flex gap-1 justify-content-center">
-                        <button
-                          className="btn btn-light rounded-circle shadow-sm"
-                          onClick={() => router.push(`/super-admin/delivery-boys/delivery-boysEdit/${boy.id}`)}
-                          title="Edit"
-                        >
-                          <i className="bi bi-pencil text-primary"></i>
-                        </button>
-                        <button
-                          className="btn btn-light rounded-circle shadow-sm"
-                          onClick={() => setDeleteConfirm(boy.id)}
-                          title="Delete"
-                        >
-                          <i className="bi bi-trash text-danger"></i>
-                        </button>
-                        <button
-                          className="btn btn-light rounded-circle shadow-sm"
-                          onClick={() => toggleStatusMutation.mutate({ id: boy.id, status: boy.status === 'active' ? 'inactive' : 'active' })}
-                          title="Toggle Status"
-                        >
-                          <i className={`bi ${boy.status === 'active' ? 'bi-toggle-on text-success' : 'bi-toggle-off text-secondary'}`}></i>
-                        </button>
-                      </div>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  Array(5).fill(0).map((_, i) => <SkeletonRow key={i} />)
+                ) : error ? (
+                  <tr>
+                    <td colSpan="9" className="text-center py-4 text-danger">
+                      <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                      {error.message}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : filteredBoys.length === 0 ? (
+                  <tr>
+                    <td colSpan="9" className="text-center py-4 text-muted">
+                      <i className="bi bi-emoji-frown me-2"></i>
+                      No delivery boys found
+                    </td>
+                  </tr>
+                ) : (
+                  filteredBoys.map((boy, index) => (
+                    <tr key={boy.id}>
+                      <td>{index + 1}</td>
+
+                      <td>
+                        <div className="user-info">
+                          <div className="user-avatar">{boy.avatar}</div>
+                          <span className="user-name">{boy.name}</span>
+                        </div>
+                      </td>
+
+                      <td>{boy.email || '—'}</td>
+
+                      <td>{boy.phone}</td>
+
+                      <td>{boy.district}</td>
+
+                      <td>
+                        <span className={`status-badge-table ${boy.status}`}>
+                          {boy.status === 'active' ? 'Active' : boy.status === 'inactive' ? 'Inactive' : 'Pending'}
+                        </span>
+                      </td>
+
+                      <td>{boy.deliveries}</td>
+
+                      <td>
+                        <span className="rating-stars">
+                          <i className="bi bi-star-fill"></i> {boy.rating}
+                        </span>
+                      </td>
+
+                      <td>
+                        <div className="action-buttons">
+                          <button className="btn-view" title="View">
+                            <i className="bi bi-eye"></i>
+                          </button>
+                          <button
+                            className="btn-edit"
+                            title="Edit"
+                            onClick={() =>
+                              router.push(
+                                `/super-admin/delivery-boys/delivery-boysEdit/${boy.id}`
+                              )
+                            }
+                          >
+                            <i className="bi bi-pencil"></i>
+                          </button>
+                          <button
+                            className="btn-status"
+                            title="Change Status"
+                            onClick={() =>
+                              toggleStatusMutation.mutate({
+                                id: boy.id,
+                                status: boy.status === 'active' ? 'inactive' : 'active',
+                              })
+                            }
+                          >
+                            <i className={`bi ${boy.status === 'active' ? 'bi-toggle-on' : 'bi-toggle-off'}`}></i>
+                          </button>
+                          <button
+                            className="btn-delete"
+                            title="Delete"
+                            onClick={() => setDeleteConfirm(boy.id)}
+                          >
+                            <i className="bi bi-trash"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* ─── Delete Confirmation Modal ─── */}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>

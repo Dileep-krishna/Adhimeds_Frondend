@@ -1,8 +1,8 @@
-/* ===== CUSTOM REVIEW – VISUAL ONLY (NO LAYOUT OVERRIDES) ===== */
+/* ===== CUSTOM REVIEW – THEME‑AWARE ===== */
 
 /* ─── Page Background ─── */
 .custom-review-page {
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  background: var(--bg-secondary);
   min-height: 100vh;
   padding: 1.5rem;
 }
@@ -10,29 +10,29 @@
 /* ─── Card Styling ─── */
 .card {
   border-radius: 1.5rem !important;
-  border: 1px solid #eef2ff !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.02), 0 2px 8px rgba(0, 0, 0, 0.01) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: var(--shadow) !important;
   overflow: hidden !important;
 }
 
 .card-header {
-  background: #fafcff !important;
-  border-bottom: 1px solid #eef2ff !important;
+  background: var(--bg-secondary) !important;
+  border-bottom: 1px solid var(--border-color) !important;
   padding: 1.5rem 2rem !important;
 }
 
 .card-header h3 {
   font-weight: 700 !important;
   font-size: 1.3rem !important;
-  color: #0f172a !important;
+  color: var(--text-primary) !important;
 }
 
 .card-header h3 i {
-  color: #4f46e5 !important;
+  color: var(--accent) !important;
 }
 
 .card-header hr {
-  border-color: #eef2ff !important;
+  border-color: var(--border-color) !important;
   opacity: 0.6 !important;
   margin-top: 0.8rem !important;
   margin-bottom: 0 !important;
@@ -46,7 +46,7 @@
 .form-label {
   font-weight: 600 !important;
   font-size: 0.85rem !important;
-  color: #1e293b !important;
+  color: var(--text-primary) !important;
   display: flex !important;
   align-items: center !important;
   gap: 0.4rem !important;
@@ -54,7 +54,7 @@
 }
 
 .form-label i {
-  color: #64748b !important;
+  color: var(--text-secondary) !important;
   font-size: 0.9rem !important;
 }
 
@@ -67,16 +67,18 @@
 .form-control,
 .form-select {
   border-radius: 0.75rem !important;
-  border: 1px solid #d1d5db !important;
+  border: 1px solid var(--input-border) !important;
   transition: all 0.2s ease !important;
   height: 44px !important;
   font-size: 0.9rem !important;
+  background: var(--input-bg) !important;
+  color: var(--text-primary) !important;
 }
 
 .form-control:focus,
 .form-select:focus {
-  border-color: #3b82f6 !important;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb, 59, 130, 246), 0.08) !important;
 }
 
 textarea.form-control {
@@ -87,7 +89,7 @@ textarea.form-control {
 
 .form-text {
   font-size: 0.8rem !important;
-  color: #94a3b8 !important;
+  color: var(--text-secondary) !important;
 }
 
 /* ─── Rating Stars ─── */
@@ -103,7 +105,7 @@ textarea.form-control {
   border: none !important;
   font-size: 2rem !important;
   cursor: pointer !important;
-  color: #cbd5e1 !important;
+  color: var(--border-color) !important;
   transition: all 0.2s ease !important;
   padding: 0 !important;
   line-height: 1 !important;
@@ -136,13 +138,13 @@ textarea.form-control {
 .date-options .form-check-input {
   width: 1rem !important;
   height: 1rem !important;
-  accent-color: #3b82f6 !important;
+  accent-color: var(--accent) !important;
   cursor: pointer !important;
 }
 
 .date-options .form-check-label {
   font-size: 0.9rem !important;
-  color: #1e293b !important;
+  color: var(--text-primary) !important;
   cursor: pointer !important;
 }
 
@@ -168,20 +170,20 @@ textarea.form-control {
   align-items: center !important;
   gap: 0.5rem !important;
   padding: 0.4rem 1.2rem !important;
-  background: #f1f5f9 !important;
-  border: 1px dashed #cbd5e1 !important;
+  background: var(--bg-secondary) !important;
+  border: 1px dashed var(--border-color) !important;
   border-radius: 2rem !important;
   cursor: pointer !important;
   font-size: 0.85rem !important;
-  color: #475569 !important;
+  color: var(--text-secondary) !important;
   transition: all 0.2s ease !important;
   height: 36px !important;
 }
 
 .file-label:hover {
-  background: #eef2ff !important;
-  border-color: #3b82f6 !important;
-  color: #3b82f6 !important;
+  background: var(--bg-secondary) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
 }
 
 .file-label i {
@@ -190,7 +192,7 @@ textarea.form-control {
 
 .file-name {
   font-size: 0.85rem !important;
-  color: #64748b !important;
+  color: var(--text-secondary) !important;
 }
 
 /* ─── Image Previews ─── */
@@ -199,7 +201,7 @@ textarea.form-control {
   height: 64px !important;
   object-fit: cover !important;
   border-radius: 50% !important;
-  border: 2px solid #eef2ff !important;
+  border: 2px solid var(--border-color) !important;
 }
 
 .image-preview-grid {
@@ -214,12 +216,12 @@ textarea.form-control {
   height: 72px !important;
   border-radius: 0.5rem !important;
   overflow: hidden !important;
-  border: 1px solid #e2e8f0 !important;
+  border: 1px solid var(--border-color) !important;
   transition: all 0.2s ease !important;
 }
 
 .image-preview-grid .preview-item:hover {
-  border-color: #3b82f6 !important;
+  border-color: var(--accent) !important;
   transform: scale(1.03) !important;
 }
 
@@ -232,7 +234,7 @@ textarea.form-control {
 /* ─── Buttons ─── */
 .btn-save-update,
 .btn-submit {
-  background: #3b82f6 !important;
+  background: var(--accent) !important;
   border: none !important;
   padding: 0.6rem 2rem !important;
   border-radius: 2rem !important;
@@ -244,14 +246,14 @@ textarea.form-control {
   gap: 0.5rem !important;
   cursor: pointer !important;
   transition: all 0.25s ease !important;
-  box-shadow: 0 2px 12px rgba(59, 130, 246, 0.15) !important;
+  box-shadow: 0 2px 12px rgba(var(--accent-rgb, 59, 130, 246), 0.15) !important;
 }
 
 .btn-save-update:hover:not(:disabled),
 .btn-submit:hover:not(:disabled) {
-  background: #2563eb !important;
+  background: var(--accent-hover) !important;
   transform: translateY(-2px) !important;
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.25) !important;
+  box-shadow: 0 6px 20px rgba(var(--accent-rgb, 59, 130, 246), 0.25) !important;
 }
 
 .btn-save-update:disabled,
@@ -262,9 +264,9 @@ textarea.form-control {
 }
 
 .btn-cancel {
-  background: #f1f5f9 !important;
-  color: #475569 !important;
-  border: none !important;
+  background: var(--bg-secondary) !important;
+  color: var(--text-secondary) !important;
+  border: 1px solid var(--border-color) !important;
   padding: 0.6rem 2rem !important;
   border-radius: 2rem !important;
   font-weight: 600 !important;
@@ -274,7 +276,8 @@ textarea.form-control {
 }
 
 .btn-cancel:hover {
-  background: #e2e8f0 !important;
+  background: var(--border-color) !important;
+  color: var(--text-primary) !important;
   transform: translateY(-1px) !important;
 }
 

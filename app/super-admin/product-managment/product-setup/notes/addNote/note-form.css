@@ -1,4 +1,4 @@
-/* note-form.css – Clean card design for Note Form */
+/* ===== NOTE FORM – THEME‑AWARE ===== */
 
 .note-form-wrapper {
   max-width: 600px;
@@ -6,209 +6,17 @@
   padding: 2rem 1rem;
 }
 
+/* ─── Rectangle Card with Triangle Accent ─── */
 .note-card {
-  background: #fff;
-  border-radius: 1rem;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e2e8f0;
-}
-
-.note-card-header {
-  padding: 1.5rem;
-  border-bottom: 1px solid #e2e8f0;
-  background: #fafcff;
-}
-
-.note-card-header h4 {
-  margin: 0;
-  font-weight: 600;
-  color: #0f172a;
-}
-
-.note-card-body {
-  padding: 1.5rem;
-}
-
-.form-group {
-  margin-bottom: 1.5rem;
-}
-
-.form-group label {
-  font-weight: 500;
-  margin-bottom: 0.5rem;
-  display: block;
-  color: #334155;
-}
-
-.form-control-custom {
-  width: 100%;
-  padding: 0.6rem;
-  border-radius: 0.5rem;
-  border: 1px solid #cbd5e1;
-  font-size: 1rem;
-  transition: border 0.2s, box-shadow 0.2s;
-}
-
-.form-control-custom:focus {
-  border-color: #3b82f6;
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-}
-
-textarea.form-control-custom {
-  resize: vertical;
-}
-
-.char-counter {
-  font-size: 0.8rem;
-  color: #64748b;
-  margin-top: 0.25rem;
-  text-align: right;
-}
-
-.button-group {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: flex-end;
-  margin-top: 1rem;
-}
-
-.btn-cancel {
-  padding: 0.5rem 1.2rem;
-  border-radius: 0.5rem;
-  background: #f1f5f9;
-  border: none;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-cancel:hover {
-  background: #e2e8f0;
-}
-
-.btn-save {
-  padding: 0.5rem 1.2rem;
-  border-radius: 0.5rem;
-  background: #3b82f6;
-  color: #fff;
-  border: none;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-save:hover {
-  background: #2563eb;
-}
-
-.btn-save:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-/* note-form.css – Rectangle card model (clean, sharp corners, boxed) */
-
-.note-form-wrapper {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-}
-
-/* RECTANGLE CARD – minimal border-radius, stronger border */
-.note-card {
-  background: #ffffff;
-  border-radius: 8px;           /* less round, more rectangle */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border: 1px solid #cfdfe8;    /* solid border */
-  overflow: hidden;
-}
-
-.note-card-header {
-  padding: 1.25rem 1.5rem;
-  background: #f9fbfd;
-  border-bottom: 1px solid #e2edf2;
-}
-
-.note-card-header h4 {
-  margin: 0;
-  font-weight: 600;
-  font-size: 1.25rem;
-  color: #1e2a3e;
-}
-
-.note-card-body {
-  padding: 1.5rem;
-}
-
-/* Form group spacing */
-.form-group {
-  margin-bottom: 1.5rem;
-}
-
-.form-group label {
-  display: block;
-  font-weight: 500;
-  font-size: 0.9rem;
-  margin-bottom: 0.5rem;
-  color: #2c3e50;
-}
-
-/* Inputs & textarea – rectangular, clean */
-.form-control-custom {
-  width: 100%;
-  padding: 0.6rem 0.75rem;
-  font-size: 0.95rem;
-  border: 1px solid #ccdce8;
-  border-radius: 6px;
-  background: #fff;
-  transition: 0.2s;
-}
-
-.form-control-custom:focus {
-  border-color: #3b82f6;
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
-}
-
-textarea.form-control-custom {
-  resize: vertical;
-  min-height: 100px;
-}
-
-/* Character counter – right aligned, subtle */
-.char-counter {
-  font-size: 0.75rem;
-  color: #5f7d9c;
-  text-align: right;
-  margin-top: 0.3rem;
-}
-
-/* Button group – right aligned */
-.button-group {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: flex-end;
-  margin-top: 1.5rem;
-}
-
-/* note-form.css – Rectangle card with triangle accent */
-
-.note-form-wrapper {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-}
-
-.note-card {
-  background: #ffffff;
+  background: var(--bg-card);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border: 1px solid #cfdfe8;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border-color);
   overflow: hidden;
   position: relative;
 }
 
-/* Triangle accent (top‑right corner) */
+/* Triangle accent in top‑right corner */
 .note-card::before {
   content: "";
   position: absolute;
@@ -218,14 +26,14 @@ textarea.form-control-custom {
   height: 0;
   border-style: solid;
   border-width: 0 40px 40px 0;
-  border-color: transparent #3b82f6 transparent transparent;
+  border-color: transparent var(--accent) transparent transparent;
   z-index: 1;
 }
 
 .note-card-header {
   padding: 1.25rem 1.5rem;
-  background: #f9fbfd;
-  border-bottom: 1px solid #e2edf2;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
   position: relative;
   z-index: 2;
 }
@@ -234,13 +42,14 @@ textarea.form-control-custom {
   margin: 0;
   font-weight: 600;
   font-size: 1.25rem;
-  color: #1e2a3e;
+  color: var(--text-primary);
 }
 
 .note-card-body {
   padding: 1.5rem;
 }
 
+/* ─── Form Groups ─── */
 .form-group {
   margin-bottom: 1.5rem;
 }
@@ -250,23 +59,25 @@ textarea.form-control-custom {
   font-weight: 500;
   font-size: 0.9rem;
   margin-bottom: 0.5rem;
-  color: #2c3e50;
+  color: var(--text-primary);
 }
 
+/* ─── Form Controls ─── */
 .form-control-custom {
   width: 100%;
   padding: 0.6rem 0.75rem;
   font-size: 0.95rem;
-  border: 1px solid #ccdce8;
+  border: 1px solid var(--input-border);
   border-radius: 6px;
-  background: #fff;
-  transition: 0.2s;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  transition: border 0.2s, box-shadow 0.2s;
 }
 
 .form-control-custom:focus {
-  border-color: #3b82f6;
+  border-color: var(--accent);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb, 79, 70, 229), 0.2);
 }
 
 textarea.form-control-custom {
@@ -274,13 +85,15 @@ textarea.form-control-custom {
   min-height: 100px;
 }
 
+/* ─── Character Counter ─── */
 .char-counter {
   font-size: 0.75rem;
-  color: #5f7d9c;
+  color: var(--text-secondary);
   text-align: right;
   margin-top: 0.3rem;
 }
 
+/* ─── Buttons ─── */
 .button-group {
   display: flex;
   gap: 0.75rem;
@@ -288,33 +101,36 @@ textarea.form-control-custom {
   margin-top: 1.5rem;
 }
 
-.btn-cancel, .btn-save {
+.btn-cancel,
+.btn-save {
   padding: 0.5rem 1.2rem;
   border-radius: 6px;
   font-weight: 500;
   border: none;
   cursor: pointer;
-  transition: 0.2s;
+  transition: background 0.2s, transform 0.1s;
   font-size: 0.9rem;
 }
 
 .btn-cancel {
-  background: #f0f4f8;
-  color: #2c3e50;
-  border: 1px solid #d4e2ec;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
 }
 
 .btn-cancel:hover {
-  background: #e6edf4;
+  background: var(--border-color);
+  color: var(--text-primary);
 }
 
 .btn-save {
-  background: #3b82f6;
-  color: white;
+  background: var(--accent);
+  color: #fff;
 }
 
-.btn-save:hover {
-  background: #2563eb;
+.btn-save:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
 }
 
 .btn-save:disabled {
@@ -323,5 +139,6 @@ textarea.form-control-custom {
 }
 
 .btn-save:disabled:hover {
-  background: #3b82f6;
+  background: var(--accent);
+  transform: none;
 }

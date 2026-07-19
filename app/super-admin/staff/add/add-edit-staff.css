@@ -1,14 +1,14 @@
-/* add-edit-staff.css - Full width, no spacing */
+/* ===== ADD/EDIT STAFF – THEME‑AWARE ===== */
 
 .add-edit-page {
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  background: var(--bg-secondary);
   min-height: 100vh;
   padding: 0;
   margin: 0;
 }
 
 .add-edit-container {
-  background: white;
+  background: var(--bg-card);
   width: 100%;
   max-width: 100%;
   padding: 1.5rem 2rem;
@@ -17,6 +17,7 @@
   border-radius: 0;
   box-shadow: none;
   min-height: 100vh;
+  color: var(--text-primary);
 }
 
 /* ─── Header ─── */
@@ -26,35 +27,36 @@
   align-items: center;
   margin-bottom: 1.5rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid #eef2ff;
+  border-bottom: 1px solid var(--border-color);
 }
 .form-header h2 {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 .form-header h2 i {
-  color: #4f46e5;
+  color: var(--accent);
 }
 .form-header .btn-secondary {
-  background: #f1f5f9;
-  border: none;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   padding: 0.35rem 1rem;
   border-radius: 2rem;
   font-weight: 500;
   font-size: 0.8rem;
-  color: #1e293b;
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s, color 0.2s;
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
 }
 .form-header .btn-secondary:hover {
-  background: #e2e8f0;
+  background: var(--border-color);
+  color: var(--text-primary);
 }
 
 /* ─── Form Body ─── */
@@ -77,34 +79,34 @@
   display: block;
   font-weight: 600;
   font-size: 0.78rem;
-  color: #1e293b;
+  color: var(--text-secondary);
   margin-bottom: 0.25rem;
   letter-spacing: 0.2px;
 }
 .form-group .required {
-  color: #ef4444;
+  color: #ef4444;  /* keep semantic red */
   margin-left: 0.15rem;
 }
 .form-group input,
 .form-group select {
   width: 100%;
   padding: 0.6rem 0.75rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--input-border);
   border-radius: 0.65rem;
   font-size: 0.9rem;
-  background: white;
-  color: #1e293b;
+  background: var(--input-bg);
+  color: var(--text-primary);
   transition: all 0.2s;
   outline: none;
   font-family: inherit;
 }
 .form-group input:focus,
 .form-group select:focus {
-  border-color: #4f46e5;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb, 79, 70, 229), 0.08);
 }
 .form-group input::placeholder {
-  color: #94a3b8;
+  color: var(--text-secondary);
   font-size: 0.85rem;
 }
 
@@ -114,7 +116,7 @@
   justify-content: flex-end;
   gap: 0.8rem;
   padding-top: 1rem;
-  border-top: 1px solid #eef2ff;
+  border-top: 1px solid var(--border-color);
 }
 .btn-secondary,
 .btn-primary {
@@ -130,21 +132,23 @@
   gap: 0.4rem;
 }
 .btn-secondary {
-  background: #f1f5f9;
-  color: #1e293b;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
 }
 .btn-secondary:hover {
-  background: #e2e8f0;
+  background: var(--border-color);
+  color: var(--text-primary);
 }
 .btn-primary {
-  background: #4f46e5;
-  color: white;
-  box-shadow: 0 2px 12px rgba(79, 70, 229, 0.2);
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(var(--accent-rgb, 79, 70, 229), 0.2);
 }
 .btn-primary:hover {
-  background: #4338ca;
+  background: var(--accent-hover);
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.25);
+  box-shadow: 0 6px 20px rgba(var(--accent-rgb, 79, 70, 229), 0.25);
 }
 .btn-primary:disabled {
   opacity: 0.7;
@@ -157,7 +161,7 @@
   text-align: center;
   padding: 2rem;
   font-size: 1rem;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 /* ─── Responsive ─── */

@@ -1,7 +1,3 @@
-/* ============================================
-   ANIMATIONS LIBRARY
-   ============================================ */
-
 /* ---------- FADE ANIMATIONS ---------- */
 @keyframes fadeIn {
   from {
@@ -185,13 +181,13 @@
 /* ---------- GLOW & SHIMMER ---------- */
 @keyframes glowPulse {
   0% {
-    box-shadow: 0 0 5px rgba(59,130,246,0.2);
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.2);
   }
   50% {
-    box-shadow: 0 0 20px rgba(59,130,246,0.6);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
   }
   100% {
-    box-shadow: 0 0 5px rgba(59,130,246,0.2);
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.2);
   }
 }
 
@@ -215,6 +211,39 @@
   100% {
     transform: translateY(0px);
   }
+}
+
+/* ============================================
+   ✨ FIXED WHITE UTILITIES (theme‑independent)
+   ============================================ */
+.text-fixed-white {
+  color: #ffffff !important;
+}
+
+/* ✅ FIXED: background is now white, not red */
+.bg-fixed-white {
+  background-color: #ffffff !important;
+}
+
+.border-fixed-white {
+  border-color: #ffffff !important;
+}
+
+/* Optional: white shimmer for skeletons that stay light even in dark mode */
+@keyframes shimmerWhite {
+  0% {
+    background-position: -200% 0;
+    background: linear-gradient(90deg, #f0f0f0 25%, #ffffff 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+  }
+  100% {
+    background-position: 200% 0;
+    background: linear-gradient(90deg, #f0f0f0 25%, #ffffff 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+  }
+}
+.animate-shimmer-white {
+  animation: shimmerWhite 1.5s infinite;
 }
 
 /* ---------- UTILITY CLASSES (apply on elements) ---------- */
@@ -300,6 +329,92 @@
   transition: box-shadow 0.2s ease;
 }
 .hover-glow:hover {
-  box-shadow: 0 0 15px rgba(59,130,246,0.5);
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
 }
 
+/* ============================================
+   LOGIN PAGE – FORCE LIGHT MODE (with placeholder fix)
+   ============================================ */
+
+.login-page {
+  --bg-secondary: #f8fafc !important;
+  --bg-card: #ffffff !important;
+  --text-primary: #0f172a !important;
+  --text-secondary: #475569 !important;
+  --border-color: #e2e8f0 !important;
+  --input-bg: #ffffff !important;
+  --input-border: #d1d5db !important;
+  --accent: #4f46e5 !important;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+}
+
+.login-page .bg-light {
+  background-color: #f8fafc !important;
+}
+.login-page .bg-white {
+  background-color: #ffffff !important;
+}
+.login-page .card {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08) !important;
+}
+.login-page .text-primary {
+  color: #4f46e5 !important;
+}
+.login-page .text-secondary {
+  color: #475569 !important;
+}
+.login-page .text-muted {
+  color: #6c757d !important;
+}
+.login-page .form-control {
+  background: #ffffff !important;
+  border-color: #d1d5db !important;
+  color: #0f172a !important;
+}
+
+/* ✅ PLACEHOLDER FIX – visible grey text on white background */
+.login-page .form-control::placeholder {
+  color: #6c757d !important;
+  opacity: 1 !important;
+}
+
+/* For older browsers (Safari, Firefox) */
+.login-page .form-control::-webkit-input-placeholder {
+  color: #6c757d !important;
+  opacity: 1 !important;
+}
+.login-page .form-control::-moz-placeholder {
+  color: #6c757d !important;
+  opacity: 1 !important;
+}
+.login-page .form-control:-ms-input-placeholder {
+  color: #6c757d !important;
+  opacity: 1 !important;
+}
+
+.login-page .input-group-text {
+  background: #ffffff !important;
+  border-color: #d1d5db !important;
+  color: #475569 !important;
+}
+.login-page .form-check-input {
+  background-color: #ffffff !important;
+  border-color: #d1d5db !important;
+}
+.login-page .form-check-input:checked {
+  background-color: #4f46e5 !important;
+  border-color: #4f46e5 !important;
+}
+.login-page .form-check-label {
+  color: #475569 !important;
+}
+.login-page .btn-dark {
+  background-color: #0a2b4e !important;
+  border-color: #0a2b4e !important;
+  color: #ffffff !important;
+}
+.login-page .btn-dark:hover {
+  background-color: #051a2e !important;
+}
