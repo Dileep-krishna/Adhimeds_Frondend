@@ -5,12 +5,18 @@ import UserDropdown from "@/components/header/UserDropdown";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useState } from "react";
+import { useDeliveryTheme } from "@/app/Delivery-Head/context/DeliveryThemeContext";
+import "./DeliveryHeaderBar.css";
 
-const StoreAppHeader = ({ isSidebarOpen, onToggleSidebar }) => {
+const DeliveryHeaderBar = ({ onToggleSidebar }) => {
   const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
+  const { theme, toggleTheme } = useDeliveryTheme();
 
-  const handleToggle = () => {
-    onToggleSidebar(); // call the toggle function from parent
+  // ── Sidebar toggle handler ──
+  const handleSidebarToggle = () => {
+    if (onToggleSidebar) {
+      onToggleSidebar(); // calls the parent layout's toggleSidebar
+    }
   };
 
   const toggleApplicationMenu = () => {
@@ -18,52 +24,61 @@ const StoreAppHeader = ({ isSidebarOpen, onToggleSidebar }) => {
   };
 
   return (
-    <header className="sticky-top bg-white border-bottom shadow-sm">
+    <header className="delivery-header-wrapper">
       <div className="container-fluid px-3 px-lg-4">
-        <div className="d-flex align-items-center justify-content-between py-2 py-lg-3">
-          <div className="d-flex align-items-center gap-2">
-            {/* Hamburger toggle */}
+        <div className="delivery-header-row">
+          {/* ─── Left section ─── */}
+          <div className="delivery-header-left">
+            {/* ✅ Sidebar toggle button – click this to hide/show sidebar */}
             <button
-              className="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center"
-              onClick={handleToggle}
-              style={{ width: "2.5rem", height: "2.5rem" }}
+              className="sidebar-toggle-btn"
+              onClick={handleSidebarToggle}
+              aria-label="Toggle sidebar"
             >
-              {isSidebarOpen ? (
-                <i className="bi bi-x-lg fs-5"></i>
-              ) : (
-                <i className="bi bi-list fs-5"></i>
-              )}
+              <i className="bi bi-list fs-5"></i>
             </button>
-            {/* Logo (mobile only) */}
-            <Link href="/All-store-management/store-dashboard" className="d-lg-none">
-              <Image width={154} height={32} src="/images/logo.webp" alt="Store Logo" />
+            <Link href="/All-store-management/delivery-dashboard" className="delivery-header-logo-link d-lg-none">
+              <Image width={130} height={28} src="/images/logo.webp" alt="Delivery Logo" />
             </Link>
           </div>
 
-          <div className="d-flex align-items-center gap-2">
-            {/* Three dots (mobile) */}
+          {/* ─── Right section ─── */}
+          <div className="delivery-header-right">
+            {/* Theme Toggle */}
+            <div className="delivery-theme-toggle d-none d-lg-flex align-items-center gap-1">
+              <span className="theme-icon">{theme === "dark" ? "🌙" : "☀️"}</span>
+              <div className="form-check form-switch mb-0">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id="deliveryThemeSwitch"
+                  checked={theme === "dark"}
+                  onChange={toggleTheme}
+                />
+                <label className="form-check-label" htmlFor="deliveryThemeSwitch"></label>
+              </div>
+            </div>
+
             <button
               onClick={toggleApplicationMenu}
-              className="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center d-lg-none"
-              style={{ width: "2.5rem", height: "2.5rem" }}
+              className="delivery-mobile-menu-btn d-lg-none"
+              aria-label="Open menu"
             >
               <i className="bi bi-three-dots-vertical fs-5"></i>
             </button>
 
-            {/* Notification bell (desktop) */}
-            <div className="d-none d-lg-flex align-items-center gap-2">
-              <NotificationDropdown />   {/* ✅ FIXED */}
+            <div className="delivery-header-notifications d-none d-lg-flex align-items-center gap-2">
+              <NotificationDropdown />
             </div>
-            {/* User dropdown (always visible) */}
             <UserDropdown />
           </div>
         </div>
 
-        {/* Mobile dropdown for notifications */}
         {isApplicationMenuOpen && (
-          <div className="d-lg-none mt-2 pb-2 border-top pt-2">
+          <div className="delivery-mobile-dropdown d-lg-none mt-1 pb-2 border-top pt-2">
             <div className="d-flex justify-content-end">
-              <NotificationDropdown />   {/* ✅ FIXED */}
+              <NotificationDropdown />
             </div>
           </div>
         )}
@@ -72,4 +87,4 @@ const StoreAppHeader = ({ isSidebarOpen, onToggleSidebar }) => {
   );
 };
 
-export default StoreAppHeader;
+export default DeliveryHeaderBar;

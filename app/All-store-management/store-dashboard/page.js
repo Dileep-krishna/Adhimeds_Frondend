@@ -1,5 +1,4 @@
 "use client";
-
 import React from "react";
 import "./store-dashboard.css";
 import {
@@ -46,7 +45,7 @@ export default function StoreDashboard() {
     <div className="store-dashboard">
       {/* Page Header */}
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2 className="fw-bold" style={{ color: "#0f172a" }}>Dashboard</h2>
+        <h2 className="fw-bold text-primary">Dashboard</h2>
       </div>
 
       {/* Stats Row */}
@@ -102,28 +101,30 @@ export default function StoreDashboard() {
         {/* Sales Chart */}
         <div className="col-lg-8">
           <div className="store-card">
-            <h5 className="fw-semibold mb-3" style={{ color: "#0f172a" }}>
+            <h5 className="fw-semibold mb-3 text-primary">
               <i className="bi bi-graph-up me-2 text-primary"></i>Sales Stat
             </h5>
             <div style={{ height: "260px" }}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={salesData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="month" stroke="#94a3b8" fontSize={12} />
-                  <YAxis stroke="#94a3b8" fontSize={12} domain={[0, 1]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                  <XAxis dataKey="month" stroke="var(--text-secondary)" fontSize={12} />
+                  <YAxis stroke="var(--text-secondary)" fontSize={12} domain={[0, 1]} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "#fff",
-                      border: "1px solid #e2e8f0",
+                      backgroundColor: "var(--bg-card)",
+                      border: "1px solid var(--border-color)",
                       borderRadius: "8px",
+                      color: "var(--text-primary)",
                     }}
+                    labelStyle={{ color: "var(--text-primary)" }}
                   />
                   <Line
                     type="monotone"
                     dataKey="sales"
-                    stroke="#4f46e5"
+                    stroke="var(--accent)"
                     strokeWidth={2.5}
-                    dot={{ fill: "#4f46e5", r: 4 }}
+                    dot={{ fill: "var(--accent)", r: 4 }}
                     activeDot={{ r: 6 }}
                   />
                 </LineChart>
@@ -135,26 +136,28 @@ export default function StoreDashboard() {
         {/* Category Wise Product Count */}
         <div className="col-lg-4">
           <div className="store-card">
-            <h5 className="fw-semibold mb-3" style={{ color: "#0f172a" }}>
+            <h5 className="fw-semibold mb-3 text-primary">
               <i className="bi bi-pie-chart me-2 text-primary"></i>Category wise product count
             </h5>
             <div style={{ height: "260px" }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={categoryData} layout="vertical">
-                  <XAxis type="number" stroke="#94a3b8" fontSize={12} />
+                  <XAxis type="number" stroke="var(--text-secondary)" fontSize={12} />
                   <YAxis
                     type="category"
                     dataKey="name"
-                    stroke="#94a3b8"
+                    stroke="var(--text-secondary)"
                     fontSize={12}
                     width={60}
                   />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "#fff",
-                      border: "1px solid #e2e8f0",
+                      backgroundColor: "var(--bg-card)",
+                      border: "1px solid var(--border-color)",
                       borderRadius: "8px",
+                      color: "var(--text-primary)",
                     }}
+                    labelStyle={{ color: "var(--text-primary)" }}
                   />
                   <Bar dataKey="count" radius={[0, 4, 4, 0]}>
                     {categoryData.map((entry, index) => (
@@ -172,7 +175,7 @@ export default function StoreDashboard() {
       <div className="row g-4 mb-4">
         <div className="col-md-8">
           <div className="store-card">
-            <h5 className="fw-semibold mb-3" style={{ color: "#0f172a" }}>
+            <h5 className="fw-semibold mb-3 text-primary">
               <i className="bi bi-calendar3 me-2 text-primary"></i>This Month
             </h5>
             <div className="row g-3">
@@ -206,14 +209,12 @@ export default function StoreDashboard() {
 
         <div className="col-md-4">
           <div className="store-card">
-            <h5 className="fw-semibold mb-3" style={{ color: "#0f172a" }}>
+            <h5 className="fw-semibold mb-3 text-primary">
               <i className="bi bi-wallet2 me-2 text-primary"></i>Sold Amount
             </h5>
             <div className="text-center py-2">
               <div className="text-muted small">Your sold amount (current month)</div>
-              <div className="display-6 fw-bold" style={{ color: "#0f172a" }}>
-                Rs0.00
-              </div>
+              <div className="display-6 fw-bold text-primary">Rs0.00</div>
               <div className="text-muted small">Last Month: <span className="text-success">Rs0.00</span></div>
             </div>
           </div>

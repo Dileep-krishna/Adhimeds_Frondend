@@ -16,9 +16,11 @@ import { getAttributesAPI } from '../../../../services/attributeAPI';
 import {
   getProductByIdAPI,
   updateProductAPI,
-  getStoreProductAPI,
-  updateStoreProductAPI,
 } from '../../../../services/productService';
+import {
+  updateStoreProductPriceStock,
+  getStoreProductDetails,
+} from '../../../../services/storeManagementAPI';
 import SERVERURL from '../../../../services/serverURL';
 
 export const runtime = 'nodejs';
@@ -36,22 +38,16 @@ export default function EditProductPage() {
 
   useEffect(() => {
     const fromUrl = searchParams.get('storeId');
-    console.log('🔍 storeId from URL:', fromUrl);
     if (fromUrl && fromUrl !== 'null' && fromUrl !== 'undefined') {
       setStoreId(fromUrl);
       setStoreIdSource('URL');
-      console.log('✅ Using storeId from URL:', fromUrl);
       return;
     }
     if (typeof window !== 'undefined') {
       const stored = sessionStorage.getItem('storeId');
-      console.log('🔍 storeId from sessionStorage:', stored);
       if (stored && stored !== 'null' && stored !== 'undefined') {
         setStoreId(stored);
         setStoreIdSource('sessionStorage');
-        console.log('✅ Using storeId from sessionStorage:', stored);
-      } else {
-        console.warn('⚠️ No valid storeId found – will use master APIs (super-admin mode)');
       }
     }
   }, [searchParams]);
@@ -128,8 +124,6 @@ export default function EditProductPage() {
   const [existingThumbnail, setExistingThumbnail] = useState('');
   const [existingMetaImage, setExistingMetaImage] = useState('');
   const [existingGalleryImages, setExistingGalleryImages] = useState([]);
-  const [existingReviewerImageUrl, setExistingReviewerImageUrl] = useState('');
-  const [existingReviewImages, setExistingReviewImages] = useState([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -167,7 +161,6 @@ export default function EditProductPage() {
         });
         setSelectedAttributeValues(initialSelections);
       } catch (error) {
-        console.error('Error loading dropdown data:', error);
         toast.error('Failed to load dropdown data');
       } finally {
         setLoadingData(false);
@@ -188,11 +181,8 @@ export default function EditProductPage() {
       try {
         let res;
         if (storeId) {
-          console.log(`📦 Fetching store product with storeId=${storeId} (source: ${storeIdSource})`);
-          res = await getStoreProductAPI(id, storeId);
-          console.log('📦 Store product response:', res);
+          res = await getStoreProductDetails(id, storeId);
         } else {
-          console.log('📦 No storeId – fetching master product (super-admin mode)');
           res = await getProductByIdAPI(id);
         }
         if (res.success && res.data) {
@@ -243,8 +233,8 @@ export default function EditProductPage() {
             videoFile: null,
             videoThumbnail: null,
             pdfSpec: null,
-            unitPrice: p.unitPrice || 0,
-            stock: p.stock || 0,
+            unitPrice: (p.customPrice ?? p.unitPrice) || 0,
+            stock: (p.customStock ?? p.stock) || 0,
             sku: p.sku || '',
             colorsEnabled: p.colorsEnabled || false,
             selectedColors: p.selectedColors || [],
@@ -278,7 +268,6 @@ export default function EditProductPage() {
           router.push('/All-store-management/Store-Product');
         }
       } catch (error) {
-        console.error(error);
         toast.error('Server error loading product');
       } finally {
         setLoading(false);
@@ -291,7 +280,6 @@ export default function EditProductPage() {
 
   // Only handle changes for unitPrice and stock
   const handleChange = (field, value) => {
-    // Only allow editing of unitPrice and stock
     if (field === 'unitPrice' || field === 'stock') {
       setFormData((prev) => ({ ...prev, [field]: value }));
     }
@@ -374,11 +362,11 @@ export default function EditProductPage() {
     return payload;
   };
 
+  // ─── SUBMIT HANDLER – using the store API ───
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('🚀 handleSubmit called. storeId:', storeId, 'source:', storeIdSource);
-    
-    // Only validate price and stock
+
+    // Validate price and stock
     if (formData.unitPrice <= 0) {
       toast.error('Please enter a valid price');
       return;
@@ -387,30 +375,19 @@ export default function EditProductPage() {
       toast.error('Stock cannot be negative');
       return;
     }
-    
+
     setSaving(true);
     try {
+      const payload = {
+        unitPrice: parseFloat(formData.unitPrice),
+        stock: parseInt(formData.stock)
+      };
+
       let res;
       if (storeId) {
-        // STORE USER: Send ONLY price and stock
-        const jsonPayload = {
-          unitPrice: parseFloat(formData.unitPrice),
-          stock: parseInt(formData.stock)
-        };
-
-        console.log(`🔄 Calling STORE API - Updating only Price & Stock for product ${id}, storeId=${storeId}`);
-        res = await updateStoreProductAPI(id, storeId, jsonPayload);
-        console.log('✅ STORE API response:', res);
+        res = await updateStoreProductPriceStock(id, storeId, payload);
       } else {
-        // SUPER-ADMIN: Send ONLY price and stock
-        const jsonPayload = {
-          unitPrice: parseFloat(formData.unitPrice),
-          stock: parseInt(formData.stock)
-        };
-        
-        console.log(`🔄 Calling MASTER API - Updating only Price & Stock for product ${id}`);
-        res = await updateProductAPI(id, jsonPayload);
-        console.log('✅ MASTER API response:', res);
+        res = await updateProductAPI(id, payload);
       }
 
       if (res.success) {
@@ -426,7 +403,6 @@ export default function EditProductPage() {
         toast.error(res.message || 'Update failed');
       }
     } catch (error) {
-      console.error('❌ Error in handleSubmit:', error);
       toast.error('Server error while updating');
     } finally {
       setSaving(false);

@@ -1,7 +1,7 @@
 // context/ThemeContext.js
 'use client';
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 
 const THEMES = {
   LIGHT: 'light',
@@ -11,7 +11,8 @@ const THEMES = {
 
 const ThemeContext = createContext();
 
-export function ThemeProvider({ children }) {
+// ─── Provider for super‑admin (wraps content inside .super-admin-wrapper) ───
+export function SuperAdminThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('theme') || THEMES.LIGHT;
@@ -19,10 +20,14 @@ export function ThemeProvider({ children }) {
     return THEMES.LIGHT;
   });
 
+  const wrapperRef = useRef(null);
+
   useEffect(() => {
     localStorage.setItem('theme', theme);
-    document.documentElement.classList.remove('light', 'dark', 'green');
-    document.documentElement.classList.add(theme);
+    if (wrapperRef.current) {
+      wrapperRef.current.classList.remove('light', 'dark', 'green');
+      wrapperRef.current.classList.add(theme);
+    }
   }, [theme]);
 
   const toggleTheme = (newTheme) => {
@@ -37,6 +42,21 @@ export function ThemeProvider({ children }) {
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, toggleTheme, THEMES }}>
+      <div ref={wrapperRef} className="super-admin-wrapper">
+        {children}
+      </div>
+    </ThemeContext.Provider>
+  );
+}
+
+// ─── Global provider (fallback, does nothing special) ───
+export function ThemeProvider({ children }) {
+  // This provider is for pages that don't need dark mode (store, delivery, pharma)
+  // It just passes through without applying any classes.
+  const dummyTheme = 'light';
+  const dummyToggle = () => {};
+  return (
+    <ThemeContext.Provider value={{ theme: dummyTheme, toggleTheme: dummyToggle, THEMES }}>
       {children}
     </ThemeContext.Provider>
   );

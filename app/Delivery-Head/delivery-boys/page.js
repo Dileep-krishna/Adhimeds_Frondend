@@ -3,10 +3,10 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
-import "./delivery-boys.css";
 import { getDeliveryBoysAPI } from "@/app/services/deliveryService";
 import { getOrdersByStore, updateItemStatus } from "@/app/services/orderAPI";
 import { getStoreId } from "@/utils/jwtHelper";
+import "./delivery-boys.css"; // custom CSS
 
 export default function DeliveryBoysPage() {
   const queryClient = useQueryClient();
@@ -17,7 +17,6 @@ export default function DeliveryBoysPage() {
   const [assignedModalOpen, setAssignedModalOpen] = useState(false);
   const [viewingBoy, setViewingBoy] = useState(null);
 
-  // ✅ Get store ID (ObjectId) and district from storage
   let storeId = getStoreId();
   if (!storeId) {
     storeId = localStorage.getItem('storeId') || sessionStorage.getItem('storeId');
@@ -29,9 +28,6 @@ export default function DeliveryBoysPage() {
     sessionStorage.getItem('staffDistrict') || 
     null;
 
-  console.log(`🏪 Store ID: ${storeId}, District: ${storeDistrict}`);
-
-  // ─── Fetch boys ───
   const {
     data: boys = [],
     isLoading: boysLoading,
@@ -52,7 +48,6 @@ export default function DeliveryBoysPage() {
           if (Array.isArray(response[key])) { boysData = response[key]; break; }
         }
       }
-      // Normalize district field (fallback to zone)
       return boysData.map((boy) => ({
         ...boy,
         district: boy.district || boy.zone || '',
@@ -63,7 +58,6 @@ export default function DeliveryBoysPage() {
     placeholderData: (prev) => prev,
   });
 
-  // ─── Fetch orders for this store only ───
   const {
     data: orders = [],
     isLoading: ordersLoading,
@@ -73,8 +67,7 @@ export default function DeliveryBoysPage() {
     queryFn: async () => {
       if (!storeId) return [];
       const response = await getOrdersByStore(storeId);
-      let ordersData = response.data || [];
-      return ordersData;
+      return response.data || [];
     },
     enabled: !!storeId,
     staleTime: 10000,
@@ -82,7 +75,6 @@ export default function DeliveryBoysPage() {
     placeholderData: (prev) => prev,
   });
 
-  // ─── Filter boys by district ───
   const filteredBoys = useMemo(() => {
     let result = boys;
     if (storeDistrict) {
@@ -90,7 +82,6 @@ export default function DeliveryBoysPage() {
         (b) => b.district?.toLowerCase() === storeDistrict.toLowerCase()
       );
     }
-    // Apply search filter
     if (searchTerm.trim()) {
       result = result.filter(
         (b) =>
@@ -102,12 +93,10 @@ export default function DeliveryBoysPage() {
     return result;
   }, [boys, storeDistrict, searchTerm]);
 
-  // ─── Orders ready for assignment (status = "assigned" but no assignedTo) ───
   const assignableOrders = useMemo(() => {
     const items = [];
     orders.forEach(order => {
       (order.items || []).forEach(item => {
-        // Only show items that are assigned but not yet assigned to a specific boy
         if (item.status === "assigned" && !item.assignedTo) {
           items.push({ order, item });
         }
@@ -116,7 +105,6 @@ export default function DeliveryBoysPage() {
     return items;
   }, [orders]);
 
-  // ─── Orders assigned to a specific boy ───
   const getAssignedOrdersForBoy = (boyId) => {
     const items = [];
     orders.forEach(order => {
@@ -129,7 +117,6 @@ export default function DeliveryBoysPage() {
     return items;
   };
 
-  // ─── Assign mutation ───
   const assignMutation = useMutation({
     mutationFn: async ({ boyId, orderIds }) => {
       const results = [];
@@ -160,7 +147,6 @@ export default function DeliveryBoysPage() {
     },
   });
 
-  // ─── Stats (based on filtered boys) ───
   const stats = useMemo(() => {
     const total = filteredBoys.length;
     const active = filteredBoys.filter((b) => b.status === "active").length;
@@ -171,7 +157,6 @@ export default function DeliveryBoysPage() {
     return { total, active, offline, totalDeliveries, avgRating: avgRating.toFixed(1) };
   }, [filteredBoys]);
 
-  // ─── Handlers ───
   const handleAssignClick = (boy) => {
     setSelectedBoy(boy);
     setSelectedOrders([]);
@@ -202,277 +187,198 @@ export default function DeliveryBoysPage() {
 
   const isLoading = boysLoading || ordersLoading;
 
-  // If no district, show a message
   if (!storeDistrict) {
     return (
-      <div className="container-fluid px-4 py-4">
-        <div className="alert alert-warning">No store district found. Please log in again.</div>
+      <div className="db-page">
+        <div className="db-alert db-alert-warning">No store district found. Please log in again.</div>
       </div>
     );
   }
 
   return (
-    <div className="delivery-boys-container container-fluid px-4 py-4">
-      {/* Page Header */}
-      <div className="d-flex flex-wrap justify-content-between align-items-center mb-4">
-        <div>
-          <h4 className="fw-bold mb-1">👥 Delivery Boys</h4>
-          <p className="text-muted small">
-            Manage your delivery team in <strong>{storeDistrict}</strong>
-          </p>
+    <div className="db-page">
+      <div className="db-container">
+        {/* Header */}
+        <div className="db-header">
+          <div>
+            <h4 className="db-title">👥 Delivery Boys</h4>
+            <p className="db-subtitle">Manage your delivery team in <strong>{storeDistrict}</strong></p>
+          </div>
+          <button className="db-btn db-btn-refresh" onClick={() => refetchBoys()}>
+            <i className="bi bi-arrow-clockwise me-2"></i>Refresh
+          </button>
         </div>
-        <button className="btn btn-dark rounded-pill px-4" onClick={() => refetchBoys()}>
-          <i className="bi bi-arrow-clockwise me-2"></i>Refresh
-        </button>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="row g-3 mb-4">
-        <div className="col-6 col-md-3">
-          <div className="stat-card bg-white rounded-3 p-3 shadow-sm border-start border-4 border-primary">
-            <div className="d-flex justify-content-between">
-              <div>
-                <p className="text-muted small mb-0">Total Boys</p>
-                <h3 className="fw-bold mb-0">{stats.total}</h3>
-              </div>
-              <div className="stat-icon bg-primary bg-opacity-10 rounded-circle p-2">
-                <i className="bi bi-people text-primary"></i>
-              </div>
+        {/* Stats */}
+        <div className="db-stats-grid">
+          <div className="db-stat-card db-stat-total">
+            <div>
+              <p className="db-stat-label">Total Boys</p>
+              <h3 className="db-stat-value">{stats.total}</h3>
+            </div>
+            <div className="db-stat-icon">
+              <i className="bi bi-people"></i>
+            </div>
+          </div>
+          <div className="db-stat-card db-stat-active">
+            <div>
+              <p className="db-stat-label">Active</p>
+              <h3 className="db-stat-value">{stats.active}</h3>
+            </div>
+            <div className="db-stat-icon">
+              <i className="bi bi-check-circle"></i>
+            </div>
+          </div>
+          <div className="db-stat-card db-stat-offline">
+            <div>
+              <p className="db-stat-label">Offline</p>
+              <h3 className="db-stat-value">{stats.offline}</h3>
+            </div>
+            <div className="db-stat-icon">
+              <i className="bi bi-circle"></i>
+            </div>
+          </div>
+          <div className="db-stat-card db-stat-deliveries">
+            <div>
+              <p className="db-stat-label">Total Deliveries</p>
+              <h3 className="db-stat-value">{stats.totalDeliveries}</h3>
+            </div>
+            <div className="db-stat-icon">
+              <i className="bi bi-truck"></i>
             </div>
           </div>
         </div>
-        <div className="col-6 col-md-3">
-          <div className="stat-card bg-white rounded-3 p-3 shadow-sm border-start border-4 border-success">
-            <div className="d-flex justify-content-between">
-              <div>
-                <p className="text-muted small mb-0">Active</p>
-                <h3 className="fw-bold mb-0">{stats.active}</h3>
-              </div>
-              <div className="stat-icon bg-success bg-opacity-10 rounded-circle p-2">
-                <i className="bi bi-check-circle text-success"></i>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="col-6 col-md-3">
-          <div className="stat-card bg-white rounded-3 p-3 shadow-sm border-start border-4 border-danger">
-            <div className="d-flex justify-content-between">
-              <div>
-                <p className="text-muted small mb-0">Offline</p>
-                <h3 className="fw-bold mb-0">{stats.offline}</h3>
-              </div>
-              <div className="stat-icon bg-danger bg-opacity-10 rounded-circle p-2">
-                <i className="bi bi-circle text-danger"></i>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="col-6 col-md-3">
-          <div className="stat-card bg-white rounded-3 p-3 shadow-sm border-start border-4 border-info">
-            <div className="d-flex justify-content-between">
-              <div>
-                <p className="text-muted small mb-0">Total Deliveries</p>
-                <h3 className="fw-bold mb-0">{stats.totalDeliveries}</h3>
-              </div>
-              <div className="stat-icon bg-info bg-opacity-10 rounded-circle p-2">
-                <i className="bi bi-truck text-info"></i>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Search & Filter */}
-      <div className="d-flex flex-wrap gap-3 mb-4">
-        <div className="flex-grow-1" style={{ maxWidth: "400px" }}>
-          <div className="input-group">
-            <span className="input-group-text bg-white border-end-0">
+        {/* Search */}
+        <div className="db-search-section">
+          <div className="db-search-wrapper">
+            <span className="db-search-icon">
               <i className="bi bi-search"></i>
             </span>
             <input
               type="text"
-              className="form-control border-start-0"
+              className="db-search-input"
               placeholder="Search by name, phone, or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-        </div>
-        <div>
-          <span className="badge bg-light text-dark p-2">
+          <span className="db-filter-badge">
             {filteredBoys.length} of {boys.length} boys in {storeDistrict}
           </span>
         </div>
-      </div>
 
-      {/* Boys Grid */}
-      {isLoading && !boys.length ? (
-        <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
+        {/* Boys Grid */}
+        {isLoading && !boys.length ? (
+          <div className="db-loading">
+            <div className="spinner-border text-primary" />
           </div>
-        </div>
-      ) : error ? (
-        <div className="alert alert-danger">Failed to load delivery boys</div>
-      ) : filteredBoys.length === 0 ? (
-        <div className="text-center py-5 text-muted">
-          <i className="bi bi-person-x fs-1"></i>
-          <p className="mt-2">
-            No delivery boys found in <strong>{storeDistrict}</strong>
-          </p>
-          <p className="small">Please add delivery boys in this district.</p>
-        </div>
-      ) : (
-        <div className="row g-4">
-          {filteredBoys.map((boy) => {
-            const assignedOrders = getAssignedOrdersForBoy(boy.id || boy._id);
-            return (
-              <div key={boy.id || boy._id} className="col-12 col-md-6 col-lg-4">
-                <div className="boy-card bg-white rounded-3 p-3 shadow-sm h-100 d-flex flex-column">
-                  {/* Avatar & Info */}
-                  <div className="d-flex align-items-start gap-3">
-                    <div className="boy-avatar position-relative">
+        ) : error ? (
+          <div className="db-alert db-alert-danger">Failed to load delivery boys</div>
+        ) : filteredBoys.length === 0 ? (
+          <div className="db-empty-state">
+            <i className="bi bi-person-x fs-1"></i>
+            <p className="mt-2">No delivery boys found in <strong>{storeDistrict}</strong></p>
+            <p className="small">Please add delivery boys in this district.</p>
+          </div>
+        ) : (
+          <div className="db-boys-grid">
+            {filteredBoys.map((boy) => {
+              const assignedOrders = getAssignedOrdersForBoy(boy.id || boy._id);
+              return (
+                <div key={boy.id || boy._id} className="db-boy-card">
+                  <div className="db-boy-header">
+                    <div className="db-boy-avatar">
                       {boy.avatar ? (
                         <img
                           src={boy.avatar}
                           alt={boy.name}
-                          className="rounded-circle border"
-                          style={{ width: "64px", height: "64px", objectFit: "cover" }}
+                          className="db-avatar-img"
                           onError={(e) => (e.target.style.display = "none")}
                         />
                       ) : (
-                        <div
-                          className="rounded-circle border d-flex align-items-center justify-content-center bg-light"
-                          style={{ width: "64px", height: "64px" }}
-                        >
-                          <i className="bi bi-person fs-2 text-secondary"></i>
+                        <div className="db-avatar-placeholder">
+                          <i className="bi bi-person fs-2"></i>
                         </div>
                       )}
-                      <span
-                        className={`status-dot position-absolute bottom-0 end-0 p-1 rounded-circle border border-white ${
-                          boy.status === "active" ? "bg-success" : "bg-secondary"
-                        }`}
-                        style={{ width: "14px", height: "14px" }}
-                      ></span>
+                      <span className={`db-status-dot ${boy.status === "active" ? "db-status-active" : "db-status-offline"}`}></span>
                     </div>
-                    <div className="flex-grow-1">
-                      <h6 className="fw-bold mb-0">{boy.name}</h6>
-                      <p className="small text-muted mb-0">
-                        <i className="bi bi-phone me-1"></i>{boy.phone}
-                      </p>
-                      <p className="small text-muted mb-0">
-                        <i className="bi bi-envelope me-1"></i>{boy.email || "N/A"}
-                      </p>
-                      <span className="badge bg-secondary mt-1">{boy.district}</span>
+                    <div className="db-boy-info">
+                      <h6 className="db-boy-name">{boy.name}</h6>
+                      <p className="db-boy-phone"><i className="bi bi-phone me-1"></i>{boy.phone}</p>
+                      <p className="db-boy-email"><i className="bi bi-envelope me-1"></i>{boy.email || "N/A"}</p>
+                      <span className="db-boy-district">{boy.district}</span>
                     </div>
-                    <span className={`badge ${boy.status === "active" ? "bg-success" : "bg-secondary"}`}>
+                    <span className={`db-boy-status ${boy.status === "active" ? "db-boy-status-active" : "db-boy-status-offline"}`}>
                       {boy.status || "offline"}
                     </span>
                   </div>
 
-                  {/* Stats */}
-                  <div className="d-flex justify-content-between mt-3 pt-3 border-top">
+                  <div className="db-boy-stats">
                     <div>
-                      <small className="text-muted">Deliveries</small>
-                      <p className="fw-bold mb-0">{boy.totalDeliveries || 0}</p>
+                      <small>Deliveries</small>
+                      <p className="db-stat-number">{boy.totalDeliveries || 0}</p>
                     </div>
                     <div>
-                      <small className="text-muted">Rating</small>
-                      <p className="fw-bold mb-0">
-                        <i className="bi bi-star-fill text-warning me-1"></i>
-                        {boy.rating || 0}
+                      <small>Rating</small>
+                      <p className="db-stat-number"><i className="bi bi-star-fill text-warning me-1"></i>{boy.rating || 0}</p>
+                    </div>
+                    <div>
+                      <small>Joined</small>
+                      <p className="db-stat-number small">
+                        {boy.joinedDate ? new Date(boy.joinedDate).toLocaleDateString() : "N/A"}
                       </p>
                     </div>
                     <div>
-                      <small className="text-muted">Joined</small>
-                      <p className="fw-bold mb-0 small">
-                        {boy.joinedDate
-                          ? new Date(boy.joinedDate).toLocaleDateString()
-                          : "N/A"}
-                      </p>
-                    </div>
-                    <div>
-                      <small className="text-muted">Assigned</small>
-                      <p className="fw-bold mb-0 small">{assignedOrders.length}</p>
+                      <small>Assigned</small>
+                      <p className="db-stat-number small">{assignedOrders.length}</p>
                     </div>
                   </div>
 
-                  {/* Buttons */}
-                  <button
-                    className="btn btn-primary rounded-pill mt-2 w-100"
-                    onClick={() => handleAssignClick(boy)}
-                  >
+                  <button className="db-btn db-btn-primary db-btn-block" onClick={() => handleAssignClick(boy)}>
                     <i className="bi bi-check2-square me-2"></i>Assign Orders
                   </button>
-                  <button
-                    className="btn btn-outline-secondary rounded-pill mt-1 w-100"
-                    onClick={() => handleViewAssigned(boy)}
-                    disabled={assignedOrders.length === 0}
-                  >
+                  <button className="db-btn db-btn-outline db-btn-block" onClick={() => handleViewAssigned(boy)} disabled={assignedOrders.length === 0}>
                     <i className="bi bi-eye me-2"></i>View Assigned ({assignedOrders.length})
                   </button>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-      {/* Assign Orders Modal */}
+      {/* Assign Modal */}
       {assignModalOpen && selectedBoy && (
-        <div
-          className="modal fade show d-block"
-          style={{ background: "rgba(0,0,0,0.5)" }}
-          onClick={() => setAssignModalOpen(false)}
-        >
-          <div
-            className="modal-dialog modal-dialog-centered"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-content rounded-4 shadow-lg">
-              <div className="modal-header border-0">
-                <h5 className="modal-title fw-bold">
-                  Assign Orders to {selectedBoy.name}
-                </h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setAssignModalOpen(false)}
-                ></button>
+        <div className="db-modal-overlay" onClick={() => setAssignModalOpen(false)}>
+          <div className="db-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="db-modal-content">
+              <div className="db-modal-header">
+                <h5 className="db-modal-title">Assign Orders to {selectedBoy.name}</h5>
+                <button className="db-modal-close" onClick={() => setAssignModalOpen(false)}>&times;</button>
               </div>
-              <div className="modal-body">
-                <p className="text-muted small">
-                  Select orders to assign to this delivery boy:
-                </p>
+              <div className="db-modal-body">
+                <p className="db-modal-text">Select orders to assign to this delivery boy:</p>
                 {assignableOrders.length === 0 ? (
-                  <p className="text-center text-muted py-3">No orders ready for assignment</p>
+                  <p className="db-modal-empty">No orders ready for assignment</p>
                 ) : (
-                  <div className="list-group">
+                  <div className="db-order-list">
                     {assignableOrders.map(({ order, item }) => {
                       const isChecked = selectedOrders.some(
                         o => o.orderId === order._id && o.itemId === item._id
                       );
                       return (
-                        <label
-                          key={`${order._id}-${item._id}`}
-                          className={`list-group-item list-group-item-action d-flex align-items-center gap-3 ${
-                            isChecked ? "active" : ""
-                          }`}
-                          style={{ cursor: "pointer" }}
-                        >
+                        <label key={`${order._id}-${item._id}`} className={`db-order-item ${isChecked ? "db-order-item-active" : ""}`}>
                           <input
                             type="checkbox"
-                            className="form-check-input"
+                            className="db-checkbox"
                             checked={isChecked}
                             onChange={() => handleOrderToggle(order._id, item._id)}
-                            style={{ transform: "scale(1.2)" }}
                           />
-                          <div className="flex-grow-1">
+                          <div className="db-order-info">
                             <strong>#{order._id.slice(-8)}</strong> – {item.productName}
                             <br />
-                            <small className="text-muted">
-                              {item.storeName} · Qty: {item.quantity} · ₹{(item.mrp || 0) * item.quantity}
-                            </small>
+                            <small>{item.storeName} · Qty: {item.quantity} · ₹{(item.mrp || 0) * item.quantity}</small>
                           </div>
                         </label>
                       );
@@ -480,26 +386,10 @@ export default function DeliveryBoysPage() {
                   </div>
                 )}
               </div>
-              <div className="modal-footer border-0">
-                <button
-                  className="btn btn-outline-secondary rounded-pill px-4"
-                  onClick={() => setAssignModalOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="btn btn-primary rounded-pill px-4"
-                  onClick={handleAssignSubmit}
-                  disabled={assignMutation.isPending || selectedOrders.length === 0}
-                >
-                  {assignMutation.isPending ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-2" />
-                      Assigning...
-                    </>
-                  ) : (
-                    `Assign ${selectedOrders.length} Order(s)`
-                  )}
+              <div className="db-modal-footer">
+                <button className="db-btn db-btn-secondary" onClick={() => setAssignModalOpen(false)}>Cancel</button>
+                <button className="db-btn db-btn-primary" onClick={handleAssignSubmit} disabled={assignMutation.isPending || selectedOrders.length === 0}>
+                  {assignMutation.isPending ? "Assigning..." : `Assign ${selectedOrders.length} Order(s)`}
                 </button>
               </div>
             </div>
@@ -507,38 +397,25 @@ export default function DeliveryBoysPage() {
         </div>
       )}
 
-      {/* View Assigned Orders Modal */}
+      {/* View Assigned Modal */}
       {assignedModalOpen && viewingBoy && (
-        <div
-          className="modal fade show d-block"
-          style={{ background: "rgba(0,0,0,0.5)" }}
-          onClick={() => setAssignedModalOpen(false)}
-        >
-          <div
-            className="modal-dialog modal-dialog-centered modal-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-content rounded-4 shadow-lg">
-              <div className="modal-header border-0">
-                <h5 className="modal-title fw-bold">
-                  Orders assigned to {viewingBoy.name}
-                </h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setAssignedModalOpen(false)}
-                ></button>
+        <div className="db-modal-overlay" onClick={() => setAssignedModalOpen(false)}>
+          <div className="db-modal db-modal-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="db-modal-content">
+              <div className="db-modal-header">
+                <h5 className="db-modal-title">Orders assigned to {viewingBoy.name}</h5>
+                <button className="db-modal-close" onClick={() => setAssignedModalOpen(false)}>&times;</button>
               </div>
-              <div className="modal-body">
+              <div className="db-modal-body">
                 {(() => {
                   const assignedItems = getAssignedOrdersForBoy(viewingBoy.id || viewingBoy._id);
                   if (assignedItems.length === 0) {
-                    return <p className="text-center text-muted py-3">No orders assigned</p>;
+                    return <p className="db-modal-empty">No orders assigned</p>;
                   }
                   return (
-                    <div className="table-responsive">
-                      <table className="table table-bordered table-hover align-middle">
-                        <thead className="table-light">
+                    <div className="db-table-wrapper">
+                      <table className="db-table">
+                        <thead>
                           <tr>
                             <th>Order ID</th>
                             <th>Product</th>
@@ -556,11 +433,7 @@ export default function DeliveryBoysPage() {
                               <td>{item.storeName}</td>
                               <td>{item.quantity}</td>
                               <td>₹{(item.mrp || 0) * item.quantity}</td>
-                              <td>
-                                <span className="badge bg-info text-white">
-                                  {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                                </span>
-                              </td>
+                              <td><span className="db-badge db-badge-info">{item.status}</span></td>
                             </tr>
                           ))}
                         </tbody>
@@ -569,13 +442,8 @@ export default function DeliveryBoysPage() {
                   );
                 })()}
               </div>
-              <div className="modal-footer border-0">
-                <button
-                  className="btn btn-outline-secondary rounded-pill px-4"
-                  onClick={() => setAssignedModalOpen(false)}
-                >
-                  Close
-                </button>
+              <div className="db-modal-footer">
+                <button className="db-btn db-btn-secondary" onClick={() => setAssignedModalOpen(false)}>Close</button>
               </div>
             </div>
           </div>

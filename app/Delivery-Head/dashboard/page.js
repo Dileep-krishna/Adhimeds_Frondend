@@ -20,7 +20,6 @@ import {
 import { Line, Bar, Doughnut } from "react-chartjs-2";
 import "./delivery-dashboard.css";
 
-// Register ChartJS components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -39,7 +38,6 @@ export default function DeliveryHeadDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState("today");
   const [selectedView, setSelectedView] = useState("overview");
 
-  // ---------- Fetch orders ----------
   const {
     data: orders = [],
     isLoading,
@@ -56,7 +54,6 @@ export default function DeliveryHeadDashboard() {
     refetchOnWindowFocus: false,
   });
 
-  // ---------- Calculate statistics ----------
   const calculateStats = () => {
     let totalOrders = 0;
     let pendingOrders = 0;
@@ -108,7 +105,6 @@ export default function DeliveryHeadDashboard() {
 
   const stats = calculateStats();
 
-  // ---------- Order status distribution for Doughnut chart ----------
   const statusData = {
     labels: ["Pending", "Processing", "Delivered", "Cancelled"],
     datasets: [
@@ -126,7 +122,6 @@ export default function DeliveryHeadDashboard() {
     ],
   };
 
-  // ---------- Revenue trend (mock data for demo) ----------
   const revenueData = {
     labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     datasets: [
@@ -141,7 +136,6 @@ export default function DeliveryHeadDashboard() {
     ],
   };
 
-  // ---------- Order trend ----------
   const orderTrendData = {
     labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     datasets: [
@@ -156,7 +150,6 @@ export default function DeliveryHeadDashboard() {
     ],
   };
 
-  // ---------- Recent orders ----------
   const recentOrders = orders.slice(0, 5).flatMap((order) =>
     (order.items || []).map((item) => ({
       id: item._id,
@@ -170,22 +163,20 @@ export default function DeliveryHeadDashboard() {
     }))
   );
 
-  // ---------- Status badge helper ----------
   const getStatusBadge = (status) => {
     const map = {
-      pending: "bg-warning text-dark",
-      processing: "bg-info text-white",
-      completed: "bg-success text-white",
-      cancelled: "bg-danger text-white",
+      pending: "dd-badge dd-badge-warning",
+      processing: "dd-badge dd-badge-info",
+      completed: "dd-badge dd-badge-success",
+      cancelled: "dd-badge dd-badge-danger",
     };
-    return map[status] || "bg-secondary text-white";
+    return map[status] || "dd-badge dd-badge-secondary";
   };
 
   const getStatusLabel = (status) => {
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
-  // ---------- Format date ----------
   const formatDate = (dateString) => {
     const d = new Date(dateString);
     return d.toLocaleDateString("en-US", {
@@ -196,7 +187,6 @@ export default function DeliveryHeadDashboard() {
     });
   };
 
-  // ---------- Period selector ----------
   const periods = [
     { label: "Today", value: "today" },
     { label: "This Week", value: "week" },
@@ -204,252 +194,198 @@ export default function DeliveryHeadDashboard() {
     { label: "This Year", value: "year" },
   ];
 
-  // ---------- Render ----------
   return (
-    <div className="delivery-dashboard container-fluid px-4 py-4">
+    <div className="dd-page">
       {/* Header */}
-      <div className="d-flex flex-wrap justify-content-between align-items-center mb-4">
+      <div className="dd-header">
         <div>
-          <h4 className="fw-bold mb-1">📦 Delivery Dashboard</h4>
-          <p className="text-muted small mb-0">
-            Real-time overview of your delivery operations
-          </p>
+          <h4 className="dd-title">📦 Delivery Dashboard</h4>
+          <p className="dd-subtitle">Real-time overview of your delivery operations</p>
         </div>
-        <div className="d-flex gap-2 flex-wrap">
+        <div className="dd-header-actions">
           {periods.map((period) => (
             <button
               key={period.value}
-              className={`btn btn-sm ${
-                selectedPeriod === period.value
-                  ? "btn-dark"
-                  : "btn-outline-secondary"
+              className={`dd-period-btn ${
+                selectedPeriod === period.value ? "dd-period-btn-active" : ""
               }`}
               onClick={() => setSelectedPeriod(period.value)}
             >
               {period.label}
             </button>
           ))}
-          <button
-            className="btn btn-outline-primary btn-sm"
-            onClick={() => refetch()}
-          >
+          <button className="dd-refresh-btn" onClick={() => refetch()}>
             <i className="bi bi-arrow-clockwise"></i> Refresh
           </button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="row g-3 mb-4">
-        <div className="col-12 col-sm-6 col-xl-3">
-          <div className="stat-card bg-white rounded-3 p-3 shadow-sm border-start border-4 border-primary">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <p className="text-muted small mb-1">Total Orders</p>
-                <h3 className="fw-bold mb-0">{stats.totalOrders}</h3>
-              </div>
-              <div className="stat-icon bg-primary bg-opacity-10 rounded-circle p-3">
-                <i className="bi bi-cart-check text-primary fs-4"></i>
-              </div>
-            </div>
-            <div className="mt-2">
-              <span className="badge bg-primary bg-opacity-10 text-primary">
-                +12.5% from last week
-              </span>
-            </div>
+      <div className="dd-stats-grid">
+        <div className="dd-stat-card dd-stat-card-primary">
+          <div className="dd-stat-card-content">
+            <p className="dd-stat-label">Total Orders</p>
+            <h3 className="dd-stat-value">{stats.totalOrders}</h3>
+          </div>
+          <div className="dd-stat-icon dd-stat-icon-primary">
+            <i className="bi bi-cart-check"></i>
+          </div>
+          <div className="dd-stat-badge dd-stat-badge-primary">+12.5% from last week</div>
+        </div>
+
+        <div className="dd-stat-card dd-stat-card-warning">
+          <div className="dd-stat-card-content">
+            <p className="dd-stat-label">Active Orders</p>
+            <h3 className="dd-stat-value">{stats.activeOrders}</h3>
+          </div>
+          <div className="dd-stat-icon dd-stat-icon-warning">
+            <i className="bi bi-clock-history"></i>
+          </div>
+          <div className="dd-stat-badge dd-stat-badge-warning">
+            {stats.pendingOrders} pending · {stats.processingOrders} processing
           </div>
         </div>
 
-        <div className="col-12 col-sm-6 col-xl-3">
-          <div className="stat-card bg-white rounded-3 p-3 shadow-sm border-start border-4 border-warning">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <p className="text-muted small mb-1">Active Orders</p>
-                <h3 className="fw-bold mb-0">{stats.activeOrders}</h3>
-              </div>
-              <div className="stat-icon bg-warning bg-opacity-10 rounded-circle p-3">
-                <i className="bi bi-clock-history text-warning fs-4"></i>
-              </div>
-            </div>
-            <div className="mt-2">
-              <span className="badge bg-warning bg-opacity-10 text-warning">
-                {stats.pendingOrders} pending · {stats.processingOrders} processing
-              </span>
-            </div>
+        <div className="dd-stat-card dd-stat-card-success">
+          <div className="dd-stat-card-content">
+            <p className="dd-stat-label">Delivered</p>
+            <h3 className="dd-stat-value">{stats.completedOrders}</h3>
+          </div>
+          <div className="dd-stat-icon dd-stat-icon-success">
+            <i className="bi bi-check-circle"></i>
+          </div>
+          <div className="dd-stat-badge dd-stat-badge-success">
+            {stats.deliveryRate}% delivery rate
           </div>
         </div>
 
-        <div className="col-12 col-sm-6 col-xl-3">
-          <div className="stat-card bg-white rounded-3 p-3 shadow-sm border-start border-4 border-success">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <p className="text-muted small mb-1">Delivered</p>
-                <h3 className="fw-bold mb-0">{stats.completedOrders}</h3>
-              </div>
-              <div className="stat-icon bg-success bg-opacity-10 rounded-circle p-3">
-                <i className="bi bi-check-circle text-success fs-4"></i>
-              </div>
-            </div>
-            <div className="mt-2">
-              <span className="badge bg-success bg-opacity-10 text-success">
-                {stats.deliveryRate}% delivery rate
-              </span>
-            </div>
+        <div className="dd-stat-card dd-stat-card-info">
+          <div className="dd-stat-card-content">
+            <p className="dd-stat-label">Total Revenue</p>
+            <h3 className="dd-stat-value">₹{stats.totalRevenue.toLocaleString()}</h3>
           </div>
-        </div>
-
-        <div className="col-12 col-sm-6 col-xl-3">
-          <div className="stat-card bg-white rounded-3 p-3 shadow-sm border-start border-4 border-info">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <p className="text-muted small mb-1">Total Revenue</p>
-                <h3 className="fw-bold mb-0">₹{stats.totalRevenue.toLocaleString()}</h3>
-              </div>
-              <div className="stat-icon bg-info bg-opacity-10 rounded-circle p-3">
-                <i className="bi bi-currency-rupee text-info fs-4"></i>
-              </div>
-            </div>
-            <div className="mt-2">
-              <span className="badge bg-info bg-opacity-10 text-info">
-                From {stats.completedOrders} deliveries
-              </span>
-            </div>
+          <div className="dd-stat-icon dd-stat-icon-info">
+            <i className="bi bi-currency-rupee"></i>
+          </div>
+          <div className="dd-stat-badge dd-stat-badge-info">
+            From {stats.completedOrders} deliveries
           </div>
         </div>
       </div>
 
       {/* Charts Row */}
-      <div className="row g-3 mb-4">
-        <div className="col-12 col-lg-4">
-          <div className="chart-card bg-white rounded-3 p-3 shadow-sm h-100">
-            <h6 className="fw-semibold mb-3">Order Status Distribution</h6>
-            <div style={{ height: "240px" }}>
-              {stats.totalOrders > 0 ? (
-                <Doughnut
-                  data={statusData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: {
-                        position: "bottom",
-                        labels: {
-                          padding: 10,
-                          usePointStyle: true,
-                          pointStyle: "circle",
-                        },
-                      },
-                    },
-                    cutout: "60%",
-                  }}
-                />
-              ) : (
-                <div className="text-center text-muted py-5">
-                  <i className="bi bi-pie-chart fs-1"></i>
-                  <p className="mt-2">No data available</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="col-12 col-lg-4">
-          <div className="chart-card bg-white rounded-3 p-3 shadow-sm h-100">
-            <h6 className="fw-semibold mb-3">Revenue Trend</h6>
-            <div style={{ height: "240px" }}>
-              <Line
-                data={revenueData}
+      <div className="dd-charts-grid">
+        <div className="dd-chart-card">
+          <h6 className="dd-chart-title">Order Status Distribution</h6>
+          <div className="dd-chart-container">
+            {stats.totalOrders > 0 ? (
+              <Doughnut
+                data={statusData}
                 options={{
                   responsive: true,
                   maintainAspectRatio: false,
                   plugins: {
                     legend: {
-                      display: false,
-                    },
-                  },
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      ticks: {
-                        callback: (value) => "₹" + value.toLocaleString(),
+                      position: "bottom",
+                      labels: {
+                        padding: 10,
+                        usePointStyle: true,
+                        pointStyle: "circle",
                       },
                     },
                   },
+                  cutout: "60%",
                 }}
               />
-            </div>
+            ) : (
+              <div className="dd-chart-empty">
+                <i className="bi bi-pie-chart fs-1"></i>
+                <p className="mt-2">No data available</p>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="col-12 col-lg-4">
-          <div className="chart-card bg-white rounded-3 p-3 shadow-sm h-100">
-            <h6 className="fw-semibold mb-3">Order Trend</h6>
-            <div style={{ height: "240px" }}>
-              <Line
-                data={orderTrendData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: {
-                      display: false,
+        <div className="dd-chart-card">
+          <h6 className="dd-chart-title">Revenue Trend</h6>
+          <div className="dd-chart-container">
+            <Line
+              data={revenueData}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    ticks: {
+                      callback: (value) => "₹" + value.toLocaleString(),
                     },
                   },
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      ticks: {
-                        stepSize: 20,
-                      },
-                    },
+                },
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="dd-chart-card">
+          <h6 className="dd-chart-title">Order Trend</h6>
+          <div className="dd-chart-container">
+            <Line
+              data={orderTrendData}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 20 },
                   },
-                }}
-              />
-            </div>
+                },
+              }}
+            />
           </div>
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="row g-3 mb-4">
-        <div className="col-12">
-          <div className="bg-white rounded-3 p-3 shadow-sm">
-            <h6 className="fw-semibold mb-3">Quick Actions</h6>
-            <div className="d-flex flex-wrap gap-2">
-              <button
-                className="btn btn-dark rounded-pill px-4"
-                onClick={() => router.push("/All-store-management/Order-Requests")}
-              >
-                <i className="bi bi-plus-circle me-2"></i>View Pending Orders
-              </button>
-              <button
-                className="btn btn-outline-primary rounded-pill px-4"
-                onClick={() => router.push("/All-store-management/All-Orders")}
-              >
-                <i className="bi bi-list me-2"></i>All Orders
-              </button>
-              <button
-                className="btn btn-outline-success rounded-pill px-4"
-                onClick={() => router.push("/All-store-management/delivery-tracker")}
-              >
-                <i className="bi bi-truck me-2"></i>Delivery Tracker
-              </button>
-              <button
-                className="btn btn-outline-secondary rounded-pill px-4"
-                onClick={() => refetch()}
-              >
-                <i className="bi bi-arrow-repeat me-2"></i>Sync Data
-              </button>
-            </div>
-          </div>
+      <div className="dd-actions-card">
+        <h6 className="dd-actions-title">Quick Actions</h6>
+        <div className="dd-actions-group">
+          <button
+            className="dd-action-btn dd-action-btn-dark"
+            onClick={() => router.push("/All-store-management/Order-Requests")}
+          >
+            <i className="bi bi-plus-circle me-2"></i>View Pending Orders
+          </button>
+          <button
+            className="dd-action-btn dd-action-btn-outline-primary"
+            onClick={() => router.push("/All-store-management/All-Orders")}
+          >
+            <i className="bi bi-list me-2"></i>All Orders
+          </button>
+          <button
+            className="dd-action-btn dd-action-btn-outline-success"
+            onClick={() => router.push("/All-store-management/delivery-tracker")}
+          >
+            <i className="bi bi-truck me-2"></i>Delivery Tracker
+          </button>
+          <button
+            className="dd-action-btn dd-action-btn-outline-secondary"
+            onClick={() => refetch()}
+          >
+            <i className="bi bi-arrow-repeat me-2"></i>Sync Data
+          </button>
         </div>
       </div>
 
       {/* Recent Orders Table */}
-      <div className="bg-white rounded-3 p-3 shadow-sm">
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <h6 className="fw-semibold mb-0">Recent Orders</h6>
+      <div className="dd-table-card">
+        <div className="dd-table-header">
+          <h6 className="dd-table-title">Recent Orders</h6>
           <button
-            className="btn btn-sm btn-link text-decoration-none"
+            className="dd-table-view-link"
             onClick={() => router.push("/All-store-management/All-Orders")}
           >
             View All <i className="bi bi-chevron-right"></i>
@@ -457,20 +393,18 @@ export default function DeliveryHeadDashboard() {
         </div>
 
         {isLoading ? (
-          <div className="text-center py-5">
-            <div className="spinner-border text-primary" role="status">
-              <span className="visually-hidden">Loading...</span>
-            </div>
+          <div className="dd-loading">
+            <div className="spinner-border text-primary" />
           </div>
         ) : recentOrders.length === 0 ? (
-          <div className="text-center text-muted py-4">
+          <div className="dd-empty-state">
             <i className="bi bi-inbox fs-1"></i>
             <p className="mt-2">No orders found</p>
           </div>
         ) : (
-          <div className="table-responsive">
-            <table className="table table-hover align-middle mb-0">
-              <thead className="table-light">
+          <div className="dd-table-wrapper">
+            <table className="dd-table">
+              <thead>
                 <tr>
                   <th>Order ID</th>
                   <th>Product</th>
@@ -486,7 +420,7 @@ export default function DeliveryHeadDashboard() {
                 {recentOrders.slice(0, 8).map((order) => (
                   <tr key={order.id}>
                     <td>
-                      <span className="fw-semibold">
+                      <span className="dd-order-code">
                         #{order.orderId.substring(order.orderId.length - 8)}
                       </span>
                     </td>
@@ -494,15 +428,15 @@ export default function DeliveryHeadDashboard() {
                     <td>{order.quantity}</td>
                     <td>₹{order.amount.toFixed(2)}</td>
                     <td>{order.customer}</td>
-                    <td className="small">{formatDate(order.createdAt)}</td>
+                    <td className="dd-order-date">{formatDate(order.createdAt)}</td>
                     <td>
-                      <span className={`badge ${getStatusBadge(order.status)}`}>
+                      <span className={getStatusBadge(order.status)}>
                         {getStatusLabel(order.status)}
                       </span>
                     </td>
                     <td>
                       <button
-                        className="btn btn-sm btn-outline-primary"
+                        className="dd-view-btn"
                         onClick={() =>
                           router.push(
                             `/All-store-management/orders/${order.orderId}`

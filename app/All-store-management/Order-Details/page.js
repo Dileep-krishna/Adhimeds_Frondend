@@ -15,7 +15,6 @@ export default function OrderDetailsPage() {
   const orderId = searchParams.get('id');
   const queryClient = useQueryClient();
 
-  // ---------- Modal state ----------
   const [showBillModal, setShowBillModal] = useState(false);
   const [billFile, setBillFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -37,10 +36,12 @@ export default function OrderDetailsPage() {
       return response.data;
     },
     enabled: !!orderId,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    refetchInterval: 30000,
   });
 
-  // ---------- Order‑level Accept (pending → confirmed) ----------
+  // ---------- Order‑level Accept ----------
   const acceptOrderMutation = useMutation({
     mutationFn: async ({ billUrl }) => {
       if (!order) throw new Error("Order not found");
@@ -48,25 +49,18 @@ export default function OrderDetailsPage() {
       if (pendingItems.length === 0) {
         throw new Error("No pending items to accept.");
       }
-      console.log("📤 Accepting order with billUrl:", billUrl);
-      // Update each pending item to 'confirmed'
       const promises = pendingItems.map(item =>
         updateItemStatus(orderId, item._id, "confirmed", undefined, billUrl)
       );
       await Promise.all(promises);
-      // Update the order‑level status
       const statusResponse = await updateOrderStatus(orderId, "confirmed");
-      console.log("📥 Order status update response:", statusResponse);
-      // Return the updated order from the response
       return statusResponse.data || statusResponse;
     },
     onSuccess: async (updatedOrder) => {
       toast.success("Order accepted and confirmed!");
-      // ✅ Update cache with the fresh order data
       if (updatedOrder) {
         queryClient.setQueryData(["order", orderId], updatedOrder);
       }
-      // Invalidate and refetch to be extra safe
       await queryClient.invalidateQueries({ queryKey: ["order", orderId] });
       await refetch();
       setShowBillModal(false);
@@ -78,7 +72,7 @@ export default function OrderDetailsPage() {
     },
   });
 
-  // ---------- Order‑level Reject (pending → cancelled) ----------
+  // ---------- Order‑level Reject ----------
   const rejectOrderMutation = useMutation({
     mutationFn: async () => {
       if (!order) throw new Error("Order not found");
@@ -145,26 +139,22 @@ export default function OrderDetailsPage() {
       }
       const firstPendingItemId = pendingItems[0]._id;
 
-      console.log("📤 Uploading bill for item:", firstPendingItemId, "file:", billFile.name);
       const uploadResult = await uploadBill(orderId, firstPendingItemId, billFile);
-      console.log("📥 Bill upload result:", uploadResult);
       if (!uploadResult.success) {
         toast.error('Bill upload failed: ' + (uploadResult.message || 'Unknown error'));
         setUploading(false);
         return;
       }
       const billUrl = uploadResult.billUrl;
-      console.log("✅ Bill URL received:", billUrl);
       acceptOrderMutation.mutate({ billUrl });
     } catch (err) {
-      console.error("🔥 Error uploading bill:", err);
       toast.error('Error uploading bill.');
     } finally {
       setUploading(false);
     }
   };
 
-  // ---------- UI Helpers ----------
+  // ---------- UI helpers ----------
   const formatDate = (dateString) => {
     const d = new Date(dateString);
     return d.toLocaleDateString("en-US", {
@@ -186,36 +176,24 @@ export default function OrderDetailsPage() {
     return map[status] || "bg-secondary text-white";
   };
 
-  // ✅ Updated: uses SERVERURL and encodes spaces
   const getBillPreview = (url) => {
-    console.log("🖼️ getBillPreview called with URL:", url);
-    if (!url) {
-      console.warn("⚠️ No bill URL provided.");
-      return null;
-    }
+    if (!url) return null;
     const isImage = url.match(/\.(jpeg|jpg|png|gif|webp)$/i);
     const fullUrl = `${SERVERURL}${url}`;
     const encodedUrl = fullUrl.replace(/ /g, '%20');
-    console.log("🖼️ Encoded full URL:", encodedUrl);
-    console.log("🖼️ Is image?", isImage);
 
     if (isImage) {
       return (
         <img
           src={encodedUrl}
           alt="Bill"
-          className="img-fluid rounded border"
-          style={{ maxWidth: '100%', maxHeight: '150px' }}
-          onLoad={() => console.log("✅ Image loaded successfully:", encodedUrl)}
-          onError={(e) => {
-            console.error("❌ Image failed to load:", encodedUrl);
-            e.target.style.display = 'none';
-          }}
+          className="order-bill-thumbnail"
+          onError={(e) => { e.target.style.display = 'none'; }}
         />
       );
     } else {
       return (
-        <a href={encodedUrl} target="_blank" rel="noopener noreferrer" className="d-flex align-items-center text-decoration-none">
+        <a href={encodedUrl} target="_blank" rel="noopener noreferrer" className="order-bill-link">
           <i className="bi bi-file-earmark-pdf fs-3 text-danger me-2"></i>
           <span>View PDF Bill</span>
         </a>
@@ -223,10 +201,10 @@ export default function OrderDetailsPage() {
     }
   };
 
-  // ---------- Render ----------
+  // ---------- Early returns ----------
   if (!orderId) {
     return (
-      <div className="container-fluid py-4 bg-light min-vh-100">
+      <div className="order-page">
         <div className="alert alert-danger">Order ID is missing.</div>
       </div>
     );
@@ -234,7 +212,7 @@ export default function OrderDetailsPage() {
 
   if (isLoading) {
     return (
-      <div className="container-fluid py-4 bg-light min-vh-100 d-flex justify-content-center align-items-center">
+      <div className="order-page d-flex justify-content-center align-items-center">
         <div className="spinner-border text-primary" />
       </div>
     );
@@ -242,7 +220,7 @@ export default function OrderDetailsPage() {
 
   if (!order) {
     return (
-      <div className="container-fluid py-4 bg-light min-vh-100">
+      <div className="order-page">
         <div className="alert alert-danger">Order not found.</div>
       </div>
     );
@@ -251,248 +229,266 @@ export default function OrderDetailsPage() {
   const orderData = order;
   const customerName = "Guest";
   const customerPhone = "N/A";
-  const orderStatus = orderData.status || "pending";
+
+  // ─── FIX: Derive order status from items ───
+  const statuses = orderData.items.map(item => item.status);
+  const hasPending = statuses.includes("pending");
+  const hasConfirmed = statuses.includes("confirmed");
+  const hasProcessing = statuses.includes("processing");
+  const hasCancelled = statuses.includes("cancelled");
+  const hasAssigned = statuses.includes("assigned");
+
+  let orderStatus = "pending";
+  if (hasCancelled) orderStatus = "cancelled";
+  else if (hasAssigned) orderStatus = "assigned";
+  else if (hasConfirmed) orderStatus = "confirmed";
+  else if (hasProcessing) orderStatus = "processing";
+
   const totalAmount = orderData.items.reduce(
     (sum, item) => sum + (item.mrp || 0) * (item.quantity || 1),
     0
   );
   const hasPendingItems = orderData.items.some(item => item.status === "pending");
   const billUrl = orderData.items.find(item => item.billUrl)?.billUrl || null;
-  console.log("📌 Final billUrl from order:", billUrl);
 
+  // ---------- Main return ----------
   return (
-    <div className="container-fluid py-4 bg-light min-vh-100">
-      <div className="card border-0 shadow-lg rounded-4 overflow-hidden">
-        {/* Header with gradient */}
-        <div className="card-header bg-gradient-primary text-white py-4 px-4 d-flex justify-content-between align-items-center">
-          <h4 className="mb-0 fw-bold">
-            <i className="bi bi-file-earmark-text me-2"></i>Order Details
-          </h4>
-          <button className="btn btn-light btn-sm rounded-pill px-3" onClick={() => router.back()}>
-            <i className="bi bi-arrow-left me-1"></i> Back
-          </button>
-        </div>
+    <div className="order-page">
+      <div className="order-container">
+        <div className="order-card">
+          <div className="order-card-header order-header-gradient">
+            <h4 className="order-header-title">
+              <i className="bi bi-file-earmark-text me-2"></i>Order Details
+            </h4>
+            <div className="order-header-actions">
+              <button
+                className="order-refresh-btn"
+                onClick={() => refetch()}
+                title="Refresh order status"
+              >
+                <i className="bi bi-arrow-clockwise"></i>
+              </button>
+              <button className="order-back-btn" onClick={() => router.back()}>
+                <i className="bi bi-arrow-left me-1"></i> Back
+              </button>
+            </div>
+          </div>
 
-        <div className="card-body p-4">
-          {/* Top Section */}
-          <div className="row">
-            <div className="col-lg-6">
-              <div className="d-flex align-items-start gap-4">
-                <div className="qr-code">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${orderData._id}`}
-                    width={110}
-                    height={110}
-                    alt="QR"
-                    className="rounded border p-1 shadow-sm"
-                  />
+          <div className="order-card-body">
+            {/* ─── Top section ─── */}
+            <div className="order-top-row">
+              <div className="order-left-col">
+                <div className="order-customer-info">
+                  <div className="order-qr">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${orderData._id}`}
+                      width={110}
+                      height={110}
+                      alt="QR"
+                      className="order-qr-img"
+                    />
+                  </div>
+                  <div>
+                    <h5 className="order-customer-name">{customerName}</h5>
+                    <p className="order-text-muted">{customerPhone}</p>
+                  </div>
                 </div>
-                <div>
-                  <h5 className="fw-bold">{customerName}</h5>
-                  <p className="text-muted">{customerPhone}</p>
-                </div>
-              </div>
 
-              {/* Uploaded Bill Section */}
-              <div className="mt-4 p-4 border rounded-3 bg-white shadow-sm" style={{ maxWidth: '400px' }}>
-                <div className="d-flex justify-content-between align-items-center">
-                  <h6 className="fw-semibold mb-0">
-                    <i className="bi bi-file-earmark-check me-2 text-success"></i>
-                    Uploaded Bill
-                  </h6>
-                  {billUrl && (
-                    <button
-                      className="btn btn-outline-primary btn-sm rounded-pill"
-                      onClick={() => setShowBillView(true)}
-                    >
-                      <i className="bi bi-eye me-1"></i> View
-                    </button>
+                <div className="order-bill-section">
+                  <div className="order-bill-header">
+                    <h6 className="order-bill-title">
+                      <i className="bi bi-file-earmark-check me-2 order-icon-success"></i>
+                      Uploaded Bill
+                    </h6>
+                    {billUrl && (
+                      <button
+                        className="order-view-bill-btn"
+                        onClick={() => setShowBillView(true)}
+                      >
+                        <i className="bi bi-eye me-1"></i> View
+                      </button>
+                    )}
+                  </div>
+                  {billUrl ? (
+                    <div className="order-bill-preview">{getBillPreview(billUrl)}</div>
+                  ) : (
+                    <div className="order-text-muted small">No bill uploaded yet.</div>
                   )}
                 </div>
-                {billUrl ? (
-                  <div className="mt-3">{getBillPreview(billUrl)}</div>
-                ) : (
-                  <div className="text-muted small">No bill uploaded yet.</div>
-                )}
+              </div>
+
+              <div className="order-right-col">
+                <div className="order-info-card">
+                  <table className="order-info-table">
+                    <tbody>
+                      <tr><th className="order-info-label">Order #</th><td className="order-info-value order-accent">{orderData._id}</td></tr>
+                      <tr><th className="order-info-label">Status</th><td><span className={`order-status-badge ${getStatusBadge(orderStatus)}`}>{orderStatus.charAt(0).toUpperCase() + orderStatus.slice(1)}</span></td></tr>
+                      <tr><th className="order-info-label">Date</th><td className="order-info-value">{formatDate(orderData.createdAt)}</td></tr>
+                      <tr><th className="order-info-label">Total</th><td className="order-info-value order-accent fw-bold">₹{totalAmount.toFixed(2)}</td></tr>
+                      <tr><th className="order-info-label">Payment</th><td className="order-info-value">Cash on Delivery</td></tr>
+                      <tr><th className="order-info-label">Additional</th><td className="order-info-value">—</td></tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
-            {/* Order Info */}
-            <div className="col-lg-6 d-flex justify-content-lg-end mt-4 mt-lg-0">
-              <div className="bg-white p-4 rounded-3 shadow-sm w-100" style={{ maxWidth: '380px' }}>
-                <table className="table table-borderless mb-0">
-                  <tbody>
-                    <tr><th className="fw-semibold">Order #</th><td className="text-primary fw-semibold">{orderData._id}</td></tr>
-                    <tr><th className="fw-semibold">Status</th><td><span className={`badge ${getStatusBadge(orderStatus)} rounded-pill px-3 py-2`}>{orderStatus.charAt(0).toUpperCase() + orderStatus.slice(1)}</span></td></tr>
-                    <tr><th className="fw-semibold">Date</th><td>{formatDate(orderData.createdAt)}</td></tr>
-                    <tr><th className="fw-semibold">Total</th><td className="fw-bold text-primary">₹{totalAmount.toFixed(2)}</td></tr>
-                    <tr><th className="fw-semibold">Payment</th><td>Cash on Delivery</td></tr>
-                    <tr><th className="fw-semibold">Additional</th><td>—</td></tr>
-                  </tbody>
-                </table>
-              </div>
+            <hr className="order-divider" />
+
+            {/* ─── Product table ─── */}
+            <div className="order-table-responsive">
+              <table className="order-table">
+                <thead className="order-table-header">
+                  <tr>
+                    <th>#</th>
+                    <th>Photo</th>
+                    <th>Description</th>
+                    <th>Delivery Type</th>
+                    <th className="text-center">Qty</th>
+                    <th className="text-end">Price</th>
+                    <th className="text-end">Total</th>
+                    <th className="text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orderData.items.map((item, idx) => {
+                    const itemTotal = (item.mrp || 0) * (item.quantity || 1);
+                    return (
+                      <tr key={item._id || idx}>
+                        <td>{idx + 1}</td>
+                        <td className="text-center" style={{ fontSize: '1.5rem' }}>💊</td>
+                        <td>
+                          <div className="order-product-name">{item.productName}</div>
+                          <small className="order-text-muted">SKU: {item.sku || "-"}</small>
+                        </td>
+                        <td>{item.deliveryType || "-"}</td>
+                        <td className="text-center">{item.quantity || 1}</td>
+                        <td className="text-end">₹{(item.mrp || 0).toFixed(2)}</td>
+                        <td className="text-end">₹{itemTotal.toFixed(2)}</td>
+                        <td className="text-center">
+                          <span className={`order-status-badge ${getStatusBadge(item.status)}`}>
+                            {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          </div>
 
-          <hr className="my-4" />
-
-          {/* Product Table */}
-          <div className="table-responsive">
-            <table className="table align-middle table-hover">
-              <thead className="table-light">
-                <tr>
-                  <th>#</th>
-                  <th>Photo</th>
-                  <th>Description</th>
-                  <th>Delivery Type</th>
-                  <th className="text-center">Qty</th>
-                  <th className="text-end">Price</th>
-                  <th className="text-end">Total</th>
-                  <th className="text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orderData.items.map((item, idx) => {
-                  const itemTotal = (item.mrp || 0) * (item.quantity || 1);
-                  return (
-                    <tr key={item._id || idx}>
-                      <td>{idx + 1}</td>
-                      <td className="text-center" style={{ fontSize: '1.5rem' }}>💊</td>
-                      <td>
-                        <div className="fw-semibold">{item.productName}</div>
-                        <small className="text-muted">SKU: {item.sku || "-"}</small>
-                      </td>
-                      <td>{item.deliveryType || "-"}</td>
-                      <td className="text-center">{item.quantity || 1}</td>
-                      <td className="text-end">₹{(item.mrp || 0).toFixed(2)}</td>
-                      <td className="text-end">₹{itemTotal.toFixed(2)}</td>
-                      <td className="text-center">
-                        <span className={`badge ${getStatusBadge(item.status)} rounded-pill px-2`}>
-                          {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Summary */}
-          <div className="row justify-content-end mt-4">
-            <div className="col-lg-3">
-              <div className="bg-white p-3 rounded-3 shadow-sm">
-                <table className="table table-borderless mb-0">
+            {/* ─── Summary ─── */}
+            <div className="order-summary-row">
+              <div className="order-summary-card">
+                <table className="order-summary-table">
                   <tbody>
                     <tr><th>Sub Total :</th><td className="text-end">₹{totalAmount.toFixed(2)}</td></tr>
                     <tr><th>Tax :</th><td className="text-end">₹0.00</td></tr>
                     <tr><th>Shipping :</th><td className="text-end">₹0.00</td></tr>
                     <tr><th>Coupon :</th><td className="text-end">₹0.00</td></tr>
-                    <tr className="table-light">
+                    <tr className="order-summary-total">
                       <th className="fs-5">Total :</th>
-                      <th className="text-end fs-3 text-primary">₹{totalAmount.toFixed(2)}</th>
+                      <th className="text-end fs-3 order-accent">₹{totalAmount.toFixed(2)}</th>
                     </tr>
                   </tbody>
                 </table>
               </div>
             </div>
-          </div>
 
-          {/* Footer Actions */}
-          <div className="text-end mt-4 d-flex justify-content-end gap-3">
-            {hasPendingItems && (
-              <>
-                <button
-                  className="btn btn-success shadow-sm rounded-pill px-4 py-2 fw-semibold"
-                  onClick={handleAcceptClick}
-                  disabled={acceptOrderMutation.isPending}
-                >
-                  {acceptOrderMutation.isPending ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-2" />
-                      Accepting...
-                    </>
-                  ) : (
-                    <>
-                      <i className="bi bi-check-circle me-2"></i>
-                      Accept Order
-                    </>
-                  )}
-                </button>
-                <button
-                  className="btn btn-danger shadow-sm rounded-pill px-4 py-2 fw-semibold"
-                  onClick={() => {
-                    if (!confirm("Reject all pending items?")) return;
-                    rejectOrderMutation.mutate();
-                  }}
-                  disabled={rejectOrderMutation.isPending}
-                >
-                  {rejectOrderMutation.isPending ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-2" />
-                      Rejecting...
-                    </>
-                  ) : (
-                    <>
-                      <i className="bi bi-x-circle me-2"></i>
-                      Reject Order
-                    </>
-                  )}
-                </button>
-              </>
-            )}
-            <button
-              className="btn btn-light shadow-sm rounded-circle"
-              style={{ width: 55, height: 55 }}
-              onClick={() => window.print()}
-            >
-              <i className="bi bi-printer fs-4"></i>
-            </button>
+            {/* ─── Actions ─── */}
+            <div className="order-actions">
+              {hasPendingItems && (
+                <>
+                  <button
+                    className="order-btn order-btn-success"
+                    onClick={handleAcceptClick}
+                    disabled={acceptOrderMutation.isPending}
+                  >
+                    {acceptOrderMutation.isPending ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" />
+                        Accepting...
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-check-circle me-2"></i>
+                        Accept Order
+                      </>
+                    )}
+                  </button>
+                  <button
+                    className="order-btn order-btn-danger"
+                    onClick={() => {
+                      if (!confirm("Reject all pending items?")) return;
+                      rejectOrderMutation.mutate();
+                    }}
+                    disabled={rejectOrderMutation.isPending}
+                  >
+                    {rejectOrderMutation.isPending ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" />
+                        Rejecting...
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-x-circle me-2"></i>
+                        Reject Order
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+              <button
+                className="order-btn order-btn-print"
+                onClick={() => window.print()}
+              >
+                <i className="bi bi-printer fs-4"></i>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Bill Upload Modal */}
+      {/* ─── Bill Upload Modal ─── */}
       {showBillModal && (
         <div
-          className="modal show d-block"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          className="order-modal-overlay"
           onClick={() => {
             setShowBillModal(false);
             setBillFile(null);
           }}
         >
-          <div className="modal-dialog modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-content border-0 shadow-lg rounded-4">
-              <div className="modal-header bg-gradient-primary text-white">
-                <h5 className="modal-title"><i className="bi bi-upload me-2"></i>Upload Bill</h5>
+          <div className="order-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="order-modal-content">
+              <div className="order-modal-header order-header-gradient">
+                <h5 className="order-modal-title"><i className="bi bi-upload me-2"></i>Upload Bill</h5>
                 <button
-                  type="button"
-                  className="btn-close btn-close-white"
+                  className="order-modal-close"
                   onClick={() => {
                     setShowBillModal(false);
                     setBillFile(null);
                   }}
-                />
+                >
+                  &times;
+                </button>
               </div>
-              <div className="modal-body p-4">
-                <p className="text-muted">Please upload the bill document (PDF or image) to accept the order.</p>
-                <div className="border border-2 border-dashed rounded-3 p-4 text-center">
-                  <i className="bi bi-cloud-upload fs-1 text-primary"></i>
+              <div className="order-modal-body">
+                <p className="order-text-muted">Please upload the bill document (PDF or image) to accept the order.</p>
+                <div className="order-drop-zone">
+                  <i className="bi bi-cloud-upload fs-1 order-accent"></i>
                   <p className="mt-2">Drop your file here or click to browse</p>
                   <input
                     type="file"
-                    className="form-control"
+                    className="order-file-input"
                     accept=".pdf,.jpg,.jpeg,.png"
                     onChange={handleFileChange}
-                    style={{ opacity: 0, position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', cursor: 'pointer' }}
                   />
                 </div>
                 {billFile && (
                   <div className="mt-3">
                     <span className="text-success">✅ {billFile.name}</span>
                     <button
-                      className="btn btn-sm btn-outline-danger ms-2"
+                      className="order-remove-file"
                       onClick={() => setBillFile(null)}
                     >
                       Remove
@@ -500,9 +496,9 @@ export default function OrderDetailsPage() {
                   </div>
                 )}
               </div>
-              <div className="modal-footer border-0">
+              <div className="order-modal-footer">
                 <button
-                  className="btn btn-secondary rounded-pill"
+                  className="order-btn order-btn-secondary"
                   onClick={() => {
                     setShowBillModal(false);
                     setBillFile(null);
@@ -511,7 +507,7 @@ export default function OrderDetailsPage() {
                   Cancel
                 </button>
                 <button
-                  className="btn btn-success rounded-pill px-4"
+                  className="order-btn order-btn-success"
                   onClick={handleUploadAndAccept}
                   disabled={uploading || !billFile}
                 >
@@ -523,46 +519,44 @@ export default function OrderDetailsPage() {
         </div>
       )}
 
-      {/* Bill View Modal */}
+      {/* ─── Bill View Modal ─── */}
       {showBillView && billUrl && (
         <div
-          className="modal show d-block"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          className="order-modal-overlay"
           onClick={() => setShowBillView(false)}
         >
-          <div className="modal-dialog modal-dialog-centered modal-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-content border-0 shadow-lg rounded-4">
-              <div className="modal-header bg-gradient-primary text-white">
-                <h5 className="modal-title"><i className="bi bi-file-earmark-text me-2"></i>Bill Document</h5>
-                <button type="button" className="btn-close btn-close-white" onClick={() => setShowBillView(false)} />
+          <div className="order-modal order-modal-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="order-modal-content">
+              <div className="order-modal-header order-header-gradient">
+                <h5 className="order-modal-title"><i className="bi bi-file-earmark-text me-2"></i>Bill Document</h5>
+                <button className="order-modal-close" onClick={() => setShowBillView(false)}>
+                  &times;
+                </button>
               </div>
-              <div className="modal-body p-4 text-center">
+              <div className="order-modal-body text-center">
                 {billUrl.match(/\.(jpeg|jpg|png|gif|webp)$/i) ? (
                   <img
                     src={`${SERVERURL}${billUrl}`.replace(/ /g, '%20')}
                     alt="Bill"
-                    className="img-fluid rounded"
-                    onLoad={() => console.log("✅ Bill image loaded in modal")}
-                    onError={(e) => {
-                      console.error("❌ Bill image failed to load in modal");
-                      e.target.style.display = 'none';
-                    }}
+                    className="order-bill-image"
+                    onError={(e) => { e.target.style.display = 'none'; }}
                   />
                 ) : (
                   <iframe
                     src={`${SERVERURL}${billUrl}`.replace(/ /g, '%20')}
-                    style={{ width: '100%', height: '500px' }}
-                    className="border rounded"
+                    className="order-bill-pdf"
                   />
                 )}
               </div>
-              <div className="modal-footer border-0">
-                <button className="btn btn-secondary rounded-pill" onClick={() => setShowBillView(false)}>Close</button>
+              <div className="order-modal-footer">
+                <button className="order-btn order-btn-secondary" onClick={() => setShowBillView(false)}>
+                  Close
+                </button>
                 <a
                   href={`${SERVERURL}${billUrl}`.replace(/ /g, '%20')}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn btn-primary rounded-pill px-4"
+                  className="order-btn order-btn-primary"
                 >
                   Download
                 </a>

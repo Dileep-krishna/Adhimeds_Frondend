@@ -40,7 +40,6 @@ export default function AllOrdersPage() {
     refetch();
   }, []);
 
-  // ---------- Delete Order ----------
   const deleteOrderMutation = useMutation({
     mutationFn: async (orderId) => {
       const order = orders.find(o => o._id === orderId);
@@ -91,107 +90,105 @@ export default function AllOrdersPage() {
   }
 
   return (
-    <div className="container-fluid py-4">
-      <div className="card border-0 shadow-sm rounded-4">
-        <div className="card-header bg-white border-0 py-3 px-4">
-          <h5 className="fw-bold mb-0">
-            Order History
-            <span className="badge bg-light text-dark ms-2">{orders.length}</span>
-          </h5>
-        </div>
-        <div className="card-body p-0">
-          {isLoading ? (
-            <div className="text-center py-5"><div className="spinner-border text-primary" /></div>
-          ) : orders.length === 0 ? (
-            <div className="text-center py-5"><h5>No Orders Found</h5><p className="text-muted">You have no orders yet.</p></div>
-          ) : (
-            <div className="order-table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Order Code</th>
-                    <th>Num. of Products</th>
-                    <th>Customer</th>
-                    <th>Seller</th>
-                    <th>Amount</th>
-                    <th>Delivery Status</th>
-                    <th>Payment method</th>
-                    <th>Payment Status</th>
-                    <th className="text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((order) => {
-                    // 🔍 LOG EACH ORDER'S DATA
-                    console.log("🔎 Order:", order._id, "order.status:", order.status);
-                    console.log("   Items statuses:", order.items.map(item => item.status));
+    <div className="orders-page-wrapper">
+      <div className="container-fluid py-4">
+        <div className="card border-0 shadow-sm rounded-4">
+          <div className="card-header bg-white border-0 py-3 px-4">
+            <h5 className="fw-bold mb-0">
+              Order History
+              <span className="badge bg-light text-dark ms-2">{orders.length}</span>
+            </h5>
+          </div>
+          <div className="card-body p-0">
+            {isLoading ? (
+              <div className="text-center py-5"><div className="spinner-border text-primary" /></div>
+            ) : orders.length === 0 ? (
+              <div className="text-center py-5">
+<h5 className="fw-bold empty-title">No Orders Found</h5>
+                <p className="text-muted">You have no orders yet.</p>
+              </div>
+            ) : (
+              <div className="order-table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Order Code</th>
+                      <th>Num. of Products</th>
+                      <th>Customer</th>
+                      <th>Seller</th>
+                      <th>Amount</th>
+                      <th>Delivery Status</th>
+                      <th>Payment method</th>
+                      <th>Payment Status</th>
+                      <th className="text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map((order) => {
+                      const statuses = order.items.map(item => item.status);
+                      const hasPending = statuses.includes("pending");
+                      const hasConfirmed = statuses.includes("confirmed");
+                      const hasProcessing = statuses.includes("processing");
+                      const hasCancelled = statuses.includes("cancelled");
+                      const hasAssigned = statuses.includes("assigned");
 
-                    // Compute display status
-                    const statuses = order.items.map(item => item.status);
-                    const hasPending = statuses.includes("pending");
-                    const hasConfirmed = statuses.includes("confirmed");
-                    const hasProcessing = statuses.includes("processing");
-                    const hasCancelled = statuses.includes("cancelled");
-                    const hasAssigned = statuses.includes("assigned");
+                      let displayStatus = "pending";
+                      if (hasCancelled) displayStatus = "cancelled";
+                      else if (hasAssigned) displayStatus = "assigned";
+                      else if (hasConfirmed) displayStatus = "confirmed";
+                      else if (hasProcessing) displayStatus = "processing";
 
-                    let displayStatus = "pending";
-                    if (hasCancelled) displayStatus = "cancelled";
-                    else if (hasAssigned) displayStatus = "assigned";
-                    else if (hasConfirmed) displayStatus = "confirmed";
-                    else if (hasProcessing) displayStatus = "processing";
-
-                    console.log("   Computed displayStatus:", displayStatus);
-
-                    return (
-                      <tr key={order._id}>
-                        <td>
-                          <div className="fw-semibold">{order._id}</div>
-                          <small className="text-muted">{formatDate(order.createdAt)}</small>
-                        </td>
-                        <td>{order.items?.length || 0}</td>
-                        <td>Guest</td>
-                        <td>{order.items?.[0]?.storeName || "Inhouse Order"}</td>
-                        <td className="fw-semibold">₹{(order.total || 0).toFixed(2)}</td>
-                        <td>
-                          <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(displayStatus)}`}>
-                            {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
-                          </span>
-                        </td>
-                        <td>Cash on Delivery</td>
-                        <td><span className="badge bg-danger rounded-pill px-3 py-2">Un-Paid</span></td>
-                        <td>
-                          <div className="d-flex justify-content-center gap-2">
-                            <button
-                              className="btn btn-light rounded-circle shadow-sm"
-                              onClick={() => router.push(`/All-store-management/Order-Details?id=${order._id}`)}
-                              title="View Details"
-                            >
-                              <i className="bi bi-eye text-primary"></i>
-                            </button>
-                            <button
-                              className="btn btn-light rounded-circle shadow-sm"
-                              onClick={() => toast.info("Download invoice for order " + order._id)}
-                              title="Download Invoice"
-                            >
-                              <i className="bi bi-download text-secondary"></i>
-                            </button>
-                            <button
-                              className="btn btn-light rounded-circle shadow-sm"
-                              onClick={() => handleDeleteOrder(order._id)}
-                              disabled={deleteOrderMutation.isPending}
-                              title="Delete Order"
-                            >
-                              <i className="bi bi-trash text-danger"></i>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                      return (
+                        <tr key={order._id}>
+                          <td>
+                            <div className="fw-semibold">{order._id}</div>
+                            <small className="text-muted">{formatDate(order.createdAt)}</small>
+                          </td>
+                          <td>{order.items?.length || 0}</td>
+                          <td>Guest</td>
+                          <td>{order.items?.[0]?.storeName || "Inhouse Order"}</td>
+                          <td className="fw-semibold">₹{(order.total || 0).toFixed(2)}</td>
+                          <td>
+                            <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(displayStatus)}`}>
+                              {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
+                            </span>
+                          </td>
+                          <td>Cash on Delivery</td>
+                          <td><span className="badge bg-danger rounded-pill px-3 py-2">Un-Paid</span></td>
+                          <td>
+                            <div className="d-flex justify-content-center gap-2">
+                              <button
+                                className="btn btn-light rounded-circle shadow-sm"
+                                onClick={() => router.push(`/All-store-management/Order-Details?id=${order._id}`)}
+                                title="View Details"
+                              >
+                                <i className="bi bi-eye text-primary"></i>
+                              </button>
+                              <button
+                                className="btn btn-light rounded-circle shadow-sm"
+                                onClick={() => toast.info("Download invoice for order " + order._id)}
+                                title="Download Invoice"
+                              >
+                                <i className="bi bi-download text-secondary"></i>
+                              </button>
+                              <button
+                                className="btn btn-light rounded-circle shadow-sm"
+                                onClick={() => handleDeleteOrder(order._id)}
+                                disabled={deleteOrderMutation.isPending}
+                                title="Delete Order"
+                              >
+                                <i className="bi bi-trash text-danger"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

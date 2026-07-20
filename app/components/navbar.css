@@ -362,3 +362,28 @@
     max-width: 90%;
   }
 }
+
+/* ─── FORCE STORE SELECTOR TEXT TO BE DARK ─── */
+.store-selector .react-select__single-value {
+  color: #212529 !important;
+  opacity: 1 !important;
+}
+
+/* ─── ALSO OVERRIDE DARK MODE ─── */
+html.dark .store-selector .react-select__single-value {
+  color: #212529 !important;
+  opacity: 1 !important;
+}
+
+/* ─── FORCE THE CONTROL BACKGROUND ─── */
+.store-selector .react-select__control,
+html.dark .store-selector .react-select__control {
+  background: #ffffff !important;
+  border: 1px solid #ced4da !important;
+}
+
+/* ─── FORCE THE PLACEHOLDER ─── */
+.store-selector .react-select__placeholder,
+html.dark .store-selector .react-select__placeholder {
+  color: #6c757d !important;
+}

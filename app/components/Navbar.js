@@ -346,44 +346,47 @@ export default function Navbar() {
             </span>
 
             <div style={{ minWidth: "160px", marginRight: "8px" }}>
-              <Select
-                options={allStores}
-                placeholder="All Stores"
-                isClearable={true}
-                value={selectedStore}
-                onChange={(option) => setSelectedStore(option)}
-                isOptionDisabled={(option) => option.isDisabled}
-                styles={{
-                  control: (provided) => ({
-                    ...provided,
-                    border: "none",
-                    boxShadow: "none",
-                    minHeight: "30px",
-                    background: "transparent",
-                  }),
-                  indicatorSeparator: () => ({ display: "none" }),
-                  dropdownIndicator: (provided) => ({
-                    ...provided,
-                    padding: "2px",
-                  }),
-                  option: (provided, state) => ({
-                    ...provided,
-                    color: state.isDisabled ? "#adb5bd" : "#000",
-                    cursor: state.isDisabled ? "not-allowed" : "pointer",
-                    backgroundColor: state.isDisabled ? "#f8f9fa" : "transparent",
-                  }),
-                  singleValue: (provided) => ({
-                    ...provided,
-                    color: "#000",
-                    fontWeight: "500",
-                  }),
-                  placeholder: (provided) => ({
-                    ...provided,
-                    color: "#6c757d",
-                    fontWeight: "400",
-                  }),
-                }}
-              />
+         <Select
+           className="store-selector" 
+  options={allStores}
+  placeholder="All Stores"
+  isClearable={true}
+  value={selectedStore}
+  onChange={(option) => setSelectedStore(option)}
+  isOptionDisabled={(option) => option.isDisabled}
+  classNamePrefix="react-select"
+  styles={{
+    control: (provided) => ({
+      ...provided,
+      border: "none",
+      boxShadow: "none",
+      minHeight: "30px",
+      background: "transparent",
+    }),
+    indicatorSeparator: () => ({ display: "none" }),
+    dropdownIndicator: (provided) => ({
+      ...provided,
+      padding: "2px",
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      color: state.isDisabled ? "#adb5bd" : "#000",
+      cursor: state.isDisabled ? "not-allowed" : "pointer",
+      backgroundColor: state.isDisabled ? "#f8f9fa" : "transparent",
+    }),
+    // ✅ ADD THIS – forces the selected value text to dark
+    singleValue: (provided) => ({
+      ...provided,
+      color: "#004a94 !important",
+      fontWeight: "500",
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      color: "#6c757d",
+      fontWeight: "400",
+    }),
+  }}
+/>
             </div>
 
             <input

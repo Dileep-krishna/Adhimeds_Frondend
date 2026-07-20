@@ -1,9 +1,9 @@
-import React from 'react'
+// import React from 'react'
 
-function AllOrdersClient() {
-  return (
-    <div>AllOrdersClient</div>
-  )
-}
+// function AllOrdersClient() {
+//   return (
+//     <div>AllOrdersClient</div>
+//   )
+// }
 
-export default AllOrdersClient
+// export default AllOrdersClient

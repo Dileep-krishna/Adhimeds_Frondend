@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef, memo, useTransition } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation'; // 👈 for navigation
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -33,7 +32,9 @@ function usePagination(totalItems, itemsPerPage = 10) {
   return { currentPage, totalPages, goToPage, nextPage, prevPage, setCurrentPage };
 }
 
-const ProductRow = memo(({ product, onViewProduct, onToggleStoreAccess, onTogglePin, isPinned, getImageUrl }) => {
+// ─── Product Row – with navigation ───
+const ProductRow = memo(({ product, onTogglePin, isPinned, getImageUrl }) => {
+  const router = useRouter();
   const thumbnailUrl = getImageUrl(product.thumbnail);
   return (
     <tr key={product._id}>
@@ -70,7 +71,11 @@ const ProductRow = memo(({ product, onViewProduct, onToggleStoreAccess, onToggle
       <td>₹{product.unitPrice}</td>
       <td>{product.discount > 0 ? `${product.discount}%` : '—'}</td>
       <td>
-        <button className="btn-icon view-btn" onClick={() => onViewProduct(product)} title="View Details">
+        <button
+          className="btn-icon view-btn"
+          onClick={() => router.push(`/All-store-management/All-Products/product-view/${product._id}`)}
+          title="View Details"
+        >
           <i className="bi bi-eye"></i>
         </button>
       </td>
@@ -87,7 +92,7 @@ const ProductRow = memo(({ product, onViewProduct, onToggleStoreAccess, onToggle
       <td>
         <button
           className="btn-icon store-access-btn"
-          onClick={() => onToggleStoreAccess(product)}
+          onClick={() => router.push(`/All-store-management/All-Products/store-access/${product._id}`)}
           title="Enable/Disable for store"
           style={{ background: 'none', border: 'none', color: '#3b82f6', fontSize: '1.2rem', cursor: 'pointer' }}
         >
@@ -99,6 +104,7 @@ const ProductRow = memo(({ product, onViewProduct, onToggleStoreAccess, onToggle
 });
 ProductRow.displayName = 'ProductRow';
 
+// ─── Skeleton Row ───
 const SkeletonRow = memo(() => (
   <tr className="skeleton-row">
     <td><div className="skeleton" style={{ width: '120px', height: '40px' }}></div></td>
@@ -117,35 +123,28 @@ SkeletonRow.displayName = 'SkeletonRow';
 export const dynamic = "force-dynamic";
 
 export default function AllProductsPage() {
+  const router = useRouter();
+
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOption, setFilterOption] = useState('');
   const [sortOption, setSortOption] = useState('');
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [showModal, setShowModal] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [showStoreModal, setShowStoreModal] = useState(false);
-  const [currentProductForStore, setCurrentProductForStore] = useState(null);
-  const [storeEmail, setStoreEmail] = useState('');
-  const [enableForStore, setEnableForStore] = useState(true);
-  const [updatingStoreAccess, setUpdatingStoreAccess] = useState(false);
-  
-  // ✅ Load pins synchronously from localStorage using current email (if any)
+
+  // ─── Pins ───
   const getCurrentEmail = () => {
-    if (typeof window !== 'undefined') {
-      return sessionStorage.getItem('storeEmail') || localStorage.getItem('storeEmail') || '';
-    }
-    return '';
+    if (typeof window === 'undefined') return '';
+    return sessionStorage.getItem('storeEmail') || localStorage.getItem('storeEmail') || '';
   };
-  
+
   const getPinnedStorageKey = (email) => {
     if (email && email !== 'null' && email !== 'undefined') {
       return `pinnedProductIds_${email}`;
     }
     return 'pinnedProductIds';
   };
-  
+
   const initialEmail = getCurrentEmail();
   const initialKey = getPinnedStorageKey(initialEmail);
   const initialPins = (() => {
@@ -160,9 +159,10 @@ export default function AllProductsPage() {
     }
     return [];
   })();
-  
+
   const [pinnedProductIds, setPinnedProductIds] = useState(initialPins);
 
+  // ─── Debounce & transition ───
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [isPending, startTransition] = useTransition();
 
@@ -171,34 +171,14 @@ export default function AllProductsPage() {
     return `${SERVERURL}/imgUploads/${filename}`;
   }, []);
 
-  // Update storeEmail from storage when component mounts (for later use in modal)
+  // ─── Save pins on change ───
   useEffect(() => {
     const email = getCurrentEmail();
-    if (email) setStoreEmail(email);
-  }, []);
-
-  // Whenever storeEmail changes (e.g., login/logout), reload pins from correct key
-  useEffect(() => {
-    const key = getPinnedStorageKey(storeEmail);
-    const saved = localStorage.getItem(key);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) setPinnedProductIds(parsed);
-      } catch (e) {}
-    } else {
-      // No saved pins for this store → reset to empty
-      setPinnedProductIds([]);
-    }
-  }, [storeEmail]);
-
-  // Save pins to localStorage whenever they change, using current email
-  useEffect(() => {
-    const email = storeEmail || getCurrentEmail();
     const key = getPinnedStorageKey(email);
     localStorage.setItem(key, JSON.stringify(pinnedProductIds));
-  }, [pinnedProductIds, storeEmail]);
+  }, [pinnedProductIds]);
 
+  // ─── Fetch products ───
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
@@ -234,11 +214,15 @@ export default function AllProductsPage() {
     fetchProducts();
   }, [fetchProducts]);
 
+  // ─── Filter & sort ───
   const filteredAndSortedProducts = useMemo(() => {
     let result = [...products];
     if (debouncedSearchTerm) {
       const searchLower = debouncedSearchTerm.toLowerCase();
-      result = result.filter(p => p.productName?.toLowerCase().includes(searchLower) || p.brand?.toLowerCase().includes(searchLower));
+      result = result.filter(p =>
+        p.productName?.toLowerCase().includes(searchLower) ||
+        p.brand?.toLowerCase().includes(searchLower)
+      );
     }
     if (filterOption === 'published') result = result.filter(p => p.published === true);
     if (filterOption === 'featured') result = result.filter(p => p.featured === true);
@@ -253,7 +237,10 @@ export default function AllProductsPage() {
     return [...pinnedItems, ...unpinnedItems];
   }, [products, debouncedSearchTerm, filterOption, sortOption, pinnedProductIds]);
 
-  const { currentPage, totalPages, goToPage, nextPage, prevPage, setCurrentPage } = usePagination(filteredAndSortedProducts.length, itemsPerPage);
+  // ─── Pagination ───
+  const { currentPage, totalPages, goToPage, nextPage, prevPage, setCurrentPage } =
+    usePagination(filteredAndSortedProducts.length, itemsPerPage);
+
   useEffect(() => setCurrentPage(1), [debouncedSearchTerm, filterOption, sortOption, pinnedProductIds, setCurrentPage]);
 
   const paginatedProducts = useMemo(() => {
@@ -271,63 +258,12 @@ export default function AllProductsPage() {
     return pages;
   }, [currentPage, totalPages]);
 
-  const handleViewProduct = useCallback((product) => {
-    setSelectedProduct(product);
-    setShowModal(true);
-  }, []);
-
-  const closeModal = useCallback(() => {
-    setShowModal(false);
-    setSelectedProduct(null);
-  }, []);
-
+  // ─── Handlers ───
   const handleTogglePin = useCallback((productId) => {
-    setPinnedProductIds(prev => prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]);
+    setPinnedProductIds(prev =>
+      prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]
+    );
   }, []);
-
-  const handleToggleStoreAccess = useCallback((product) => {
-    setCurrentProductForStore(product);
-    const storedEmail = sessionStorage.getItem('storeEmail') || localStorage.getItem('storeEmail') || '';
-    setStoreEmail(storedEmail);
-    setEnableForStore(true);
-    setShowStoreModal(true);
-  }, []);
-
-  const handleStoreAccessSubmit = async () => {
-    if (!storeEmail.trim()) {
-      toast.error('Please enter a store email');
-      return;
-    }
-    setUpdatingStoreAccess(true);
-    try {
-      const resolveUrl = `${SERVERURL}/store/by-email?email=${encodeURIComponent(storeEmail)}`;
-      const resolveRes = await fetch(resolveUrl);
-      const resolveData = await resolveRes.json();
-      if (!resolveData.success) {
-        toast.error(resolveData.message || 'Store not found with this email');
-        return;
-      }
-      const storeId = resolveData.storeId;
-      const url = `${SERVERURL}/store/product-access/${currentProductForStore._id}/${storeId}`;
-      const res = await fetch(url, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: enableForStore })
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success(`Product ${enableForStore ? 'enabled' : 'disabled'} for store ${resolveData.storeName || storeEmail}`);
-        setShowStoreModal(false);
-      } else {
-        toast.error(data.message || 'Failed to update store access');
-      }
-    } catch (error) {
-      console.error('Error updating store access:', error);
-      toast.error('Server error');
-    } finally {
-      setUpdatingStoreAccess(false);
-    }
-  };
 
   const resetFilters = useCallback(() => {
     setSearchTerm('');
@@ -349,12 +285,6 @@ export default function AllProductsPage() {
   const startItem = filteredAndSortedProducts.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, filteredAndSortedProducts.length);
 
-  const modalVariants = {
-    initial: { x: '100%', opacity: 0, scale: 0.95 },
-    animate: { x: 0, opacity: 1, scale: 1, transition: { type: 'tween', duration: 0.3, ease: 'easeOut' } },
-    exit: { x: '100%', opacity: 0, scale: 0.95, transition: { type: 'tween', duration: 0.25, ease: 'easeIn' } }
-  };
-
   return (
     <div className="all-products-container">
       <Toaster position="top-right" />
@@ -364,7 +294,13 @@ export default function AllProductsPage() {
       <div className="filter-bar">
         <div className="row g-2 align-items-end">
           <div className="col-md-4">
-            <input type="text" className="form-control" placeholder="Search products..." value={searchTerm} onChange={handleSearchChange} />
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+            />
           </div>
           <div className="col-md-3">
             <select className="form-select" value={filterOption} onChange={(e) => setFilterOption(e.target.value)}>
@@ -432,8 +368,6 @@ export default function AllProductsPage() {
                   <ProductRow
                     key={product._id}
                     product={product}
-                    onViewProduct={handleViewProduct}
-                    onToggleStoreAccess={handleToggleStoreAccess}
                     onTogglePin={handleTogglePin}
                     isPinned={pinnedProductIds.includes(product._id)}
                     getImageUrl={getImageUrl}
@@ -448,9 +382,15 @@ export default function AllProductsPage() {
             </table>
             {filteredAndSortedProducts.length > 0 && (
               <div className="pagination-controls">
-                <div className="pagination-info">Showing {startItem} to {endItem} of {filteredAndSortedProducts.length} products</div>
+                <div className="pagination-info">
+                  Showing {startItem} to {endItem} of {filteredAndSortedProducts.length} products
+                </div>
                 <div className="pagination-actions">
-                  <select className="form-select per-page-select" value={itemsPerPage} onChange={handleItemsPerPageChange}>
+                  <select
+                    className="form-select per-page-select"
+                    value={itemsPerPage}
+                    onChange={handleItemsPerPageChange}
+                  >
                     <option value={10}>10 per page</option>
                     <option value={25}>25 per page</option>
                     <option value={50}>50 per page</option>
@@ -465,7 +405,9 @@ export default function AllProductsPage() {
                       </li>
                       {pageNumbers.map(pageNum => (
                         <li key={pageNum} className={`page-item ${currentPage === pageNum ? 'active' : ''}`}>
-                          <button className="page-link" onClick={() => goToPage(pageNum)}>{pageNum}</button>
+                          <button className="page-link" onClick={() => goToPage(pageNum)}>
+                            {pageNum}
+                          </button>
                         </li>
                       ))}
                       <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
@@ -481,113 +423,6 @@ export default function AllProductsPage() {
           </>
         )}
       </div>
-
-      <AnimatePresence>
-        {showModal && selectedProduct && (
-          <>
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'tween', duration: 0.3 }}
-              className="side-modal info-modal"
-            >
-              <div className="side-modal-header">
-                <h5>Product Details</h5>
-                <button className="close-modal" onClick={closeModal}>×</button>
-              </div>
-              <div className="side-modal-body">
-                <div className="product-detail-card">
-                  {selectedProduct.thumbnail && (
-                    <div className="text-center mb-3">
-                      <img src={getImageUrl(selectedProduct.thumbnail)} alt={selectedProduct.productName} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '1rem' }} />
-                    </div>
-                  )}
-                  <h4>{selectedProduct.productName}</h4>
-                  <p><strong>Brand:</strong> {selectedProduct.brand}</p>
-                  <p><strong>Category:</strong> {selectedProduct.mainCategory}</p>
-                  <p><strong>Unit:</strong> {selectedProduct.unit || 'N/A'}</p>
-                  <p><strong>Weight:</strong> {selectedProduct.weight} kg</p>
-                  <p><strong>Min Qty:</strong> {selectedProduct.minPurchaseQty}</p>
-                  <p><strong>Price:</strong> ₹{selectedProduct.unitPrice}</p>
-                  <p><strong>Discount:</strong> {selectedProduct.discount > 0 ? `${selectedProduct.discount}%` : 'None'}</p>
-                  <p><strong>Stock:</strong> {selectedProduct.stock}</p>
-                  <p><strong>SKU:</strong> {selectedProduct.sku || 'N/A'}</p>
-                  <p><strong>Barcode:</strong> {selectedProduct.barcode || 'N/A'}</p>
-                  <p><strong>HSN:</strong> {selectedProduct.hsnCode || 'N/A'}</p>
-                  <p><strong>GST:</strong> {selectedProduct.gstRate || 0}%</p>
-                  <p><strong>Rating:</strong> {selectedProduct.avgRating > 0 ? `${selectedProduct.avgRating}/5 (${selectedProduct.reviewCount} reviews)` : 'No reviews'}</p>
-                  {selectedProduct.description && <div><strong>Description:</strong><p>{selectedProduct.description}</p></div>}
-                  {selectedProduct.galleryImages?.length > 0 && (
-                    <div>
-                      <strong>Gallery:</strong>
-                      <div className="d-flex flex-wrap gap-2 mt-2">
-                        {selectedProduct.galleryImages.map((img, idx) => <img key={idx} src={getImageUrl(img)} width="60" height="60" style={{ objectFit: 'cover', borderRadius: '8px' }} />)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-            <div className="side-overlay" onClick={closeModal} />
-          </>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showStoreModal && currentProductForStore && (
-          <>
-            <motion.div
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              variants={modalVariants}
-              className="side-modal store-access-modal"
-              style={{ width: '400px' }}
-            >
-              <div className="side-modal-header">
-                <h5>Store Access for {currentProductForStore.productName}</h5>
-                <button className="close-modal" onClick={() => setShowStoreModal(false)}>×</button>
-              </div>
-              <div className="side-modal-body">
-                <div className="form-group mb-3">
-                  <label className="form-label">Store Email Address</label>
-                  <input type="email" className="form-control" placeholder="e.g., store@example.com" value={storeEmail} onChange={(e) => setStoreEmail(e.target.value)} />
-                  <small className="text-muted">Enter the store's registered email address. (Pre-filled with logged-in store email)</small>
-                </div>
-                <div className="form-group mb-3">
-                  <label className="form-label">Action</label>
-                  <div className="d-flex gap-3">
-                    <label className="d-flex align-items-center gap-2">
-                      <input type="radio" value="true" checked={enableForStore === true} onChange={() => setEnableForStore(true)} />
-                      Enable product for this store
-                    </label>
-                    <label className="d-flex align-items-center gap-2">
-                      <input type="radio" value="false" checked={enableForStore === false} onChange={() => setEnableForStore(false)} />
-                      Disable product for this store
-                    </label>
-                  </div>
-                </div>
-                <div className="d-flex justify-content-end gap-2 mt-3">
-                  <button className="btn-secondary" onClick={() => setShowStoreModal(false)}>Cancel</button>
-                  <button className="btn-primary" onClick={handleStoreAccessSubmit} disabled={updatingStoreAccess}>
-                    {updatingStoreAccess ? 'Updating...' : 'Save'}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-            <motion.div
-              className="side-overlay"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={() => setShowStoreModal(false)}
-              style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
-            />
-          </>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

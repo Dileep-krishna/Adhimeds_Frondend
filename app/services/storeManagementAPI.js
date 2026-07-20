@@ -126,3 +126,89 @@ export const getShopsForOrderAPI = async () => {
   const res = await fetch(url);
   return handleResponse(res);
 };
+
+// storeManagementAPI.js (add these after existing functions)
+
+// ─── UPDATE product access for a store ───
+export const updateStoreProductAccess = async (productId, storeId, enabled) => {
+  const url = `${SERVERURL}/api/store/product-access/${productId}/${storeId}`;
+  console.log('🔄 updateStoreProductAccess URL:', url);
+  console.log('📦 Payload:', { enabled });
+
+  const options = {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  };
+
+  try {
+    const res = await fetch(url, options);
+    console.log('📥 Response status:', res.status, res.statusText);
+    return handleResponse(res);
+  } catch (error) {
+    console.error('🔥 Fetch error:', error);
+    throw error;
+  }
+};
+
+// ─── GET all products for a store (with access status) ───
+export const getStoreProductsAccess = async (storeId) => {
+  const url = `${SERVERURL}/api/store/products/${storeId}`;
+  console.log('🔍 getStoreProductsAccess URL:', url);
+  try {
+    const res = await fetch(url);
+    return handleResponse(res);
+  } catch (error) {
+    console.error('🔥 Fetch error:', error);
+    throw error;
+  }
+};
+
+// ─── DELETE product access (optional) ───
+export const deleteStoreProductAccess = async (productId, storeId) => {
+  const url = `${SERVERURL}/api/store/product-access/${productId}/${storeId}`;
+  console.log('🗑️ deleteStoreProductAccess URL:', url);
+  try {
+    const res = await fetch(url, { method: "DELETE" });
+    return handleResponse(res);
+  } catch (error) {
+    console.error('🔥 Fetch error:', error);
+    throw error;
+  }
+};
+
+// storeManagementAPI.js – add this function
+
+// ─── Update store product price & stock ───
+export const updateStoreProductPriceStock = async (productId, storeId, data) => {
+  const url = `${SERVERURL}/api/store/product/${productId}/${storeId}`;
+  console.log('🔄 updateStoreProductPriceStock URL:', url);
+  console.log('📦 Payload:', data);
+
+  const options = {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  };
+
+  try {
+    const res = await fetch(url, options);
+    console.log('📥 Response status:', res.status, res.statusText);
+    return handleResponse(res);
+  } catch (error) {
+    console.error('🔥 Fetch error:', error);
+    throw error;
+  }
+};
+// ─── GET store product details (with custom price/stock) ───
+export const getStoreProductDetails = async (productId, storeId) => {
+  const url = `${SERVERURL}/api/store/product-details/${productId}/${storeId}`;
+  console.log('🔍 getStoreProductDetails URL:', url);
+  try {
+    const res = await fetch(url);
+    return handleResponse(res);
+  } catch (error) {
+    console.error('🔥 Fetch error:', error);
+    throw error;
+  }
+};

@@ -1,17 +1,22 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useTransition, memo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useTransition, memo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './Store-Product.css';
-import { getAllStoreProductsAPI, getProductsAPI } from '../../services/productService';
+import { getProductsAPI } from '../../services/productService';
 import { getAllCustomReviewsAPI } from '../../services/customReviewService';
+import {
+  updateStoreProductAccess,
+  getStoreProductsAccess,
+  deleteStoreProductAccess,   // ✅ new import
+} from '../../services/storeManagementAPI';
 import SERVERURL from '../../services/serverURL';
 
-// Custom debounce hook
+// ─── Debounce ───
 function useDebounce(value, delay) {
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
@@ -21,7 +26,7 @@ function useDebounce(value, delay) {
   return debouncedValue;
 }
 
-// Pagination hook
+// ─── Pagination ───
 function usePagination(totalItems, itemsPerPage = 10) {
   const [currentPage, setCurrentPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
@@ -34,8 +39,8 @@ function usePagination(totalItems, itemsPerPage = 10) {
   return { currentPage, totalPages, goToPage, nextPage, prevPage, setCurrentPage };
 }
 
-// Memoized product row for the main list (enabled products only)
-const ProductRow = memo(({ product, onView, onEdit, onDelete, getImageUrl }) => {
+// ─── Product Row ───
+const ProductRow = memo(({ product, onToggle, onView, onEdit, onDelete, isEnabled, updating, getImageUrl }) => {
   const thumbnailUrl = getImageUrl(product.thumbnail);
   return (
     <tr>
@@ -77,16 +82,28 @@ const ProductRow = memo(({ product, onView, onEdit, onDelete, getImageUrl }) => 
         <button className="action-btn edit-btn" onClick={() => onEdit(product._id)} title="Edit Product">
           <i className="bi bi-pencil"></i>
         </button>
-        <button className="action-btn delete-btn" onClick={() => onDelete(product._id)} title="Disable for my store">
+        <button className="action-btn delete-btn" onClick={() => onDelete(product._id)} title="Remove from my store">
           <i className="bi bi-trash"></i>
         </button>
+      </td>
+      <td>
+        <label className="switch">
+          <input
+            type="checkbox"
+            checked={isEnabled}
+            disabled={updating}
+            onChange={() => onToggle(product._id, isEnabled)}
+          />
+          <span className="slider round"></span>
+        </label>
+        {updating && <span className="ms-2 small">Updating...</span>}
       </td>
     </tr>
   );
 });
 ProductRow.displayName = 'ProductRow';
 
-// Skeleton row for loading
+// ─── Skeleton ───
 const SkeletonRow = memo(() => (
   <tr className="skeleton-row">
     <td><div className="skeleton" style={{ width: '120px', height: '40px' }}></div></td>
@@ -96,6 +113,7 @@ const SkeletonRow = memo(() => (
     <td><div className="skeleton" style={{ width: '60px', height: '20px' }}></div></td>
     <td><div className="skeleton" style={{ width: '50px', height: '20px' }}></div></td>
     <td><div className="skeleton" style={{ width: '120px', height: '30px' }}></div></td>
+    <td><div className="skeleton" style={{ width: '60px', height: '30px' }}></div></td>
   </tr>
 ));
 SkeletonRow.displayName = 'SkeletonRow';
@@ -114,8 +132,8 @@ export default function StoreProductsPage() {
   const [showModal, setShowModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [storeId, setStoreId] = useState(null);
-  const [showManagement, setShowManagement] = useState(false);
   const [updating, setUpdating] = useState({});
+  const isSubmitting = useRef(false);
 
   // Get storeId from sessionStorage
   useEffect(() => {
@@ -136,14 +154,40 @@ export default function StoreProductsPage() {
     return `${SERVERURL}/imgUploads/${filename}`;
   }, []);
 
-  // Fetch both enabled products and all master products
+  // ─── Fetch enabled products (with custom price/stock) ───
   const fetchData = useCallback(async () => {
     if (!storeId) return;
     setLoading(true);
     try {
-      const enabledRes = await getAllStoreProductsAPI(storeId);
+      console.log('🔵 fetchData called for storeId:', storeId);
+      const enabledRes = await getStoreProductsAccess(storeId);
+      console.log('📦 enabledRes:', enabledRes);
+
       if (!enabledRes.success) throw new Error(enabledRes.message);
-      let enabledData = enabledRes.data;
+
+      console.log('📋 enabledRes.data length:', enabledRes.data?.length);
+
+      let enabledProducts = [];
+      if (enabledRes.data && Array.isArray(enabledRes.data)) {
+        const enabledAccess = enabledRes.data.filter(access => access.enabled === true);
+        enabledProducts = enabledAccess.map(access => {
+          console.log('🔎 Access record:', access);
+          if (!access.productId) {
+            console.warn('⚠️ Missing productId in access record:', access);
+            return null;
+          }
+          return {
+            ...access.productId,
+            _id: access.productId._id,
+            storeAccessId: access._id,
+            enabled: access.enabled,
+            unitPrice: access.customPrice ?? access.productId.unitPrice,
+            stock: access.customStock ?? access.productId.stock,
+          };
+        }).filter(Boolean);
+      }
+
+      console.log('📦 enabledProducts after mapping (only enabled):', enabledProducts);
 
       const allRes = await getProductsAPI();
       if (!allRes.success) throw new Error(allRes.message);
@@ -165,10 +209,13 @@ export default function StoreProductsPage() {
         return { ...product, avgRating, reviewCount: productReviews.length };
       });
 
-      setProducts(attachRatings(enabledData));
+      const ratedEnabled = attachRatings(enabledProducts);
+      console.log('⭐ ratedEnabled (enabled only):', ratedEnabled);
+      setProducts(ratedEnabled);
       setAllMasterProducts(attachRatings(allData));
+      console.log('✅ State updated: products count =', ratedEnabled.length);
     } catch (error) {
-      console.error(error);
+      console.error('❌ fetchData error:', error);
       toast.error('Failed to load products');
     } finally {
       setLoading(false);
@@ -179,59 +226,74 @@ export default function StoreProductsPage() {
     if (storeId) fetchData();
   }, [fetchData, storeId]);
 
-  // Toggle product enable/disable for this store (used in Manage tab)
-  const toggleProductForStore = async (productId, currentEnabled) => {
+  // ─── Toggle product (enable/disable) ───
+  const toggleProduct = async (productId, currentEnabled) => {
+    if (isSubmitting.current) return;
+    isSubmitting.current = true;
+
     const newEnabled = !currentEnabled;
+    console.log(`🔄 Toggling product ${productId} from ${currentEnabled} to ${newEnabled}`);
     setUpdating(prev => ({ ...prev, [productId]: true }));
+
     try {
-      const url = `${SERVERURL}/store/product-access/${productId}/${storeId}`;
-      const res = await fetch(url, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: newEnabled })
-      });
-      const data = await res.json();
-      if (data.success) {
+      const response = await updateStoreProductAccess(productId, storeId, newEnabled);
+      console.log('📤 Toggle response:', response);
+      if (response.success) {
         toast.success(`Product ${newEnabled ? 'enabled' : 'disabled'} for this store`);
+        console.log('✅ Toggle succeeded, calling fetchData...');
         await fetchData();
+        console.log('✅ fetchData completed');
       } else {
-        toast.error(data.message || 'Failed to update');
+        toast.error(response.message || 'Failed to update');
       }
     } catch (error) {
-      console.error(error);
+      console.error('❌ Error toggling product:', error);
       toast.error('Server error');
     } finally {
       setUpdating(prev => ({ ...prev, [productId]: false }));
+      isSubmitting.current = false;
     }
   };
 
-  // Disable product for this store (delete button)
+  // ─── Delete (PERMANENTLY remove access record) ───
   const handleDelete = async (id) => {
-    if (!window.confirm('Disable this product for your store? It will no longer appear in your dashboard.')) return;
+    if (!window.confirm('Remove this product permanently from your store?')) return;
+    if (isSubmitting.current) return;
+    isSubmitting.current = true;
+
     setUpdating(prev => ({ ...prev, [id]: true }));
     try {
-      const url = `${SERVERURL}/store/product-access/${id}/${storeId}`;
-      const res = await fetch(url, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: false })
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success('Product disabled for your store');
+      // ✅ Call the DELETE endpoint to remove the access record entirely
+      const response = await deleteStoreProductAccess(id, storeId);
+      if (response.success) {
+        toast.success('Product permanently removed from your store');
         await fetchData();
       } else {
-        toast.error(data.message || 'Failed to disable product');
+        toast.error(response.message || 'Failed to remove product');
       }
     } catch (error) {
       console.error(error);
       toast.error('Server error');
     } finally {
       setUpdating(prev => ({ ...prev, [id]: false }));
+      isSubmitting.current = false;
     }
   };
 
-  // Filter & sort for the main product list (enabled products)
+  // ─── View / Edit ───
+  const handleView = (product) => {
+    setSelectedProduct(product);
+    setShowModal(true);
+  };
+  const closeModal = () => {
+    setShowModal(false);
+    setSelectedProduct(null);
+  };
+  const handleEdit = (id) => {
+    router.push(`/All-store-management/Store-Product/Store-Product-Edit/${id}`);
+  };
+
+  // ─── Filter & sort ───
   const filteredAndSortedProducts = useMemo(() => {
     let result = [...products];
     if (debouncedSearchTerm) {
@@ -274,19 +336,6 @@ export default function StoreProductsPage() {
     return pages;
   }, [currentPage, totalPages]);
 
-  // Handlers
-  const handleView = (product) => {
-    setSelectedProduct(product);
-    setShowModal(true);
-  };
-  const closeModal = () => {
-    setShowModal(false);
-    setSelectedProduct(null);
-  };
-  const handleEdit = (id) => {
-    router.push(`/All-store-management/Store-Product/Store-Product-Edit/${id}`);
-  };
-
   const resetFilters = () => {
     setSearchTerm('');
     setFilterOption('');
@@ -316,239 +365,142 @@ export default function StoreProductsPage() {
       <Toaster position="top-right" />
 
       <div className="header-actions">
-        <h4 className="page-title">Store Products</h4>
-        <div className="d-flex gap-2">
-          <button
-            className={`btn ${!showManagement ? 'btn-primary' : 'btn-outline-secondary'}`}
-            onClick={() => setShowManagement(false)}
-          >
-            My Products
-          </button>
-          <button
-            className={`btn ${showManagement ? 'btn-primary' : 'btn-outline-secondary'}`}
-            onClick={() => setShowManagement(true)}
-          >
-            Manage Products
-          </button>
+        <h4 className="page-title">My Store Products</h4>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="filter-bar">
+        <div className="row g-2 align-items-end">
+          <div className="col-md-4">
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Search my products..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+            />
+          </div>
+          <div className="col-md-3">
+            <select className="form-select" value={filterOption} onChange={(e) => setFilterOption(e.target.value)}>
+              <option value="">All Products</option>
+              <option value="published">Published Only</option>
+              <option value="featured">Featured</option>
+              <option value="todayDeal">Today's Deal</option>
+              <option value="discount">Has Discount</option>
+            </select>
+          </div>
+          <div className="col-md-3">
+            <select className="form-select" value={sortOption} onChange={(e) => setSortOption(e.target.value)}>
+              <option value="">Sort by</option>
+              <option value="price-asc">Price (Low to High)</option>
+              <option value="price-desc">Price (High to Low)</option>
+              <option value="rating-desc">Highest Rated</option>
+              <option value="name-asc">Name (A-Z)</option>
+            </select>
+          </div>
+          <div className="col-md-2">
+            <button className="btn btn-outline-secondary w-100 no-hover-btn" onClick={resetFilters}>Reset</button>
+          </div>
         </div>
       </div>
 
-      {!showManagement ? (
-        // MY PRODUCTS (enabled products)
-        <>
-          <div className="filter-bar">
-            <div className="row g-2 align-items-end">
-              <div className="col-md-4">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Search my products..."
-                  value={searchTerm}
-                  onChange={handleSearchChange}
-                />
-              </div>
-              <div className="col-md-3">
-                <select className="form-select" value={filterOption} onChange={(e) => setFilterOption(e.target.value)}>
-                  <option value="">All Products</option>
-                  <option value="published">Published Only</option>
-                  <option value="featured">Featured</option>
-                  <option value="todayDeal">Today's Deal</option>
-                  <option value="discount">Has Discount</option>
-                </select>
-              </div>
-              <div className="col-md-3">
-                <select className="form-select" value={sortOption} onChange={(e) => setSortOption(e.target.value)}>
-                  <option value="">Sort by</option>
-                  <option value="price-asc">Price (Low to High)</option>
-                  <option value="price-desc">Price (High to Low)</option>
-                  <option value="rating-desc">Highest Rated</option>
-                  <option value="name-asc">Name (A-Z)</option>
-                </select>
-              </div>
-              <div className="col-md-2">
-                <button className="btn btn-outline-secondary w-100" onClick={resetFilters}>Reset</button>
-              </div>
-            </div>
-          </div>
-
-          <div className="table-responsive">
-            {loading ? (
-              <table className="med-table">
-                <thead>
+      {/* Table */}
+      <div className="table-responsive">
+        {loading ? (
+          <table className="med-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Brand</th>
+                <th>Category</th>
+                <th>Rating</th>
+                <th>Price (₹)</th>
+                <th>Discount</th>
+                <th>Actions</th>
+                <th>Enable / Disable</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array(itemsPerPage).fill(null).map((_, i) => <SkeletonRow key={i} />)}
+            </tbody>
+          </table>
+        ) : (
+          <>
+            <table className="med-table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Brand</th>
+                  <th>Category</th>
+                  <th>Rating</th>
+                  <th>Price (₹)</th>
+                  <th>Discount</th>
+                  <th>Actions</th>
+                  <th>Enable / Disable</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedProducts.map(product => (
+                  <ProductRow
+                    key={product._id}
+                    product={product}
+                    onToggle={toggleProduct}
+                    onView={handleView}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    isEnabled={product.enabled ?? true}
+                    updating={updating[product._id]}
+                    getImageUrl={getImageUrl}
+                  />
+                ))}
+                {paginatedProducts.length === 0 && (
                   <tr>
-                    <th>Product</th>
-                    <th>Brand</th>
-                    <th>Category</th>
-                    <th>Rating</th>
-                    <th>Price (₹)</th>
-                    <th>Discount</th>
-                    <th>Actions</th>
+                    <td colSpan={8} className="text-center py-4">
+                      No products are enabled for your store. Enable products from the "All Products" page.
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {Array(itemsPerPage).fill(null).map((_, i) => <SkeletonRow key={i} />)}
-                </tbody>
-              </table>
-            ) : (
-              <>
-                <table className="med-table">
-                  <thead>
-                    <tr>
-                      <th>Product</th>
-                      <th>Brand</th>
-                      <th>Category</th>
-                      <th>Rating</th>
-                      <th>Price (₹)</th>
-                      <th>Discount</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedProducts.map(product => (
-                      <ProductRow
-                        key={product._id}
-                        product={product}
-                        onView={handleView}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                        getImageUrl={getImageUrl}
-                      />
-                    ))}
-                    {paginatedProducts.length === 0 && (
-                      <tr><td colSpan={7} className="text-center py-4">No products are enabled for your store. Use "Manage Products" to enable products.您知道吗?</td></tr>
-                    )}
-                  </tbody>
-                </table>
-                {filteredAndSortedProducts.length > 0 && (
-                  <div className="pagination-controls">
-                    <div className="pagination-info">
-                      Showing {startItem} to {endItem} of {filteredAndSortedProducts.length} products
-                    </div>
-                    <div className="pagination-actions">
-                      <select className="form-select per-page-select" value={itemsPerPage} onChange={handleItemsPerPageChange}>
-                        <option value={10}>10 per page</option>
-                        <option value={25}>25 per page</option>
-                        <option value={50}>50 per page</option>
-                        <option value={100}>100 per page</option>
-                      </select>
-                      <nav>
-                        <ul className="pagination mb-0">
-                          <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                            <button className="page-link" onClick={prevPage} disabled={currentPage === 1}>
-                              <i className="bi bi-chevron-left"></i>
-                            </button>
-                          </li>
-                          {pageNumbers.map(p => (
-                            <li key={p} className={`page-item ${currentPage === p ? 'active' : ''}`}>
-                              <button className="page-link" onClick={() => goToPage(p)}>{p}</button>
-                            </li>
-                          ))}
-                          <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-                            <button className="page-link" onClick={nextPage} disabled={currentPage === totalPages}>
-                              <i className="bi bi-chevron-right"></i>
-                            </button>
-                          </li>
-                        </ul>
-                      </nav>
-                    </div>
-                  </div>
                 )}
-              </>
-            )}
-          </div>
-        </>
-      ) : (
-        // MANAGE PRODUCTS (all master products with enable/disable toggle)
-        <>
-          <div className="filter-bar mt-3">
-            <div className="row g-2 align-items-end">
-              <div className="col-md-6">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Search in all products..."
-                  value={searchTerm}
-                  onChange={handleSearchChange}
-                />
+              </tbody>
+            </table>
+            {filteredAndSortedProducts.length > 0 && (
+              <div className="pagination-controls">
+                <div className="pagination-info">
+                  Showing {startItem} to {endItem} of {filteredAndSortedProducts.length} products
+                </div>
+                <div className="pagination-actions">
+                  <select className="form-select per-page-select" value={itemsPerPage} onChange={handleItemsPerPageChange}>
+                    <option value={10}>10 per page</option>
+                    <option value={25}>25 per page</option>
+                    <option value={50}>50 per page</option>
+                    <option value={100}>100 per page</option>
+                  </select>
+                  <nav>
+                    <ul className="pagination mb-0">
+                      <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                        <button className="page-link" onClick={prevPage} disabled={currentPage === 1}>
+                          <i className="bi bi-chevron-left"></i>
+                        </button>
+                      </li>
+                      {pageNumbers.map(p => (
+                        <li key={p} className={`page-item ${currentPage === p ? 'active' : ''}`}>
+                          <button className="page-link" onClick={() => goToPage(p)}>{p}</button>
+                        </li>
+                      ))}
+                      <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                        <button className="page-link" onClick={nextPage} disabled={currentPage === totalPages}>
+                          <i className="bi bi-chevron-right"></i>
+                        </button>
+                      </li>
+                    </ul>
+                  </nav>
+                </div>
               </div>
-              <div className="col-md-2">
-                <button className="btn btn-outline-secondary w-100" onClick={resetFilters}>Reset</button>
-              </div>
-            </div>
-          </div>
-
-          <div className="table-responsive mt-3">
-            {loading ? (
-              <div className="text-center py-4">Loading products...</div>
-            ) : (
-              <table className="med-table">
-                <thead>
-                  <tr>
-                    <th>Product</th>
-                    <th>Brand</th>
-                    <th>Category</th>
-                    <th>Price (₹)</th>
-                    <th>Enable for my store</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allMasterProducts
-                    .filter(p => {
-                      if (!debouncedSearchTerm) return true;
-                      const term = debouncedSearchTerm.toLowerCase();
-                      return p.productName?.toLowerCase().includes(term) || p.brand?.toLowerCase().includes(term);
-                    })
-                    .map(product => {
-                      const isEnabled = products.some(p => p._id === product._id);
-                      return (
-                        <tr key={product._id}>
-                          <td>
-                            <div className="d-flex align-items-center gap-2">
-                              {product.thumbnail && (
-                                <img
-                                  src={getImageUrl(product.thumbnail)}
-                                  alt={product.productName}
-                                  width="40"
-                                  height="40"
-                                  style={{ objectFit: 'cover', borderRadius: '8px' }}
-                                  onError={(e) => e.target.style.display = 'none'}
-                                />
-                              )}
-                              <div>
-                                <div className="fw-bold">{product.productName}</div>
-                                <small>{product.brand}</small>
-                              </div>
-                            </div>
-                           </td>
-                           <td>{product.brand}</td>
-                           <td>{product.mainCategory}</td>
-                           <td>₹{product.unitPrice}</td>
-                           <td>
-                            <label className="switch">
-                              <input
-                                type="checkbox"
-                                checked={isEnabled}
-                                disabled={updating[product._id]}
-                                onChange={() => toggleProductForStore(product._id, isEnabled)}
-                              />
-                              <span className="slider round"></span>
-                            </label>
-                            {updating[product._id] && <span className="ms-2 small">Updating...</span>}
-                           </td>
-                        </tr>
-                      );
-                    })}
-                  {allMasterProducts.length === 0 && (
-                    <tr><td colSpan="5" className="text-center py-4">No products found in master catalog.您知道吗?</td></tr>
-                  )}
-                </tbody>
-              </table>
             )}
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
 
-      {/* Product Details Modal (unchanged) */}
+      {/* Product Details Modal */}
       <AnimatePresence>
         {showModal && selectedProduct && (
           <>

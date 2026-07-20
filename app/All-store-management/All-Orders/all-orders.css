@@ -1,43 +1,42 @@
-/* all-orders.css */
+/* all-orders.css – uses CSS variables, dark mode ready */
 
-/* ---------- Card & Header ---------- */
+.orders-page-wrapper {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
 .card {
   border-radius: 18px !important;
   overflow: hidden !important;
 }
 .card-header {
-  background: #ffffff !important;
+  background: var(--bg-card) !important;
+  border-bottom: 1px solid var(--border-color) !important;
 }
 
-/* ---------- Filter Bar ---------- */
-.filter-bar {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  align-items: center !important;
-  gap: 8px !important;
-}
-.filter-bar > * {
-  flex: 0 0 auto !important;
-  display: inline-block !important;
-}
-.filter-bar .form-control,
-.filter-bar .form-select {
-  width: auto !important;
-  min-width: 140px !important;
-  border-radius: 10px !important;
-  border-color: #e0e0e0 !important;
-  font-size: 14px !important;
-}
-.filter-bar .form-control:focus,
-.filter-bar .form-select:focus {
-  border-color: #0d6efd !important;
-  box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15) !important;
-}
-.filter-bar .btn {
-  white-space: nowrap !important;
+/* ─── FIX: Order History heading visibility in dark mode ─── */
+.orders-page-wrapper .card-header h5,
+.orders-page-wrapper .card-header .fw-bold {
+  color: var(--text-primary) !important;
 }
 
-/* ---------- Table ---------- */
+/* ─── Empty state text visibility ─── */
+.empty-title {
+  color: var(--text-primary) !important;
+}
+
+.empty-subtitle {
+  color: var(--text-secondary) !important;
+}
+
+/* ─── Order date text visibility ─── */
+.order-date,
+small.text-muted {
+  color: var(--text-secondary) !important;
+}
+
+/* ─── Table ─── */
 .order-table-wrapper {
   display: block !important;
   width: 100% !important;
@@ -64,42 +63,27 @@
   display: table-cell !important;
   padding: 16px 18px !important;
   vertical-align: middle !important;
-  border-bottom: 1px solid #f2f2f2 !important;
+  border-bottom: 1px solid var(--border-color, #e2e8f0) !important;
   text-align: left !important;
   font-size: 14px !important;
-  color: #212529 !important;
+  color: var(--text-primary) !important;
 }
 .order-table-wrapper th {
-  background: #ffffff !important;
+  background: var(--bg-secondary, #f8fafc) !important;
   font-size: 13px !important;
   font-weight: 600 !important;
-  color: #555 !important;
-  border-bottom: 1px solid #ececec !important;
+  color: var(--text-secondary, #475569) !important;
+  border-bottom: 1px solid var(--border-color, #e2e8f0) !important;
   white-space: nowrap !important;
   position: sticky !important;
   top: 0 !important;
   z-index: 2 !important;
 }
 .order-table-wrapper tbody tr:hover {
-  background: #fafcff !important;
+  background: var(--bg-secondary, #f8fafc) !important;
 }
 
-/* ---- Order Code & Date styling ---- */
-.order-code {
-  font-weight: 600 !important;
-  font-family: 'SF Mono', 'Menlo', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace !important;
-  font-size: 14px !important;
-  letter-spacing: 0.2px !important;
-  color: #0a2b4e !important;
-}
-.order-date {
-  font-size: 12px !important;
-  color: #6c757d !important;
-  display: block !important;
-  margin-top: 2px !important;
-}
-
-/* ---------- Action Buttons ---------- */
+/* ─── Action Buttons ─── */
 .order-table-wrapper .btn.rounded-circle {
   width: 40px !important;
   height: 40px !important;
@@ -107,29 +91,38 @@
   align-items: center !important;
   justify-content: center !important;
   border: none !important;
-  background: #f8f9fa !important;
+  background: var(--bg-secondary, #f8f9fa) !important;
 }
 .order-table-wrapper .btn.rounded-circle:hover {
-  background: #e9ecef !important;
+  background: var(--border-color, #e9ecef) !important;
+}
+.order-table-wrapper .text-primary {
+  color: var(--accent, #0d6efd) !important;
+}
+.order-table-wrapper .text-secondary {
+  color: var(--text-secondary, #6c757d) !important;
+}
+.order-table-wrapper .text-danger {
+  color: #dc3545 !important;
 }
 
-/* ---------- Badges ---------- */
+/* ─── Badges ─── */
 .badge {
   font-size: 12px !important;
   font-weight: 500 !important;
 }
 
-/* ---------- Responsive ---------- */
+/* ─── Responsive ─── */
 @media (max-width: 768px) {
   .order-table-wrapper th,
   .order-table-wrapper td {
     padding: 12px 14px !important;
     font-size: 13px !important;
   }
-  .order-code {
-    font-size: 13px !important;
-  }
   .order-date {
     font-size: 11px !important;
   }
+}
+.empty-title {
+  color: var(--text-primary);
 }
