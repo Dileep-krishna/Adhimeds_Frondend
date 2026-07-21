@@ -683,6 +683,100 @@
         background .2s,
         color .2s !important;
 }
+
+/* ─── Search Bar (light) ─── */
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  margin: 0.5rem 1rem;
+  background: #f1f5f9;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.sidebar-search:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+.sidebar-search-icon {
+  color: #64748b;
+  font-size: 1rem;
+}
+.sidebar-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  color: #0f172a;
+  font-size: 0.9rem;
+  padding: 0.2rem 0;
+}
+.sidebar-search-input::placeholder {
+  color: #94a3b8;
+}
+.sidebar-search-clear {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 50%;
+  transition: background 0.15s;
+}
+.sidebar-search-clear:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* ─── No Results (light) ─── */
+.sidebar-no-results {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+.sidebar-no-results i {
+  font-size: 1.2rem;
+}
+
+/* ============================================================
+   DARK MODE SUPPORT (adds .dark class on body or wrapper)
+   ============================================================ */
+.dark .sidebar-search {
+  background: #1e293b;
+  border-color: #334155;
+}
+.dark .sidebar-search:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+.dark .sidebar-search-icon {
+  color: #94a3b8;
+}
+.dark .sidebar-search-input {
+  color: #f1f5f9;
+}
+.dark .sidebar-search-input::placeholder {
+  color: #64748b;
+}
+.dark .sidebar-search-clear {
+  color: #94a3b8;
+}
+.dark .sidebar-search-clear:hover {
+  background: #334155;
+  color: #f1f5f9;
+}
+
+.dark .sidebar-no-results {
+  color: #94a3b8;
+}
+.dark .sidebar-no-results i {
+  color: #94a3b8;
+}
 /* ==========================================
    End
 ========================================== */

@@ -421,3 +421,16 @@
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ============================================================
+   FIX: Expand content when sidebar is hidden
+   ============================================================ */
+
+/* When sidebar is closed, remove max-width and center margin */
+.store-sidebar.store-closed ~ .store-main-wrapper .store-products-container {
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 2rem !important;
+  padding-right: 2rem !important;
+}

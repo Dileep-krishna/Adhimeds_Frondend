@@ -472,3 +472,16 @@
   .db-modal { max-width: 100%; margin: 0.5rem; }
   .db-boy-stats { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ============================================================
+   FIX: Expand content when delivery sidebar is hidden
+   ============================================================ */
+
+/* When delivery sidebar is closed, remove max-width and center margin */
+.delivery-sidebar.delivery-closed ~ .delivery-main-content .db-container {
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 2rem !important;
+  padding-right: 2rem !important;
+}

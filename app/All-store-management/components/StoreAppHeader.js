@@ -21,8 +21,8 @@ const StoreAppHeader = ({ isSidebarOpen, onToggleSidebar }) => {
   };
 
   return (
-    <header className="sticky-top bg-white border-bottom shadow-sm store-header-wrapper">
-      <div className="container-fluid px-3 px-lg-4">
+    <header className="sticky-top bg-white  border-bottom shadow-sm store-header-wrapper">
+      <div className="container-fluid  px-3 px-lg-4">
         <div className="d-flex align-items-center justify-content-between py-2 py-lg-3">
           <div className="d-flex align-items-center gap-2">
             <button

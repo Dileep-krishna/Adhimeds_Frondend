@@ -1,26 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import OrderNotificationBell from "./OrderNotificationBell";
 import "./StoreSidebar.css";
 
-export default function StoreAppSidebar() {
+export default function StoreAppSidebar({ isOpen, onToggle }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentTab = searchParams.get("tab") || "Requests";
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [productsOpen, setProductsOpen] = useState(false);
   const [productsExpandOpen, setProductsExpandOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
-  const [storeName, setStoreName] = useState("STORE HUB"); // ✅ dynamic store name
+  const [storeName, setStoreName] = useState("STORE HUB");
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // Read store name from storage on mount
   useEffect(() => {
     const name =
       localStorage.getItem("storeName") ||
@@ -29,7 +28,7 @@ export default function StoreAppSidebar() {
     setStoreName(name);
   }, []);
 
-  // Auto‑open products submenu
+  // Auto‑open dropdowns based on path
   useEffect(() => {
     if (
       pathname.startsWith("/All-store-management/All-Products") ||
@@ -40,7 +39,6 @@ export default function StoreAppSidebar() {
     }
   }, [pathname]);
 
-  // Auto‑open orders dropdown
   useEffect(() => {
     if (
       pathname.startsWith("/All-store-management/Orders") ||
@@ -56,37 +54,209 @@ export default function StoreAppSidebar() {
     const checkMobile = () => {
       const mobile = window.innerWidth <= 768;
       setIsMobile(mobile);
-      setSidebarOpen(!mobile);
     };
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
+  // ─── Define menu structure ───
+  const menuItems = useMemo(
+    () => [
+      {
+        type: "link",
+        label: "Dashboard",
+        href: "/All-store-management/store-dashboard",
+        icon: "bi-speedometer2",
+      },
+      {
+        type: "dropdown",
+        label: "Products",
+        icon: "bi-box",
+        isOpen: productsOpen,
+        toggle: () => setProductsOpen((prev) => !prev),
+        children: [
+          {
+            type: "nested",
+            label: "Products",
+            isOpen: productsExpandOpen,
+            toggle: () => setProductsExpandOpen((prev) => !prev),
+            children: [
+              {
+                type: "link",
+                label: "All‑Products",
+                href: "/All-store-management/All-Products",
+                icon: "bi-box-seam",
+              },
+              {
+                type: "link",
+                label: "Store Products",
+                href: "/All-store-management/Store-Product",
+                icon: "bi-shop",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        type: "dropdown",
+        label: "Orders",
+        icon: "bi-cart-check",
+        isOpen: ordersOpen,
+        toggle: () => setOrdersOpen((prev) => !prev),
+        children: [
+          {
+            type: "link",
+            label: "All Orders",
+            href: "/All-store-management/All-Orders",
+            icon: "bi-circle",
+          },
+        ],
+        // extra: notification bell inside the header
+        renderExtra: () => (
+          <OrderNotificationBell
+            onClick={() => router.push("/All-store-management/Order-Requests")}
+            style={{ marginRight: "4px" }}
+          />
+        ),
+      },
+    ],
+    [productsOpen, productsExpandOpen, ordersOpen]
+  );
+
+  // ─── Search filter ───
+  const filterItems = (items, term) => {
+    if (!term.trim()) return items;
+    const lower = term.toLowerCase();
+    return items
+      .map((item) => {
+        if (item.type === "link") {
+          return item.label.toLowerCase().includes(lower) ||
+            (item.href && item.href.toLowerCase().includes(lower))
+            ? item
+            : null;
+        }
+        if (item.type === "dropdown" || item.type === "nested") {
+          const filteredChildren = item.children
+            ? filterItems(item.children, term)
+            : [];
+          // keep the parent if any child matches OR label matches
+          const labelMatches = item.label.toLowerCase().includes(lower);
+          if (filteredChildren.length > 0 || labelMatches) {
+            return {
+              ...item,
+              children: filteredChildren,
+            };
+          }
+          return null;
+        }
+        return null;
+      })
+      .filter(Boolean);
+  };
+
+  const filteredItems = filterItems(menuItems, searchTerm);
+
+  // Helper to render nested items recursively
+  const renderNavItems = (items) => {
+    return items.map((item, idx) => {
+      if (item.type === "link") {
+        const isActive = pathname === item.href;
+        return (
+          <Link
+            key={idx}
+            href={item.href}
+            className={`store-nav-item ${isActive ? "active" : ""}`}
+            onClick={handleNav}
+          >
+            <i className={`bi ${item.icon}`}></i>
+            <span>{item.label}</span>
+          </Link>
+        );
+      }
+
+      if (item.type === "dropdown") {
+        const isOpen = item.isOpen;
+        const toggle = item.toggle;
+        return (
+          <div key={idx} className="store-dropdown-parent">
+            <div className="store-dropdown-header-wrapper">
+              <button className="store-dropdown-main-link" onClick={toggle}>
+                <i className={`bi ${item.icon}`}></i>
+                <span>{item.label}</span>
+              </button>
+              <div style={{ display: "flex", alignItems: "center" }}>
+                {item.renderExtra && item.renderExtra()}
+                <button className="store-chevron-toggle" onClick={toggle}>
+                  <i className={`bi bi-chevron-${isOpen ? "up" : "down"}`}></i>
+                </button>
+              </div>
+            </div>
+
+            <AnimatePresence>
+              {isOpen && item.children && item.children.length > 0 && (
+                <motion.div
+                  className="store-dropdown-menu"
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                  variants={dropdownVariants}
+                  style={{ overflow: "hidden", display: "block" }}
+                >
+                  {renderNavItems(item.children)}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      }
+
+      if (item.type === "nested") {
+        const isOpen = item.isOpen;
+        const toggle = item.toggle;
+        return (
+          <div key={idx} className="store-nested-dropdown">
+            <div
+              className="store-dropdown-item"
+              onClick={toggle}
+              style={{ cursor: "pointer", justifyContent: "space-between" }}
+            >
+              <span>{item.label}</span>
+              <i className={`bi bi-chevron-${isOpen ? "up" : "down"}`}></i>
+            </div>
+            <AnimatePresence>
+              {isOpen && item.children && item.children.length > 0 && (
+                <motion.div
+                  className="store-nested-menu"
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                  variants={dropdownVariants}
+                  style={{ overflow: "hidden", display: "block" }}
+                >
+                  {renderNavItems(item.children)}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      }
+      return null;
+    });
+  };
+
   const toggleProducts = () => setProductsOpen((prev) => !prev);
   const toggleProductsExpand = () => setProductsExpandOpen((prev) => !prev);
   const toggleOrders = () => setOrdersOpen((prev) => !prev);
+
   const handleNav = () => {
-    if (isMobile) setSidebarOpen(false);
+    if (isMobile && onToggle) {
+      onToggle();
+    }
   };
+
   const handleLogout = () => {
     window.location.href = "/login";
-  };
-
-  const orderTabs = [
-    { label: "All Orders", href: "/All-store-management/All-Orders" },
-
-  ];
-
-  const isTabActive = (tab) => {
-    if (tab.label === "All Orders") {
-      return pathname === "/All-store-management/All-Orders";
-    }
-    if (tab.label === "Requests") {
-      return pathname === "/All-store-management/Order-Requests";
-    }
-    return currentTab === tab.label;
   };
 
   const dropdownVariants = {
@@ -96,141 +266,48 @@ export default function StoreAppSidebar() {
 
   return (
     <>
-      <button className="store-mobile-menu-btn" onClick={toggleSidebar}>
-        <i className={`bi ${sidebarOpen ? "bi-x-lg" : "bi-list"}`}></i>
+      <button className="store-mobile-menu-btn" onClick={onToggle}>
+        <i className={`bi ${isOpen ? "bi-x-lg" : "bi-list"}`}></i>
       </button>
 
-      <aside className={`store-sidebar ${sidebarOpen ? "" : "store-closed"}`}>
+      <aside className={`store-sidebar ${isOpen ? "" : "store-closed"}`}>
         <div className="store-sidebar-header">
           <div className="store-logo-circle">
             <img src="/images/logo.webp" alt="Logo" className="store-logo-img" />
           </div>
-          <h2 className="store-logo-text">{storeName}</h2> {/* ✅ dynamic store name */}
+          <h2 className="store-logo-text">{storeName}</h2>
+        </div>
+
+        {/* Search Bar */}
+        <div className="store-sidebar-search">
+          <i className="bi bi-search"></i>
+          <input
+            type="text"
+            className="store-sidebar-search-input"
+            placeholder="Search..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          {searchTerm && (
+            <button
+              className="store-search-clear"
+              onClick={() => setSearchTerm("")}
+              aria-label="Clear search"
+            >
+              <i className="bi bi-x"></i>
+            </button>
+          )}
         </div>
 
         <nav className="store-sidebar-nav">
-          {/* Dashboard */}
-          <Link
-            href="/All-store-management/store-dashboard"
-            className={`store-nav-item ${pathname === "/All-store-management/store-dashboard" ? "active" : ""}`}
-            onClick={handleNav}
-          >
-            <i className="bi bi-speedometer2"></i>
-            <span>Dashboard</span>
-          </Link>
-
-          {/* Products Dropdown */}
-          <div className="store-dropdown-parent">
-            <div className="store-dropdown-header-wrapper">
-              <button className="store-dropdown-main-link" onClick={toggleProducts}>
-                <i className="bi bi-box"></i>
-                <span>Products</span>
-              </button>
-              <button className="store-chevron-toggle" onClick={toggleProducts}>
-                <i className={`bi bi-chevron-${productsOpen ? "up" : "down"}`}></i>
-              </button>
+          {filteredItems.length > 0 ? (
+            renderNavItems(filteredItems)
+          ) : (
+            <div className="store-no-search-results">
+              <i className="bi bi-search"></i>
+              <span>No results found</span>
             </div>
-
-            <AnimatePresence>
-              {productsOpen && (
-                <motion.div
-                  className="store-dropdown-menu"
-                  initial="hidden"
-                  animate="visible"
-                  exit="hidden"
-                  variants={dropdownVariants}
-                  style={{ overflow: "hidden", display: "block" }}
-                >
-                  <div className="store-nested-dropdown">
-                    <div
-                      className="store-dropdown-item"
-                      onClick={toggleProductsExpand}
-                      style={{ cursor: "pointer", justifyContent: "space-between" }}
-                    >
-                      <span>Products</span>
-                      <i className={`bi bi-chevron-${productsExpandOpen ? "up" : "down"}`}></i>
-                    </div>
-                    <AnimatePresence>
-                      {productsExpandOpen && (
-                        <motion.div
-                          className="store-nested-menu"
-                          initial="hidden"
-                          animate="visible"
-                          exit="hidden"
-                          variants={dropdownVariants}
-                          style={{ overflow: "hidden", display: "block" }}
-                        >
-                          <Link
-                            href="/All-store-management/All-Products"
-                            className="store-dropdown-sub-item"
-                            onClick={handleNav}
-                          >
-                            <i className="bi bi-box-seam"></i> All‑Products
-                          </Link>
-                          <Link
-                            href="/All-store-management/Store-Product"
-                            className="store-dropdown-sub-item"
-                            onClick={handleNav}
-                          >
-                            <i className="bi bi-shop"></i> Store Products
-                          </Link>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Orders Dropdown */}
-          <div className="store-dropdown-parent">
-            <div className="store-dropdown-header-wrapper">
-              <button
-                className="store-dropdown-main-link"
-                onClick={toggleOrders}
-                style={{ position: "relative" }}
-              >
-                <i className="bi bi-cart-check"></i>
-                <span>Orders</span>
-              </button>
-              <div style={{ display: "flex", alignItems: "center" }}>
-                <OrderNotificationBell
-                  onClick={() => {
-                    router.push("/All-store-management/Order-Requests");
-                  }}
-                  style={{ marginRight: "4px" }}
-                />
-                <button className="store-chevron-toggle" onClick={toggleOrders}>
-                  <i className={`bi bi-chevron-${ordersOpen ? "up" : "down"}`}></i>
-                </button>
-              </div>
-            </div>
-
-            <AnimatePresence>
-              {ordersOpen && (
-                <motion.div
-                  className="store-dropdown-menu"
-                  initial="hidden"
-                  animate="visible"
-                  exit="hidden"
-                  variants={dropdownVariants}
-                  style={{ overflow: "hidden", display: "block" }}
-                >
-                  {orderTabs.map((tab) => (
-                    <Link
-                      key={tab.label}
-                      href={tab.href}
-                      className={`store-dropdown-sub-item ${isTabActive(tab) ? "active" : ""}`}
-                      onClick={handleNav}
-                    >
-                      <i className="bi bi-circle"></i> {tab.label}
-                    </Link>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          )}
         </nav>
 
         {/* Logout Button */}

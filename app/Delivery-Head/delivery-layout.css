@@ -27,6 +27,11 @@
     margin-left: 280px; /* sidebar width */
     transition: margin-left 0.3s ease;
   }
+
+  /* ✅ FIX: When sidebar is closed, remove the margin so content expands */
+  .delivery-sidebar.delivery-closed ~ .delivery-main-content {
+    margin-left: 0 !important;
+  }
 }
 
 /* Mobile: no margin */

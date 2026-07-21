@@ -220,10 +220,9 @@ const SidebarContent = memo(() => {
   const pathname = usePathname();
   const { isExpanded, isMobileOpen, isHovered } = useSidebar();
 
-  // const [collapsed, setCollapsed] = useState(false);
-  // const collapsed = shouldCollapse;
   const [expandedKeys, setExpandedKeys] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
+  const [searchTerm, setSearchTerm] = useState(""); // 👈 search state
 
   // Detect mobile
   useEffect(() => {
@@ -235,19 +234,14 @@ const SidebarContent = memo(() => {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-const shouldCollapse = useMemo(() => {
-  if (isMobile) return false;
-  if (isMobileOpen) return false;
-  if (isHovered) return false;
+  const shouldCollapse = useMemo(() => {
+    if (isMobile) return false;
+    if (isMobileOpen) return false;
+    if (isHovered) return false;
+    return !isExpanded;
+  }, [isExpanded, isMobileOpen, isHovered, isMobile]);
 
-  return !isExpanded;
-}, [isExpanded, isMobileOpen, isHovered, isMobile]);
-
-const collapsed = shouldCollapse;
-
-  // useEffect(() => {
-  //   setCollapsed(shouldCollapse);
-  // }, [shouldCollapse]);
+  const collapsed = shouldCollapse;
 
   const isActive = useCallback(
     (path) => {
@@ -276,6 +270,35 @@ const collapsed = shouldCollapse;
     });
   }, []);
 
+  // ─── Search filter function ───
+  const filterItems = useCallback((items, term) => {
+    if (!term.trim()) return items;
+    const lower = term.toLowerCase();
+    return items.reduce((acc, item) => {
+      const nameMatch = item.name?.toLowerCase().includes(lower) || false;
+      // Check path match if exists
+      const pathMatch = item.path?.toLowerCase().includes(lower) || false;
+      let filteredChildren = null;
+      if (item.subItems) {
+        filteredChildren = filterItems(item.subItems, term);
+      }
+      if (nameMatch || pathMatch || (filteredChildren && filteredChildren.length > 0)) {
+        const newItem = { ...item };
+        if (item.subItems) {
+          // If name or path matches, keep all children for context; otherwise keep only filtered children
+          newItem.subItems = (nameMatch || pathMatch) ? item.subItems : filteredChildren;
+        }
+        acc.push(newItem);
+      }
+      return acc;
+    }, []);
+  }, []);
+
+  const filteredNavItems = useMemo(() => {
+    return filterItems(navItems, searchTerm);
+  }, [filterItems, searchTerm]);
+
+  // ─── Render helpers ───
   const renderMenuItems = useCallback(
     (items, parentKey = "") => {
       return items.map((item) => {
@@ -296,14 +319,14 @@ const collapsed = shouldCollapse;
         if (item.subItems) {
           const isOpen = expandedKeys.includes(key);
           return (
-        <SubMenu
-  key={key}
-  label={item.name}
-  icon={item.icon}
-  open={isOpen}
-  renderExpandIcon={() => (collapsed ? null : undefined)}
-  onOpenChange={(isOpenNow) => handleSubMenuToggle(key, isOpenNow)}
->
+            <SubMenu
+              key={key}
+              label={item.name}
+              icon={item.icon}
+              open={isOpen}
+              renderExpandIcon={() => (collapsed ? null : undefined)}
+              onOpenChange={(isOpenNow) => handleSubMenuToggle(key, isOpenNow)}
+            >
               {renderMenuItems(item.subItems, key)}
             </SubMenu>
           );
@@ -311,7 +334,7 @@ const collapsed = shouldCollapse;
         return null;
       });
     },
-    [expandedKeys, handleSubMenuToggle, isActive]
+    [expandedKeys, handleSubMenuToggle, isActive, collapsed]
   );
 
   // Auto-open active branch
@@ -376,35 +399,35 @@ const collapsed = shouldCollapse;
   };
 
   return (
-<motion.div
-  className={`sidebar-wrapper ${isMobile ? "mobile" : ""}`}
-  animate={
-    isMobile
-      ? { x: mobileX }
-      : {
-          width: collapsed ? 90 : 280,
-        }
-  }
-  transition={{
-    duration: 0.3,
-    ease: "easeInOut",
-  }}
->
-<Sidebar
-  width="100%"
-  collapsedWidth="90px"
-  collapsed={collapsed}
-  className={isMobileOpen ? "mobile-open" : ""}
-  rootStyles={{
-    border: "none",
-    display: "flex",
-    flexDirection: "column",
-    height: "100%",
-    width: "100%",
-    background: "transparent",
-  }}
-  menuItemStyles={menuItemStyles}
->
+    <motion.div
+      className={`sidebar-wrapper ${isMobile ? "mobile" : ""}`}
+      animate={
+        isMobile
+          ? { x: mobileX }
+          : {
+              width: collapsed ? 90 : 280,
+            }
+      }
+      transition={{
+        duration: 0.3,
+        ease: "easeInOut",
+      }}
+    >
+      <Sidebar
+        width="100%"
+        collapsedWidth="90px"
+        collapsed={collapsed}
+        className={isMobileOpen ? "mobile-open" : ""}
+        rootStyles={{
+          border: "none",
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          width: "100%",
+          background: "transparent",
+        }}
+        menuItemStyles={menuItemStyles}
+      >
         {/* Logo Section */}
         <div className="sidebar-logo">
           <Link href="/" className="sidebar-logo-link">
@@ -424,17 +447,46 @@ const collapsed = shouldCollapse;
           </Link>
         </div>
 
+        {/* ─── Search Bar ─── */}
+        {(!collapsed || isMobile) && (
+          <div className="sidebar-search">
+            <i className="bi bi-search sidebar-search-icon"></i>
+            <input
+              type="text"
+              className="sidebar-search-input"
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            {searchTerm && (
+              <button
+                className="sidebar-search-clear"
+                onClick={() => setSearchTerm("")}
+                aria-label="Clear search"
+              >
+                <i className="bi bi-x"></i>
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Menu Area */}
         <div className="sidebar-menu-area">
-          <Menu>{renderMenuItems(navItems)}</Menu>
+          <Menu>
+            {filteredNavItems.length > 0 ? (
+              renderMenuItems(filteredNavItems)
+            ) : (
+              <div className="sidebar-no-results">
+                <i className="bi bi-search"></i>
+                <span>No results found</span>
+              </div>
+            )}
+          </Menu>
         </div>
 
         {/* Logout Button */}
         <div className="sidebar-logout">
-          <button
-            onClick={handleLogout}
-            className="sidebar-logout-btn"
-          >
+          <button onClick={handleLogout} className="sidebar-logout-btn">
             <i className="bi bi-box-arrow-right sidebar-logout-icon"></i>
             {(!collapsed || isMobile) && <span>Logout</span>}
           </button>

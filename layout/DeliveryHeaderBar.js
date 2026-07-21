@@ -25,7 +25,7 @@ const DeliveryHeaderBar = ({ onToggleSidebar }) => {
 
   return (
     <header className="delivery-header-wrapper">
-      <div className="container-fluid px-3 px-lg-4">
+      <div className="container-fluid py-3 px-3 px-lg-4">
         <div className="delivery-header-row">
           {/* ─── Left section ─── */}
           <div className="delivery-header-left">
