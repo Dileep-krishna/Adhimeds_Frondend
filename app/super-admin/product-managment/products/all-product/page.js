@@ -1,160 +1,43 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef, memo, useTransition } from 'react';
+import { useState, useMemo, useCallback, useRef, useTransition, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './all-products.css';
-import { deleteProductAPI, getProductsAPI, updateProductAPI } from '../../../../services/productService';
-import { getAllCustomReviewsAPI } from '../../../../services/customReviewService';
+import { useDebounce } from '../components/hooks/useDebounce';
+import { usePagination } from '../components/hooks/usePagination';
+import { useProducts } from '../components/hooks/useProducts';
+import { ProductRow } from '../../products/ProductRow';
+import { SkeletonRow } from '../../products/SkeletonRow';
+import { deleteProductAPI, updateProductAPI } from '../../../../services/productService';
 import SERVERURL from '../../../../services/serverURL';
 
-// Custom debounce hook (JavaScript version)
-function useDebounce(value, delay) {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-  useEffect(() => {
-    const handler = setTimeout(() => setDebouncedValue(value), delay);
-    return () => clearTimeout(handler);
-  }, [value, delay]);
-  return debouncedValue;
-}
-
-// Simple pagination hook to manage page state
-function usePagination(totalItems, itemsPerPage = 10) {
-  const [currentPage, setCurrentPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-  
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(1);
-    }
-  }, [totalPages, currentPage]);
-  
-  const goToPage = (page) => {
-    const pageNumber = Math.max(1, Math.min(page, totalPages));
-    setCurrentPage(pageNumber);
-  };
-  
-  const nextPage = () => goToPage(currentPage + 1);
-  const prevPage = () => goToPage(currentPage - 1);
-  
-  return { currentPage, totalPages, goToPage, nextPage, prevPage, setCurrentPage };
-}
-
-// Memoized product row component
-const ProductRow = memo(({ product, onTogglePublished, onToggleFeatured, onToggleTodayDeal, onEdit, onDelete, onInfo, getImageUrl }) => {
-  const thumbnailUrl = getImageUrl(product.thumbnail);
-  
-  return (
-    <tr key={product._id}>
-      <td>
-        <div className="d-flex align-items-center gap-2">
-          {thumbnailUrl && (
-            <img
-              src={thumbnailUrl}
-              alt={product.productName}
-              width="40"
-              height="40"
-              loading="lazy"
-              decoding="async"
-              style={{ objectFit: 'cover', borderRadius: '8px' }}
-              onError={(e) => { e.target.style.display = 'none'; }}
-            />
-          )}
-          <div>
-            <div className="fw-bold">{product.productName}</div>
-            <small>{product.brand}</small>
-          </div>
-        </div>
-      </td>
-      <td>{product.brand}</td>
-      <td>{product.mainCategory}</td>
-      <td>
-        {product.avgRating > 0 ? (
-          <div>
-            <div className="stars">{'⭐'.repeat(Math.floor(product.avgRating))}</div>
-            <small>{product.avgRating}/5 ({product.reviewCount} reviews)</small>
-          </div>
-        ) : (
-          '—'
-        )}
-      </td>
-      <td>₹{product.unitPrice}</td>
-      <td>{product.discount > 0 ? `${product.discount}%` : '—'}</td>
-      <td>
-        <button className="btn-icon info" onClick={() => onInfo(product._id)} title="View Details">
-          <i className="bi bi-info-circle"></i>
-        </button>
-      </td>
-      <td>
-        <label className="switch">
-          <input type="checkbox" checked={product.published || false} onChange={() => onTogglePublished(product._id, product.published)} />
-          <span className="slider round"></span>
-        </label>
-      </td>
-      <td>
-        <label className="switch">
-          <input type="checkbox" checked={product.featured || false} onChange={() => onToggleFeatured(product._id, product.featured)} />
-          <span className="slider round"></span>
-        </label>
-      </td>
-      <td>
-        <label className="switch">
-          <input type="checkbox" checked={product.todaysDeal || false} onChange={() => onToggleTodayDeal(product._id, product.todaysDeal)} />
-          <span className="slider round"></span>
-        </label>
-      </td>
-      <td>
-        <button className="btn-icon edit" onClick={() => onEdit(product._id)}><i className="bi bi-pencil"></i></button>
-        <button className="btn-icon delete" onClick={() => onDelete(product._id)}><i className="bi bi-trash"></i></button>
-      </td>
-    </tr>
-  );
-});
-ProductRow.displayName = 'ProductRow';
-
-// Skeleton loader row
-const SkeletonRow = memo(() => (
-  <tr className="skeleton-row">
-    <td><div className="skeleton" style={{ width: '120px', height: '40px' }}></div></td>
-    <td><div className="skeleton" style={{ width: '80px', height: '20px' }}></div></td>
-    <td><div className="skeleton" style={{ width: '100px', height: '20px' }}></div></td>
-    <td><div className="skeleton" style={{ width: '80px', height: '20px' }}></div></td>
-    <td><div className="skeleton" style={{ width: '60px', height: '20px' }}></div></td>
-    <td><div className="skeleton" style={{ width: '50px', height: '20px' }}></div></td>
-    <td><div className="skeleton" style={{ width: '30px', height: '30px', borderRadius: '50%' }}></div></td>
-    <td><div className="skeleton" style={{ width: '40px', height: '20px' }}></div></td>
-    <td><div className="skeleton" style={{ width: '40px', height: '20px' }}></div></td>
-    <td><div className="skeleton" style={{ width: '40px', height: '20px' }}></div></td>
-    <td><div className="skeleton" style={{ width: '70px', height: '30px' }}></div></td>
-  </tr>
-));
-SkeletonRow.displayName = 'SkeletonRow';
-
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 export default function AllProductsPage() {
   const router = useRouter();
+  const dropdownRef = useRef(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // State
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOption, setFilterOption] = useState('');
   const [sortOption, setSortOption] = useState('');
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  
+
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [isPending, startTransition] = useTransition();
 
-  const dropdownRef = useRef(null);
+  // Data fetching
+  const { products, loading, fetchProducts } = useProducts();
 
-  // Close dropdown when clicking outside
+  // Close dropdown on outside click
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
       }
     };
@@ -162,197 +45,96 @@ export default function AllProductsPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const getImageUrl = useCallback((filename) => {
-    if (!filename) return null;
-    return `${SERVERURL}/imgUploads/${filename}`;
-  }, []);
+  // Image URL helper
+  const getImageUrl = useCallback((filename) => filename ? `${SERVERURL}/imgUploads/${filename}` : null, []);
 
-  const fetchProducts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [productsRes, reviewsRes] = await Promise.all([
-        getProductsAPI(),
-        getAllCustomReviewsAPI(),
-      ]);
-
-      if (!productsRes.success) throw new Error(productsRes.message || 'Failed to load products');
-
-      const productsData = productsRes.data;
-      const allReviews = reviewsRes.success ? reviewsRes.data : [];
-
-      const reviewsByProduct = {};
-      allReviews.forEach(review => {
-        const pid = review.productId?._id || review.productId;
-        if (!reviewsByProduct[pid]) reviewsByProduct[pid] = [];
-        reviewsByProduct[pid].push(review);
-      });
-
-      const productsWithRating = productsData.map(product => {
-        const productReviews = reviewsByProduct[product._id] || [];
-        const totalRating = productReviews.reduce((sum, r) => sum + r.rating, 0);
-        const avgRating = productReviews.length ? parseFloat((totalRating / productReviews.length).toFixed(1)) : 0;
-        return {
-          ...product,
-          avgRating,
-          reviewCount: productReviews.length,
-        };
-      });
-
-      setProducts(productsWithRating);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      toast.error('Server error while loading products');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
-
-  // Filter and sort products (memoized for performance)
+  // Filter & Sort
   const filteredAndSortedProducts = useMemo(() => {
     let result = [...products];
-    
     if (debouncedSearchTerm) {
-      const searchLower = debouncedSearchTerm.toLowerCase();
-      result = result.filter(p => 
-        p.productName?.toLowerCase().includes(searchLower) ||
-        p.brand?.toLowerCase().includes(searchLower)
+      const q = debouncedSearchTerm.toLowerCase();
+      result = result.filter(p =>
+        p.productName?.toLowerCase().includes(q) ||
+        p.brand?.toLowerCase().includes(q)
       );
     }
-    
-    if (filterOption === 'published') result = result.filter(p => p.published === true);
-    if (filterOption === 'featured') result = result.filter(p => p.featured === true);
-    if (filterOption === 'todayDeal') result = result.filter(p => p.todaysDeal === true);
+    if (filterOption === 'published') result = result.filter(p => p.published);
+    if (filterOption === 'featured') result = result.filter(p => p.featured);
+    if (filterOption === 'todayDeal') result = result.filter(p => p.todaysDeal);
     if (filterOption === 'discount') result = result.filter(p => p.discount > 0);
-    
-    if (sortOption === 'price-asc') result.sort((a, b) => (a.unitPrice || 0) - (b.unitPrice || 0));
-    if (sortOption === 'price-desc') result.sort((a, b) => (b.unitPrice || 0) - (a.unitPrice || 0));
-    if (sortOption === 'rating-desc') result.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
-    if (sortOption === 'name-asc') result.sort((a, b) => (a.productName || '').localeCompare(b.productName || ''));
-    
+
+    switch (sortOption) {
+      case 'price-asc': result.sort((a, b) => (a.unitPrice || 0) - (b.unitPrice || 0)); break;
+      case 'price-desc': result.sort((a, b) => (b.unitPrice || 0) - (a.unitPrice || 0)); break;
+      case 'rating-desc': result.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0)); break;
+      case 'name-asc': result.sort((a, b) => (a.productName || '').localeCompare(b.productName || '')); break;
+      default: break;
+    }
     return result;
   }, [products, debouncedSearchTerm, filterOption, sortOption]);
 
-  // Pagination logic
-  const { currentPage, totalPages, goToPage, nextPage, prevPage, setCurrentPage } = usePagination(filteredAndSortedProducts.length, itemsPerPage);
-  
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearchTerm, filterOption, sortOption, setCurrentPage]);
+  // Pagination
+  const { currentPage, totalPages, goToPage, nextPage, prevPage, setCurrentPage } =
+    usePagination(filteredAndSortedProducts.length, itemsPerPage);
+
+  useEffect(() => setCurrentPage(1), [debouncedSearchTerm, filterOption, sortOption, setCurrentPage]);
 
   const paginatedProducts = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filteredAndSortedProducts.slice(startIndex, endIndex);
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredAndSortedProducts.slice(start, start + itemsPerPage);
   }, [filteredAndSortedProducts, currentPage, itemsPerPage]);
 
   const pageNumbers = useMemo(() => {
-    const pages = [];
     const maxVisible = 5;
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
-    
-    if (endPage - startPage + 1 < maxVisible) {
-      startPage = Math.max(1, endPage - maxVisible + 1);
-    }
-    
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i);
-    }
-    return pages;
+    let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let end = Math.min(totalPages, start + maxVisible - 1);
+    if (end - start + 1 < maxVisible) start = Math.max(1, end - maxVisible + 1);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   }, [currentPage, totalPages]);
 
-  const togglePublished = useCallback(async (id, currentStatus) => {
-    try {
-      const response = await updateProductAPI(id, { published: !currentStatus });
-      if (response.success) {
-        toast.success(`Product ${!currentStatus ? 'published' : 'unpublished'}`);
-        fetchProducts();
-      } else {
-        toast.error(response.message || 'Update failed');
-      }
-    } catch (error) {
-      toast.error('Server error');
-    }
+  // Toggle handlers
+  const togglePublished = useCallback(async (id, current) => {
+    const res = await updateProductAPI(id, { published: !current });
+    if (res.success) { toast.success(`Product ${!current ? 'published' : 'unpublished'}`); fetchProducts(); }
+    else toast.error(res.message || 'Update failed');
   }, [fetchProducts]);
 
-  const toggleFeatured = useCallback(async (id, currentStatus) => {
-    try {
-      const response = await updateProductAPI(id, { featured: !currentStatus });
-      if (response.success) {
-        toast.success(`Product ${!currentStatus ? 'featured' : 'unfeatured'}`);
-        fetchProducts();
-      } else {
-        toast.error(response.message || 'Update failed');
-      }
-    } catch (error) {
-      toast.error('Server error');
-    }
+  const toggleFeatured = useCallback(async (id, current) => {
+    const res = await updateProductAPI(id, { featured: !current });
+    if (res.success) { toast.success(`Product ${!current ? 'featured' : 'unfeatured'}`); fetchProducts(); }
+    else toast.error(res.message || 'Update failed');
   }, [fetchProducts]);
 
-  const toggleTodayDeal = useCallback(async (id, currentStatus) => {
-    try {
-      const response = await updateProductAPI(id, { todaysDeal: !currentStatus });
-      if (response.success) {
-        toast.success(`Product ${!currentStatus ? 'added to' : 'removed from'} Today's Deal`);
-        fetchProducts();
-      } else {
-        toast.error(response.message || 'Update failed');
-      }
-    } catch (error) {
-      toast.error('Server error');
-    }
+  const toggleTodayDeal = useCallback(async (id, current) => {
+    const res = await updateProductAPI(id, { todaysDeal: !current });
+    if (res.success) { toast.success(`Product ${!current ? 'added to' : 'removed from'} Today's Deal`); fetchProducts(); }
+    else toast.error(res.message || 'Update failed');
   }, [fetchProducts]);
 
   const handleDelete = useCallback(async (id) => {
     if (!window.confirm('Delete this product permanently?')) return;
-    try {
-      const response = await deleteProductAPI(id);
-      if (response.success) {
-        toast.success('Product deleted successfully');
-        fetchProducts();
-      } else {
-        toast.error(response.message || 'Delete failed');
-      }
-    } catch (error) {
-      toast.error('Server error');
-    }
+    const res = await deleteProductAPI(id);
+    if (res.success) { toast.success('Product deleted'); fetchProducts(); }
+    else toast.error(res.message || 'Delete failed');
   }, [fetchProducts]);
 
-  const handleEdit = useCallback((id) => {
-    router.push(`/super-admin/product-managment/products/edit-product/${id}`);
-  }, [router]);
+  const handleEdit = useCallback((id) => router.push(`/super-admin/product-managment/products/edit-product/${id}`), [router]);
+  const handleInfoClick = useCallback((id) => router.push(`/super-admin/product-managment/products/product-details/${id}`), [router]);
 
-  // ✅ NEW: Navigate to product details page
-  const handleInfoClick = useCallback((productId) => {
-    router.push(`/super-admin/product-managment/products/product-details/${productId}`);
-  }, [router]);
-
-  const toggleDropdown = useCallback(() => setDropdownOpen(prev => !prev), []);
-  const closeDropdown = useCallback(() => setDropdownOpen(false), []);
-  
-  const resetFilters = useCallback(() => {
+  // UI helpers
+  const toggleDropdown = () => setDropdownOpen(prev => !prev);
+  const closeDropdown = () => setDropdownOpen(false);
+  const resetFilters = () => {
     setSearchTerm('');
     setFilterOption('');
     setSortOption('');
     setCurrentPage(1);
-  }, [setCurrentPage]);
-
-  const handleItemsPerPageChange = useCallback((e) => {
-    const newValue = parseInt(e.target.value, 10);
-    setItemsPerPage(newValue);
+  };
+  const handleItemsPerPageChange = (e) => {
+    setItemsPerPage(parseInt(e.target.value, 10));
     setCurrentPage(1);
-  }, [setCurrentPage]);
-
-  const handleSearchChange = useCallback((e) => {
-    const value = e.target.value;
-    startTransition(() => {
-      setSearchTerm(value);
-    });
-  }, []);
+  };
+  const handleSearchChange = (e) => startTransition(() => setSearchTerm(e.target.value));
 
   const startItem = filteredAndSortedProducts.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, filteredAndSortedProducts.length);
@@ -414,46 +196,17 @@ export default function AllProductsPage() {
         </div>
       </div>
 
+      {/* Table */}
       <div className="table-responsive">
         {loading ? (
           <table className="med-table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Brand</th>
-                <th>Category</th>
-                <th>Rating</th>
-                <th>Price (₹)</th>
-                <th>Discount</th>
-                <th>Info</th>
-                <th>Published</th>
-                <th>Featured</th>
-                <th>Today's Deal</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Array(itemsPerPage).fill(null).map((_, idx) => <SkeletonRow key={idx} />)}
-            </tbody>
+            <thead><tr>{['Product','Brand','Category','Rating','Price (₹)','Discount','Info','Published','Featured',"Today's Deal",'Actions'].map(h => <th key={h}>{h}</th>)}</tr></thead>
+            <tbody>{Array(itemsPerPage).fill(null).map((_, i) => <SkeletonRow key={i} />)}</tbody>
           </table>
         ) : (
           <>
             <table className="med-table">
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>Brand</th>
-                  <th>Category</th>
-                  <th>Rating</th>
-                  <th>Price (₹)</th>
-                  <th>Discount</th>
-                  <th>Info</th>
-                  <th>Published</th>
-                  <th>Featured</th>
-                  <th>Today's Deal</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
+              <thead><tr>{['Product','Brand','Category','Rating','Price (₹)','Discount','Info','Published','Featured',"Today's Deal",'Actions'].map(h => <th key={h}>{h}</th>)}</tr></thead>
               <tbody>
                 {paginatedProducts.map(product => (
                   <ProductRow
@@ -473,7 +226,7 @@ export default function AllProductsPage() {
                 )}
               </tbody>
             </table>
-            
+
             {/* Pagination */}
             {filteredAndSortedProducts.length > 0 && (
               <div className="pagination-controls">
@@ -482,19 +235,16 @@ export default function AllProductsPage() {
                 </div>
                 <div className="pagination-actions">
                   <select className="form-select per-page-select" value={itemsPerPage} onChange={handleItemsPerPageChange}>
-                    <option value={10}>10 per page</option>
-                    <option value={25}>25 per page</option>
-                    <option value={50}>50 per page</option>
-                    <option value={100}>100 per page</option>
+                    {[10,25,50,100].map(n => <option key={n} value={n}>{n} per page</option>)}
                   </select>
                   <nav aria-label="Page navigation">
                     <ul className="pagination mb-0">
                       <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
                         <button className="page-link" onClick={prevPage} disabled={currentPage === 1}><i className="bi bi-chevron-left"></i></button>
                       </li>
-                      {pageNumbers.map(pageNum => (
-                        <li key={pageNum} className={`page-item ${currentPage === pageNum ? 'active' : ''}`}>
-                          <button className="page-link" onClick={() => goToPage(pageNum)}>{pageNum}</button>
+                      {pageNumbers.map(p => (
+                        <li key={p} className={`page-item ${currentPage === p ? 'active' : ''}`}>
+                          <button className="page-link" onClick={() => goToPage(p)}>{p}</button>
                         </li>
                       ))}
                       <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
@@ -508,8 +258,6 @@ export default function AllProductsPage() {
           </>
         )}
       </div>
-
-
     </div>
   );
 }

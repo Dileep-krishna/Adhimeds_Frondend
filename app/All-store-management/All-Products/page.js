@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef, memo, useTransition } from 'react';
-import { useRouter } from 'next/navigation'; // 👈 for navigation
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -53,7 +53,7 @@ const ProductRow = memo(({ product, onTogglePin, isPinned, getImageUrl }) => {
             />
           )}
           <div>
-            <div className="fw-bold">{product.productName}</div>
+            <div className="product-name">{product.productName}</div> {/* ✅ fixed: medium weight */}
             <small>{product.brand}</small>
           </div>
         </div>
@@ -288,67 +288,55 @@ export default function AllProductsPage() {
   return (
     <div className="all-products-container">
       <Toaster position="top-right" />
+      
+      {/* ─── Page title ─── */}
       <div className="header-actions">
         <h4 className="page-title">All Products</h4>
       </div>
-      <div className="filter-bar">
-        <div className="row g-2 align-items-end">
-          <div className="col-md-4">
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Search products..."
-              value={searchTerm}
-              onChange={handleSearchChange}
-            />
-          </div>
-          <div className="col-md-3">
-            <select className="form-select" value={filterOption} onChange={(e) => setFilterOption(e.target.value)}>
-              <option value="">Filter</option>
-              <option value="published">Published</option>
-              <option value="featured">Featured</option>
-              <option value="todayDeal">Today's Deal</option>
-              <option value="discount">Has Discount</option>
-            </select>
-          </div>
-          <div className="col-md-3">
-            <select className="form-select" value={sortOption} onChange={(e) => setSortOption(e.target.value)}>
-              <option value="">Sort</option>
-              <option value="price-asc">Price (Low to High)</option>
-              <option value="price-desc">Price (High to Low)</option>
-              <option value="rating-desc">Highest Rated</option>
-              <option value="name-asc">Name (A-Z)</option>
-            </select>
-          </div>
-          <div className="col-md-2">
-            <button className="btn btn-outline-secondary w-100" onClick={resetFilters}>Reset</button>
+
+      {/* ─── Products Card ─── */}
+      <div className="products-card">
+        {/* ─── Filter Header ─── */}
+        <div className="products-header">
+          <div className="filter-bar">
+            <div className="row g-3 align-items-end">
+              <div className="col-md-4">
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Search products..."
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                />
+              </div>
+              <div className="col-md-3">
+                <select className="form-select" value={filterOption} onChange={(e) => setFilterOption(e.target.value)}>
+                  <option value="">Filter</option>
+                  <option value="published">Published</option>
+                  <option value="featured">Featured</option>
+                  <option value="todayDeal">Today's Deal</option>
+                  <option value="discount">Has Discount</option>
+                </select>
+              </div>
+              <div className="col-md-3">
+                <select className="form-select" value={sortOption} onChange={(e) => setSortOption(e.target.value)}>
+                  <option value="">Sort</option>
+                  <option value="price-asc">Price (Low to High)</option>
+                  <option value="price-desc">Price (High to Low)</option>
+                  <option value="rating-desc">Highest Rated</option>
+                  <option value="name-asc">Name (A-Z)</option>
+                </select>
+              </div>
+              <div className="col-md-2">
+                <button className="btn btn-outline-secondary w-100" onClick={resetFilters}>Reset</button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-      <div className="table-responsive">
-        {loading ? (
-          <table className="med-table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Brand</th>
-                <th>Category</th>
-                <th>Rating</th>
-                <th>Price (₹)</th>
-                <th>Discount</th>
-                <th>View</th>
-                <th>Pin</th>
-                <th>Store Access</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Array(itemsPerPage).fill(null).map((_, idx) => (
-                <SkeletonRow key={idx} />
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <>
+
+        {/* ─── Table ─── */}
+        <div className="table-responsive">
+          {loading ? (
             <table className="med-table">
               <thead>
                 <tr>
@@ -364,64 +352,87 @@ export default function AllProductsPage() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedProducts.map(product => (
-                  <ProductRow
-                    key={product._id}
-                    product={product}
-                    onTogglePin={handleTogglePin}
-                    isPinned={pinnedProductIds.includes(product._id)}
-                    getImageUrl={getImageUrl}
-                  />
+                {Array(itemsPerPage).fill(null).map((_, idx) => (
+                  <SkeletonRow key={idx} />
                 ))}
-                {paginatedProducts.length === 0 && (
-                  <tr>
-                    <td colSpan={9} className="text-center py-4">No products found.</td>
-                  </tr>
-                )}
               </tbody>
             </table>
-            {filteredAndSortedProducts.length > 0 && (
-              <div className="pagination-controls">
-                <div className="pagination-info">
-                  Showing {startItem} to {endItem} of {filteredAndSortedProducts.length} products
-                </div>
-                <div className="pagination-actions">
-                  <select
-                    className="form-select per-page-select"
-                    value={itemsPerPage}
-                    onChange={handleItemsPerPageChange}
-                  >
-                    <option value={10}>10 per page</option>
-                    <option value={25}>25 per page</option>
-                    <option value={50}>50 per page</option>
-                    <option value={100}>100 per page</option>
-                  </select>
-                  <nav>
-                    <ul className="pagination mb-0">
-                      <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                        <button className="page-link" onClick={prevPage} disabled={currentPage === 1}>
-                          <i className="bi bi-chevron-left"></i>
-                        </button>
-                      </li>
-                      {pageNumbers.map(pageNum => (
-                        <li key={pageNum} className={`page-item ${currentPage === pageNum ? 'active' : ''}`}>
-                          <button className="page-link" onClick={() => goToPage(pageNum)}>
-                            {pageNum}
+          ) : (
+            <>
+              <table className="med-table">
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th>Brand</th>
+                    <th>Category</th>
+                    <th>Rating</th>
+                    <th>Price (₹)</th>
+                    <th>Discount</th>
+                    <th>View</th>
+                    <th>Pin</th>
+                    <th>Store Access</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedProducts.map(product => (
+                    <ProductRow
+                      key={product._id}
+                      product={product}
+                      onTogglePin={handleTogglePin}
+                      isPinned={pinnedProductIds.includes(product._id)}
+                      getImageUrl={getImageUrl}
+                    />
+                  ))}
+                  {paginatedProducts.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="text-center py-4">No products found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+              {filteredAndSortedProducts.length > 0 && (
+                <div className="pagination-controls">
+                  <div className="pagination-info">
+                    Showing {startItem} to {endItem} of {filteredAndSortedProducts.length} products
+                  </div>
+                  <div className="pagination-actions">
+                    <select
+                      className="form-select per-page-select"
+                      value={itemsPerPage}
+                      onChange={handleItemsPerPageChange}
+                    >
+                      <option value={10}>10 per page</option>
+                      <option value={25}>25 per page</option>
+                      <option value={50}>50 per page</option>
+                      <option value={100}>100 per page</option>
+                    </select>
+                    <nav>
+                      <ul className="pagination mb-0">
+                        <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                          <button className="page-link" onClick={prevPage} disabled={currentPage === 1}>
+                            <i className="bi bi-chevron-left"></i>
                           </button>
                         </li>
-                      ))}
-                      <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-                        <button className="page-link" onClick={nextPage} disabled={currentPage === totalPages}>
-                          <i className="bi bi-chevron-right"></i>
-                        </button>
-                      </li>
-                    </ul>
-                  </nav>
+                        {pageNumbers.map(pageNum => (
+                          <li key={pageNum} className={`page-item ${currentPage === pageNum ? 'active' : ''}`}>
+                            <button className="page-link" onClick={() => goToPage(pageNum)}>
+                              {pageNum}
+                            </button>
+                          </li>
+                        ))}
+                        <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                          <button className="page-link" onClick={nextPage} disabled={currentPage === totalPages}>
+                            <i className="bi bi-chevron-right"></i>
+                          </button>
+                        </li>
+                      </ul>
+                    </nav>
+                  </div>
                 </div>
-              </div>
-            )}
-          </>
-        )}
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
