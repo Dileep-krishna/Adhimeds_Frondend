@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useMemo, useCallback, useRef, useTransition, useEffect } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
 import './all-products.css';
 import { useDebounce } from '../components/hooks/useDebounce';
-import { usePagination } from '../components/hooks/usePagination';
 import { useProducts } from '../components/hooks/useProducts';
 import { ProductRow } from '../../products/ProductRow';
 import { SkeletonRow } from '../../products/SkeletonRow';
@@ -20,60 +19,59 @@ export default function AllProductsPage() {
   const dropdownRef = useRef(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
+  // ── Filters & Pagination State ──
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOption, setFilterOption] = useState('');
   const [sortOption, setSortOption] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  const [isPending, startTransition] = useTransition();
-  const { products, loading, fetchProducts } = useProducts();
 
+  // ── Fetch products with current filters ──
+  const {
+    products,
+    loading,
+    total,
+    totalPages,
+    fetchProducts,
+  } = useProducts({
+    page: currentPage,
+    limit: itemsPerPage,
+    search: debouncedSearchTerm,
+    filter: filterOption,
+    sort: sortOption,
+  });
+
+  // ── Re‑fetch when filters or page change ──
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    fetchProducts();
+  }, [currentPage, itemsPerPage, debouncedSearchTerm, filterOption, sortOption]);
 
-  const getImageUrl = useCallback((filename) => filename ? `${SERVERURL}/imgUploads/${filename}` : null, []);
-
+  // ── Client‑side sorting/filtering for unsupported fields (todayDeal, discount, rating) ──
   const filteredAndSortedProducts = useMemo(() => {
     let result = [...products];
-    if (debouncedSearchTerm) {
-      const q = debouncedSearchTerm.toLowerCase();
-      result = result.filter(p =>
-        p.productName?.toLowerCase().includes(q) ||
-        p.brand?.toLowerCase().includes(q)
-      );
-    }
-    if (filterOption === 'published') result = result.filter(p => p.published);
-    if (filterOption === 'featured') result = result.filter(p => p.featured);
-    if (filterOption === 'todayDeal') result = result.filter(p => p.todaysDeal);
-    if (filterOption === 'discount') result = result.filter(p => p.discount > 0);
 
-    switch (sortOption) {
-      case 'price-asc': result.sort((a, b) => (a.unitPrice || 0) - (b.unitPrice || 0)); break;
-      case 'price-desc': result.sort((a, b) => (b.unitPrice || 0) - (a.unitPrice || 0)); break;
-      case 'rating-desc': result.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0)); break;
-      case 'name-asc': result.sort((a, b) => (a.productName || '').localeCompare(b.productName || '')); break;
-      default: break;
+    // Filter by todayDeal (if selected)
+    if (filterOption === 'todayDeal') {
+      result = result.filter(p => p.todaysDeal);
     }
+    if (filterOption === 'discount') {
+      result = result.filter(p => p.discount > 0);
+    }
+
+    // Sort by rating (descending)
+    if (sortOption === 'rating-desc') {
+      result.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
+    }
+
     return result;
-  }, [products, debouncedSearchTerm, filterOption, sortOption]);
+  }, [products, filterOption, sortOption]);
 
-  const { currentPage, totalPages, goToPage, nextPage, prevPage, setCurrentPage } =
-    usePagination(filteredAndSortedProducts.length, itemsPerPage);
-
-  useEffect(() => setCurrentPage(1), [debouncedSearchTerm, filterOption, sortOption, setCurrentPage]);
-
-  const paginatedProducts = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredAndSortedProducts.slice(start, start + itemsPerPage);
-  }, [filteredAndSortedProducts, currentPage, itemsPerPage]);
+  // ── Pagination helpers ──
+  const goToPage = (page) => setCurrentPage(page);
+  const nextPage = () => setCurrentPage(p => Math.min(p + 1, totalPages));
+  const prevPage = () => setCurrentPage(p => Math.max(p - 1, 1));
 
   const pageNumbers = useMemo(() => {
     const maxVisible = 5;
@@ -82,6 +80,12 @@ export default function AllProductsPage() {
     if (end - start + 1 < maxVisible) start = Math.max(1, end - maxVisible + 1);
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   }, [currentPage, totalPages]);
+
+  const startItem = total === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+  const endItem = Math.min(currentPage * itemsPerPage, total);
+
+  // ── Callbacks for toggles & actions ──
+  const getImageUrl = useCallback((filename) => filename ? `${SERVERURL}/imgUploads/${filename}` : null, []);
 
   const togglePublished = useCallback(async (id, current) => {
     const res = await updateProductAPI(id, { published: !current });
@@ -111,63 +115,74 @@ export default function AllProductsPage() {
   const handleEdit = useCallback((id) => router.push(`/super-admin/product-managment/products/edit-product/${id}`), [router]);
   const handleInfoClick = useCallback((id) => router.push(`/super-admin/product-managment/products/product-details/${id}`), [router]);
 
-const toggleDropdown = (e) => {
-  e.stopPropagation();
-  console.log('Toggling dropdown, current:', dropdownOpen);
-  setDropdownOpen(prev => !prev);
-};
-  const closeDropdown = () => setDropdownOpen(false);
-  const handleItemsPerPageChange = (e) => {
-    setItemsPerPage(parseInt(e.target.value, 10)); setCurrentPage(1);
+  // ── Dropdown toggle ──
+  const toggleDropdown = (e) => {
+    e.stopPropagation();
+    setDropdownOpen(prev => !prev);
   };
-  const handleSearchChange = (e) => startTransition(() => setSearchTerm(e.target.value));
+  const closeDropdown = () => setDropdownOpen(false);
 
-  const startItem = filteredAndSortedProducts.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
-  const endItem = Math.min(currentPage * itemsPerPage, filteredAndSortedProducts.length);
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <div className="all-products-container" suppressHydrationWarning>
       <Toaster position="top-right" />
-      
+
       <div className="header-actions">
         <h3 className="page-title">All products</h3>
-       <div className="dropdown-wrapper" ref={dropdownRef}>
-  <button type="button" onClick={toggleDropdown} className="add-new-btn">
-    Add New Product
-    <span className="icon-plus">➕</span>
-  </button>
-  <ul className={`dropdown-menu ${dropdownOpen ? 'open' : ''}`}>
-    <li>
-      <Link href="/super-admin/product-managment/products/add-product" onClick={closeDropdown} className="dropdown-item">
-        <i className="bi bi-box me-2"></i> Product
-      </Link>
-    </li>
-    <li>
-      <Link href="/super-admin/product-managment/product-setup/category" onClick={closeDropdown} className="dropdown-item">
-        <i className="bi bi-tags me-2"></i> Category
-      </Link>
-    </li>
-    <li>
-      <Link href="/super-admin/product-managment/product-setup/Brand" onClick={closeDropdown} className="dropdown-item">
-        <i className="bi bi-building me-2"></i> Brand
-      </Link>
-    </li>
-  </ul>
-</div>
+        <div className="dropdown-wrapper" ref={dropdownRef}>
+          <button type="button" onClick={toggleDropdown} className="add-new-btn">
+            Add New Product
+            <span className="icon-plus">➕</span>
+          </button>
+          <ul className={`dropdown-menu ${dropdownOpen ? 'open' : ''}`}>
+            <li>
+              <Link href="/super-admin/product-managment/products/add-product" onClick={closeDropdown} className="dropdown-item">
+                <i className="bi bi-box me-2"></i> Product
+              </Link>
+            </li>
+            <li>
+              <Link href="/super-admin/product-managment/product-setup/category" onClick={closeDropdown} className="dropdown-item">
+                <i className="bi bi-tags me-2"></i> Category
+              </Link>
+            </li>
+            <li>
+              <Link href="/super-admin/product-managment/product-setup/Brand" onClick={closeDropdown} className="dropdown-item">
+                <i className="bi bi-building me-2"></i> Brand
+              </Link>
+            </li>
+            <li><hr className="dropdown-divider" /></li>
+            <li>
+              <Link href="/super-admin/product-managment/products/bulk-import" onClick={closeDropdown} className="dropdown-item">
+                <i className="bi bi-upload me-2"></i> Bulk Import
+              </Link>
+            </li>
+            <li>
+              <Link href="/super-admin/product-managment/products/bulk-import" onClick={closeDropdown} className="dropdown-item">
+                <i className="bi bi-download me-2"></i> Bulk Export
+              </Link>
+            </li>
+          </ul>
+        </div>
       </div>
 
       <div className="main-table-wrapper">
-        
-        {/* TABS */}
         <ul className="product-tabs">
           <li className="tab-item active">All products</li>
         </ul>
 
-        {/* FILTER BAR */}
         <div className="filter-top">
           <div className="search-box">
             <i className="bi bi-search search-icon"></i>
-            <input type="text" placeholder="Search products..." value={searchTerm} onChange={handleSearchChange} />
+            <input type="text" placeholder="Search products..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
           <div className="select-wrapper">
             <select className="filter-select" defaultValue="">
@@ -194,7 +209,6 @@ const toggleDropdown = (e) => {
           </div>
         </div>
 
-        {/* TABLE */}
         <div className="table-responsive">
           {loading ? (
             <table className="med-table">
@@ -234,7 +248,7 @@ const toggleDropdown = (e) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedProducts.map(product => (
+                  {filteredAndSortedProducts.map(product => (
                     <ProductRow
                       key={product._id}
                       product={product}
@@ -247,28 +261,35 @@ const toggleDropdown = (e) => {
                       getImageUrl={getImageUrl}
                     />
                   ))}
-                  {paginatedProducts.length === 0 && (
+                  {filteredAndSortedProducts.length === 0 && (
                     <tr><td colSpan={11} className="no-products">No products found.</td></tr>
                   )}
                 </tbody>
               </table>
 
-              {/* PAGINATION */}
-              {filteredAndSortedProducts.length > 0 && (
+              {/* ─── Server‑side Pagination ─── */}
+              {total > 0 && (
                 <div className="pagination-wrapper">
                   <div className="pagination-info">
-                    Showing {startItem} to {endItem} of {filteredAndSortedProducts.length} products
+                    Showing {startItem} to {endItem} of {total} products
                   </div>
                   <div className="pagination-controls">
-                    <select className="pagination-select" value={itemsPerPage} onChange={handleItemsPerPageChange}>
-                      {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n} per page</option>)}
+                    <select
+                      className="pagination-select"
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                    >
+                      {[10, 25, 50, 100].map(n => (
+                        <option key={n} value={n}>{n} per page</option>
+                      ))}
                     </select>
                     <nav>
                       <ul className="pagination-list">
                         <li className={currentPage === 1 ? 'hidden' : ''}>
-                          <button onClick={prevPage} disabled={currentPage === 1} className="pagination-btn">
-                            <span className="pagination-arrow">◀</span>
-                          </button>
+                          <button onClick={prevPage} disabled={currentPage === 1} className="pagination-btn">◀</button>
                         </li>
                         {pageNumbers.map(p => (
                           <li key={p}>
@@ -278,9 +299,7 @@ const toggleDropdown = (e) => {
                           </li>
                         ))}
                         <li className={currentPage === totalPages ? 'hidden' : ''}>
-                          <button onClick={nextPage} disabled={currentPage === totalPages} className="pagination-btn">
-                            <span className="pagination-arrow">▶</span>
-                          </button>
+                          <button onClick={nextPage} disabled={currentPage === totalPages} className="pagination-btn">▶</button>
                         </li>
                       </ul>
                     </nav>

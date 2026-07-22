@@ -1,21 +1,51 @@
+// app/super-admin/product-managment/products/components/hooks/useProducts.js
 import { useState, useEffect, useCallback } from 'react';
-import toast from 'react-hot-toast';
-import { getAllCustomReviewsAPI } from '@/app/services/customReviewService';
 import { getProductsAPI } from '@/app/services/productService';
+import { getAllCustomReviewsAPI } from '@/app/services/customReviewService';
+import toast from 'react-hot-toast';
 
-
-export function useProducts() {
+export function useProducts({ page = 1, limit = 10, search = '', filter = '', sort = '' } = {}) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Build query string for the API
+  const buildQuery = useCallback(() => {
+    const params = new URLSearchParams();
+    params.append('page', page);
+    params.append('limit', limit);
+    if (search) params.append('search', search);
+
+    // Map filter options
+    if (filter === 'published') params.append('published', 'true');
+    else if (filter === 'featured') params.append('featured', 'true');
+    // todayDeal and discount are not supported by backend, ignore for now
+
+    // Map sort options
+    if (sort === 'price-asc') { params.append('sortBy', 'unitPrice'); params.append('sortOrder', 'asc'); }
+    else if (sort === 'price-desc') { params.append('sortBy', 'unitPrice'); params.append('sortOrder', 'desc'); }
+    else if (sort === 'name-asc') { params.append('sortBy', 'productName'); params.append('sortOrder', 'asc'); }
+    // rating sort is handled client-side (since avgRating is computed from reviews)
+
+    return params.toString();
+  }, [page, limit, search, filter, sort]);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
+      const query = buildQuery();
       const [productsRes, reviewsRes] = await Promise.all([
-        getProductsAPI(),
+        getProductsAPI(query),
         getAllCustomReviewsAPI(),
       ]);
-      if (!productsRes.success) throw new Error(productsRes.message);
+
+      if (!productsRes || !Array.isArray(productsRes.data)) {
+        throw new Error('Invalid product data response');
+      }
+
+      setTotal(productsRes.total || 0);
+      setTotalPages(productsRes.totalPages || 1);
 
       const allReviews = reviewsRes.success ? reviewsRes.data : [];
       const reviewsByProduct = {};
@@ -36,16 +66,16 @@ export function useProducts() {
 
       setProducts(productsWithRating);
     } catch (error) {
-      console.error(error);
+      console.error('Error fetching products:', error);
       toast.error('Server error while loading products');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [buildQuery]);
 
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
-  return { products, loading, fetchProducts };
+  return { products, loading, total, totalPages, fetchProducts };
 }

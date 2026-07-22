@@ -53,7 +53,7 @@ const ProductRow = memo(({ product, onTogglePin, isPinned, getImageUrl }) => {
             />
           )}
           <div>
-            <div className="product-name">{product.productName}</div> {/* ✅ fixed: medium weight */}
+            <div className="product-name">{product.productName}</div>
             <small>{product.brand}</small>
           </div>
         </div>
@@ -178,37 +178,46 @@ export default function AllProductsPage() {
     localStorage.setItem(key, JSON.stringify(pinnedProductIds));
   }, [pinnedProductIds]);
 
-  // ─── Fetch products ───
-  const fetchProducts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [productsRes, reviewsRes] = await Promise.all([
-        getProductsAPI(),
-        getAllCustomReviewsAPI(),
-      ]);
-      if (!productsRes.success) throw new Error(productsRes.message || 'Failed to load products');
-      const productsData = productsRes.data;
-      const allReviews = reviewsRes.success ? reviewsRes.data : [];
-      const reviewsByProduct = {};
-      allReviews.forEach(review => {
-        const pid = review.productId?._id || review.productId;
-        if (!reviewsByProduct[pid]) reviewsByProduct[pid] = [];
-        reviewsByProduct[pid].push(review);
-      });
-      const productsWithRating = productsData.map(product => {
-        const productReviews = reviewsByProduct[product._id] || [];
-        const totalRating = productReviews.reduce((sum, r) => sum + r.rating, 0);
-        const avgRating = productReviews.length ? parseFloat((totalRating / productReviews.length).toFixed(1)) : 0;
-        return { ...product, avgRating, reviewCount: productReviews.length };
-      });
-      setProducts(productsWithRating);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      toast.error('Server error while loading products');
-    } finally {
-      setLoading(false);
+  // ─── Fetch products (FIXED: handles new API format) ───
+const fetchProducts = useCallback(async () => {
+  setLoading(true);
+  try {
+    const [productsRes, reviewsRes] = await Promise.all([
+      getProductsAPI('limit=1000'),   // ✅ fetch all products for client pagination
+      getAllCustomReviewsAPI(),
+    ]);
+
+    if (!productsRes || !Array.isArray(productsRes.data)) {
+      throw new Error(productsRes?.message || 'Failed to load products');
     }
-  }, []);
+
+    const productsData = productsRes.data;
+    const allReviews = reviewsRes?.success ? reviewsRes.data : [];
+
+    const reviewsByProduct = {};
+    allReviews.forEach(review => {
+      const pid = review.productId?._id || review.productId;
+      if (!reviewsByProduct[pid]) reviewsByProduct[pid] = [];
+      reviewsByProduct[pid].push(review);
+    });
+
+    const productsWithRating = productsData.map(product => {
+      const productReviews = reviewsByProduct[product._id] || [];
+      const totalRating = productReviews.reduce((sum, r) => sum + r.rating, 0);
+      const avgRating = productReviews.length
+        ? parseFloat((totalRating / productReviews.length).toFixed(1))
+        : 0;
+      return { ...product, avgRating, reviewCount: productReviews.length };
+    });
+
+    setProducts(productsWithRating);
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    toast.error('Server error while loading products');
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
   useEffect(() => {
     fetchProducts();

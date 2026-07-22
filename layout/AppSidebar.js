@@ -33,6 +33,18 @@ const productManagement = {
           icon: <i className="bi bi-plus-circle"></i>,
           path: "/super-admin/product-managment/products/add-product",
         },
+        // ─── NEW: Bulk Import ───
+        {
+          name: "Bulk Import",
+          icon: <i className="bi bi-upload"></i>,
+          path: "/super-admin/product-managment/products/bulk-import",
+        },
+        // // ─── NEW: Bulk Export ───
+        // {
+        //   name: "Bulk Export",
+        //   icon: <i className="bi bi-download"></i>,
+        //   path: "/super-admin/product-managment/products/bulk-export",
+        // },
       ],
     },
     {
@@ -42,7 +54,23 @@ const productManagement = {
         {
           name: "Category",
           icon: <i className="bi bi-tags"></i>,
-          path: "/super-admin/product-managment/product-setup/category",
+          subItems: [
+            {
+              name: "All Categories",
+              icon: <i className="bi bi-tags"></i>,
+              path: "/super-admin/product-managment/product-setup/category",
+            },
+            {
+              name: "Add Category",
+              icon: <i className="bi bi-plus-circle"></i>,
+              path: "/super-admin/product-managment/product-setup/category/add",
+            },
+            {
+              name: "Bulk Import/Export",
+              icon: <i className="bi bi-upload"></i>,
+              path: "/super-admin/product-managment/product-setup/category/bulk-import",
+            },
+          ],
         },
         {
           name: "Brand",
@@ -215,16 +243,15 @@ const navItems = [
   { icon: <UserCircleIcon />, name: "User Profile", path: "/profile" },
 ];
 
-// ---------- Sidebar Component ----------
+// ---------- Sidebar Component (unchanged) ----------
 const SidebarContent = memo(() => {
   const pathname = usePathname();
   const { isExpanded, isMobileOpen, isHovered } = useSidebar();
 
   const [expandedKeys, setExpandedKeys] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(""); // 👈 search state
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // Detect mobile
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 992);
@@ -270,13 +297,11 @@ const SidebarContent = memo(() => {
     });
   }, []);
 
-  // ─── Search filter function ───
   const filterItems = useCallback((items, term) => {
     if (!term.trim()) return items;
     const lower = term.toLowerCase();
     return items.reduce((acc, item) => {
       const nameMatch = item.name?.toLowerCase().includes(lower) || false;
-      // Check path match if exists
       const pathMatch = item.path?.toLowerCase().includes(lower) || false;
       let filteredChildren = null;
       if (item.subItems) {
@@ -285,7 +310,6 @@ const SidebarContent = memo(() => {
       if (nameMatch || pathMatch || (filteredChildren && filteredChildren.length > 0)) {
         const newItem = { ...item };
         if (item.subItems) {
-          // If name or path matches, keep all children for context; otherwise keep only filtered children
           newItem.subItems = (nameMatch || pathMatch) ? item.subItems : filteredChildren;
         }
         acc.push(newItem);
@@ -298,7 +322,6 @@ const SidebarContent = memo(() => {
     return filterItems(navItems, searchTerm);
   }, [filterItems, searchTerm]);
 
-  // ─── Render helpers ───
   const renderMenuItems = useCallback(
     (items, parentKey = "") => {
       return items.map((item) => {
@@ -337,7 +360,6 @@ const SidebarContent = memo(() => {
     [expandedKeys, handleSubMenuToggle, isActive, collapsed]
   );
 
-  // Auto-open active branch
   useEffect(() => {
     const findActiveBranch = (items, parentKey = "") => {
       for (const item of items) {
@@ -428,7 +450,6 @@ const SidebarContent = memo(() => {
         }}
         menuItemStyles={menuItemStyles}
       >
-        {/* Logo Section */}
         <div className="sidebar-logo">
           <Link href="/" className="sidebar-logo-link">
             <div className="sidebar-logo-avatar">
@@ -447,7 +468,6 @@ const SidebarContent = memo(() => {
           </Link>
         </div>
 
-        {/* ─── Search Bar ─── */}
         {(!collapsed || isMobile) && (
           <div className="sidebar-search">
             <i className="bi bi-search sidebar-search-icon"></i>
@@ -470,7 +490,6 @@ const SidebarContent = memo(() => {
           </div>
         )}
 
-        {/* Menu Area */}
         <div className="sidebar-menu-area">
           <Menu>
             {filteredNavItems.length > 0 ? (
@@ -484,7 +503,6 @@ const SidebarContent = memo(() => {
           </Menu>
         </div>
 
-        {/* Logout Button */}
         <div className="sidebar-logout">
           <button onClick={handleLogout} className="sidebar-logout-btn">
             <i className="bi bi-box-arrow-right sidebar-logout-icon"></i>

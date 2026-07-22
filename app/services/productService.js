@@ -64,6 +64,37 @@ export const deleteProductAPI = async (id) => {
   return handleResponse(res);
 };
 
+// ================= BULK IMPORT / EXPORT =================
+
+/**
+ * Upload a CSV/Excel file for bulk product import.
+ * @param {File} file - The file to upload.
+ * @returns {Promise} - Resolves with the import result.
+ */
+export const bulkImportProductsAPI = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await fetch(`${SERVERURL}/api/products/bulk-import`, {
+    method: "POST",
+    body: formData,
+  });
+  return handleResponse(res);
+};
+
+/**
+ * Download all products as an Excel file.
+ * @returns {Promise<Blob>} - The file blob.
+ */
+export const bulkExportProductsAPI = async () => {
+  const res = await fetch(`${SERVERURL}/api/products/export`);
+  if (!res.ok) {
+    const error = await res.text();
+    throw new Error(error || 'Export failed');
+  }
+  return res.blob();
+};
+
 // ================= STORE PRODUCT OVERRIDE APIS =================
 // GET product with store overrides merged
 export const getStoreProductAPI = async (productId, storeId) => {

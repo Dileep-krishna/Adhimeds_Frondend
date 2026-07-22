@@ -1,417 +1,395 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import axios from "axios";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import toast, { Toaster } from "react-hot-toast";
-import "bootstrap/dist/css/bootstrap.min.css";
 import "./categories.css";
-import SERVERURL from "../../../../services/serverURL";
+import {
+  getCategoriesAPI,
+  deleteCategoryAPI,
+  updateCategoryAPI,
+} from "@/app/services/categoryAPI";
+import SERVERURL from "@/app/services/serverURL";
 
 export default function CategoriesPage() {
-  const [showModal, setShowModal] = useState(false);
-  const [showView, setShowView] = useState(false);
-  const [isEdit, setIsEdit] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+
+  // State
+  const [menuOpen, setMenuOpen] = useState(null);
+  const [showSidebar, setShowSidebar] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [togglingId, setTogglingId] = useState(null);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    parent: "",
-    order: 0,
-    metaTitle: "",
-    metaDescription: "",
-  });
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [limit] = useState(10);
 
-  const [bannerFile, setBannerFile] = useState(null);
-  const [iconFile, setIconFile] = useState(null);
-  const [coverFile, setCoverFile] = useState(null);
-  const [bannerPreview, setBannerPreview] = useState(null);
-  const [iconPreview, setIconPreview] = useState(null);
-  const [coverPreview, setCoverPreview] = useState(null);
-
-  const BASE_URL = `${SERVERURL}/api/category`;
-
+  // Helper functions
   const getImageUrl = useCallback((filename) => {
     if (!filename) return null;
     return `${SERVERURL}/imgUploads/${filename}`;
   }, []);
 
   const getParentName = useCallback((cat) => {
-    if (!cat.parent) return "No Parent";
+    if (!cat.parent) return "—";
     if (typeof cat.parent === "string") {
       const found = categories.find(c => c._id === cat.parent);
-      return found ? found.name : "Unknown";
+      return found ? found.name : "—";
     }
-    return cat.parent.name || "No Parent";
+    return cat.parent.name || "—";
   }, [categories]);
 
-  const getParentId = useCallback((cat) => {
-    if (!cat.parent) return "";
-    if (typeof cat.parent === "string") return cat.parent;
-    return cat.parent._id || "";
+  const getCategoryLevel = useCallback((cat) => {
+    return cat.parent ? 1 : 0;
   }, []);
 
-  const fetchCategories = useCallback(async () => {
+  // Fetch categories with pagination
+  const fetchCategories = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const res = await axios.get(`${BASE_URL}?limit=100`);
-      setCategories(res.data.data);
+      const res = await getCategoriesAPI(page, limit, "");
+      const { data, total, totalPages: pages } = res;
+      setCategories(data || []);
+      setTotalItems(total || 0);
+      setTotalPages(pages || Math.ceil((total || 0) / limit));
     } catch (err) {
       console.error(err);
       toast.error("Failed to load categories");
     } finally {
       setLoading(false);
     }
-  }, [BASE_URL]);
+  }, [limit]);
 
+  // Initial load & page change
   useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
+    fetchCategories(currentPage);
+  }, [currentPage, fetchCategories]);
 
-  // cleanup preview URLs
-  useEffect(() => {
-    return () => {
-      if (bannerPreview) URL.revokeObjectURL(bannerPreview);
-      if (iconPreview) URL.revokeObjectURL(iconPreview);
-      if (coverPreview) URL.revokeObjectURL(coverPreview);
-    };
-  }, [bannerPreview, iconPreview, coverPreview]);
-
+  // Client-side search filter
   const filteredCategories = useMemo(() => {
     if (!searchTerm) return categories;
     const term = searchTerm.toLowerCase();
     return categories.filter(cat => cat.name.toLowerCase().includes(term));
   }, [categories, searchTerm]);
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+  // Pagination handlers
+  const goToPage = (page) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
   };
 
-  const handleFileChange = (setFile, setPreview) => (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setFile(file);
-      if (setPreview) setPreview(URL.createObjectURL(file));
-    }
-  };
+  const handlePrev = () => goToPage(currentPage - 1);
+  const handleNext = () => goToPage(currentPage + 1);
 
-  const resetModal = () => {
-    setFormData({
-      name: "",
-      parent: "",
-      order: 0,
-      metaTitle: "",
-      metaDescription: "",
-    });
-    setBannerFile(null);
-    setIconFile(null);
-    setCoverFile(null);
-    if (bannerPreview) URL.revokeObjectURL(bannerPreview);
-    if (iconPreview) URL.revokeObjectURL(iconPreview);
-    if (coverPreview) URL.revokeObjectURL(coverPreview);
-    setBannerPreview(null);
-    setIconPreview(null);
-    setCoverPreview(null);
-    setIsEdit(false);
-    setSelectedCategory(null);
-  };
+  // Toggle handler
+  const handleToggle = async (categoryId, field, currentValue) => {
+    if (togglingId === categoryId) return;
+    setTogglingId(categoryId);
 
-  const handleAdd = async () => {
+    // Optimistic update
+    const updatedCategories = categories.map(cat =>
+      cat._id === categoryId ? { ...cat, [field]: !currentValue } : cat
+    );
+    setCategories(updatedCategories);
+
     try {
-      const data = new FormData();
-      data.append("name", formData.name);
-      data.append("order", Number(formData.order));
-      data.append("metaTitle", formData.metaTitle);
-      data.append("metaDescription", formData.metaDescription);
-      if (formData.parent) data.append("parent", formData.parent);
-      if (bannerFile) data.append("banner", bannerFile);
-      if (iconFile) data.append("icon", iconFile);
-      if (coverFile) data.append("coverImage", coverFile);
-
-      await axios.post(BASE_URL, data);
-      toast.success("Category added successfully");
-      fetchCategories();
-      setShowModal(false);
-      resetModal();
+      const formData = new FormData();
+      formData.append(field, !currentValue);
+      await updateCategoryAPI(categoryId, formData);
+      toast.success(`${field.replace('is', '')} toggled`);
     } catch (err) {
       console.error(err);
-      toast.error(err.response?.data?.message || "Add failed");
+      toast.error("Failed to update");
+      // Revert
+      const reverted = categories.map(cat =>
+        cat._id === categoryId ? { ...cat, [field]: currentValue } : cat
+      );
+      setCategories(reverted);
+    } finally {
+      setTogglingId(null);
     }
   };
 
-  const handleUpdate = async () => {
-    try {
-      const data = new FormData();
-      data.append("name", formData.name);
-      data.append("order", Number(formData.order));
-      data.append("metaTitle", formData.metaTitle);
-      data.append("metaDescription", formData.metaDescription);
-
-      if (formData.parent === "") {
-        data.append("parent", "null");
-      } else if (formData.parent) {
-        data.append("parent", formData.parent);
-      }
-
-      if (bannerFile) data.append("banner", bannerFile);
-      if (iconFile) data.append("icon", iconFile);
-      if (coverFile) data.append("coverImage", coverFile);
-
-      await axios.put(`${BASE_URL}/${selectedCategory._id}`, data);
-      toast.success("Category updated successfully");
-      fetchCategories();
-      setShowModal(false);
-      resetModal();
-    } catch (err) {
-      console.error(err);
-      toast.error(err.response?.data?.message || "Update failed");
-    }
-  };
-
+  // Delete
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this category permanently?")) return;
     try {
-      await axios.delete(`${BASE_URL}/${id}`);
+      await deleteCategoryAPI(id);
       toast.success("Category deleted");
-      fetchCategories();
+      fetchCategories(currentPage);
+      setMenuOpen(null);
     } catch (err) {
       console.error(err);
       toast.error("Delete failed");
     }
   };
 
-  const openAddModal = () => {
-    resetModal();
-    setShowModal(true);
+  // Sidebar
+  const handleViewMore = (category) => {
+    setSelectedCategory(category);
+    setShowSidebar(true);
   };
 
-  const openEditModal = (cat) => {
-    setIsEdit(true);
-    setSelectedCategory(cat);
-    setFormData({
-      name: cat.name,
-      parent: getParentId(cat),
-      order: cat.order,
-      metaTitle: cat.metaTitle || "",
-      metaDescription: cat.metaDescription || "",
-    });
-    if (cat.banner) setBannerPreview(getImageUrl(cat.banner));
-    if (cat.icon) setIconPreview(getImageUrl(cat.icon));
-    if (cat.coverImage) setCoverPreview(getImageUrl(cat.coverImage));
-    setShowModal(true);
-  };
-
-  const openView = (cat) => {
-    setSelectedCategory(cat);
-    setShowView(true);
+  const closeSidebar = () => {
+    setShowSidebar(false);
+    setSelectedCategory(null);
   };
 
   return (
-    <div className="categories-container">
+    <div className="categories-page">
       <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
 
-      <div className="header-actions">
-        <h4 className="page-title">📂 Category Management</h4>
-        <button className="btn-add" onClick={openAddModal}>+ Add Category</button>
-      </div>
-
-      {/* Large search bar */}
-      <div className="filter-bar">
-        <input
-          type="text"
-          className="search-input-large"
-          placeholder="🔍 Search categories by name..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
-
-      {loading ? (
-        <div className="loading-spinner">Loading categories...</div>
-      ) : (
-        <div className="table-responsive">
-          <table className="med-table">
-            <thead>
-              <tr>
-                <th>ICON</th>
-                <th>NAME</th>
-                <th>PARENT CATEGORY</th>
-                <th>ORDER LEVEL</th>
-                <th>META TITLE</th>
-                <th>OPTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredCategories.map(cat => (
-                <tr key={cat._id}>
-                  <td>
-                    {cat.icon ? (
-                      <img src={getImageUrl(cat.icon)} className="rounded-circle" width="40" height="40" style={{ objectFit: "cover" }} alt="icon" />
-                    ) : (
-                      <div className="no-icon-placeholder">
-                        <i className="bi bi-image"></i>
-                      </div>
-                    )}
-                  </td>
-                  <td>
-                    <div className="d-flex align-items-center gap-2">
-                      {cat.icon && <img src={getImageUrl(cat.icon)} width="24" height="24" className="rounded-circle" alt="icon" />}
-                      <span className="fw-semibold">{cat.name}</span>
-                    </div>
-                  </td>
-                  <td>{getParentName(cat)}</td>
-                  <td>{cat.order}</td>
-                  <td>{cat.metaTitle?.substring(0, 30) || "-"}</td>
-                  <td className="actions-cell">
-                    <button className="btn-view" onClick={() => openView(cat)}>View</button>
-                    <button className="btn-icon edit" onClick={() => openEditModal(cat)} title="Edit"><i className="bi bi-pencil"></i></button>
-                    <button className="btn-icon delete" onClick={() => handleDelete(cat._id)} title="Delete"><i className="bi bi-trash"></i></button>
-                  </td>
-                </tr>
-              ))}
-              {filteredCategories.length === 0 && (
-                <tr><td colSpan="6" className="text-center py-5">No categories found.</td></tr>
-              )}
-            </tbody>
-          </table>
+      {/* Header */}
+      <div className="categories-header">
+        <div>
+          <h2>All Categories</h2>
+          <p>Manage all product categories</p>
         </div>
-      )}
+        <button
+          className="add-category-btn"
+          onClick={() => router.push("/super-admin/product-managment/product-setup/category/add")}
+        >
+          <span>Add New Category</span>
+          <i className="bi bi-plus-lg"></i>
+        </button>
+      </div>
 
-      {/* ADD/EDIT MODAL with animation */}
-      <AnimatePresence>
-        {showModal && (
-          <motion.div
-            className="modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowModal(false)}
-          >
-            <motion.div
-              className="modal-container"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="modal-header">
-                <h5>{isEdit ? "Edit Category" : "Add Category"}</h5>
-                <button className="close-modal" onClick={() => setShowModal(false)}>&times;</button>
-              </div>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label>Name *</label>
-                  <input name="name" value={formData.name} onChange={handleChange} required />
-                </div>
-                <div className="form-group">
-                  <label>Parent Category</label>
-                  <select name="parent" value={formData.parent} onChange={handleChange}>
-                    <option value="">No Parent</option>
-                    {categories.filter(c => !isEdit || c._id !== selectedCategory?._id).map(cat => (
-                      <option key={cat._id} value={cat._id}>{cat.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Ordering Number</label>
-                  <input type="number" name="order" value={formData.order} onChange={handleChange} />
-                  <small>Higher number = higher priority</small>
-                </div>
-                <div className="form-group">
-                  <label>Banner</label>
-                  <input type="file" accept="image/*" onChange={handleFileChange(setBannerFile, setBannerPreview)} />
-                  {bannerPreview && <img src={bannerPreview} className="preview-img" alt="banner" />}
-                </div>
-                <div className="form-group">
-                  <label>Icon</label>
-                  <input type="file" accept="image/*" onChange={handleFileChange(setIconFile, setIconPreview)} />
-                  {iconPreview && <img src={iconPreview} className="preview-icon" alt="icon" />}
-                </div>
-                <div className="form-group">
-                  <label>Cover Image</label>
-                  <input type="file" accept="image/*" onChange={handleFileChange(setCoverFile, setCoverPreview)} />
-                  {coverPreview && <img src={coverPreview} className="preview-img" alt="cover" />}
-                </div>
-                <div className="form-group">
-                  <label>Meta Title</label>
-                  <input name="metaTitle" value={formData.metaTitle} onChange={handleChange} />
-                </div>
-                <div className="form-group">
-                  <label>Meta Description</label>
-                  <textarea name="metaDescription" value={formData.metaDescription} onChange={handleChange} rows="3" />
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button className="btn-cancel" onClick={() => setShowModal(false)}>Cancel</button>
-                <button className="btn-save" onClick={isEdit ? handleUpdate : handleAdd}>{isEdit ? "Update" : "Save"}</button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* SIDE VIEW DRAWER with animation */}
-      <AnimatePresence>
-        {showView && selectedCategory && (
-          <>
-            <motion.div
-              className="sidebar-backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowView(false)}
+      {/* Card */}
+      <div className="categories-card">
+        <div className="toolbar">
+          <div className="search-box">
+            <i className="bi bi-search"></i>
+            <input
+              type="text"
+              placeholder="Search Categories..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
-            <motion.div
-              className="view-sidebar"
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "tween", duration: 0.3, ease: "easeOut" }}
-            >
-              <div className="sidebar-header">
-                <h4>{selectedCategory.name}</h4>
-                <button className="btn-close" onClick={() => setShowView(false)}>✕</button>
+          </div>
+          <select className="bulk-select">
+            <option>Bulk Action</option>
+            <option>Delete Selected</option>
+            <option>Disable</option>
+          </select>
+        </div>
+
+        <div className="table-responsive">
+          {loading ? (
+            <div className="text-center py-5">Loading categories...</div>
+          ) : (
+            <table className="category-table">
+              <thead>
+                <tr>
+                  <th><input type="checkbox" /></th>
+                  <th>Icon</th>
+                  <th>Name</th>
+                  <th>Parent Category</th>
+                  <th>Order Level</th>
+                  <th>Level</th>
+                  <th>Featured</th>
+                  <th>Hot Category</th>
+                  <th className="text-end">Options</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCategories.length === 0 ? (
+                  <tr><td colSpan="9" className="text-center py-5 text-muted">No categories found.</td></tr>
+                ) : (
+                  filteredCategories.map((category) => (
+                    <tr key={category._id}>
+                      <td><input type="checkbox" /></td>
+                      <td>
+                        <div className="category-icon">
+                          {category.icon ? (
+                            <img
+                              src={getImageUrl(category.icon)}
+                              alt={category.name}
+                              style={{ width: "40px", height: "40px", objectFit: "contain" }}
+                            />
+                          ) : (
+                            <i className="bi bi-box-seam"></i>
+                          )}
+                        </div>
+                      </td>
+                      <td className="category-name">{category.name}</td>
+                      <td>{getParentName(category)}</td>
+                      <td>{category.order ?? 0}</td>
+                      <td>{getCategoryLevel(category)}</td>
+                      <td>
+                        <div
+                          className={`toggle-switch ${category.isFeatured ? 'active' : ''}`}
+                          onClick={() => handleToggle(category._id, 'isFeatured', category.isFeatured)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <div className="toggle-thumb"></div>
+                        </div>
+                      </td>
+                      <td>
+                        <div
+                          className={`toggle-switch ${category.isHot ? 'active' : ''}`}
+                          onClick={() => handleToggle(category._id, 'isHot', category.isHot)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <div className="toggle-thumb"></div>
+                        </div>
+                      </td>
+                      <td className="text-end">
+                        <div className="option-wrapper">
+                          <button className="view-btn" onClick={() => handleViewMore(category)}>
+                            View More
+                          </button>
+                          <button
+                            className="option-btn"
+                            onClick={() => setMenuOpen(menuOpen === category._id ? null : category._id)}
+                          >
+                            <i className="bi bi-three-dots-vertical"></i>
+                          </button>
+                          {menuOpen === category._id && (
+                            <div className="option-menu">
+                              <button
+                                onClick={() => {
+                                  router.push(`/super-admin/product-managment/product-setup/category/edit/${category._id}`);
+                                  setMenuOpen(null);
+                                }}
+                              >
+                                <i className="bi bi-pencil-square"></i> Edit
+                              </button>
+                              <button className="delete" onClick={() => handleDelete(category._id)}>
+                                <i className="bi bi-trash"></i> Delete
+                              </button>
+                              <button
+                                onClick={() => {
+                                  router.push(`/super-admin/product-managment/products?category=${category._id}`);
+                                  setMenuOpen(null);
+                                }}
+                              >
+                                <i className="bi bi-box"></i> View Products
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* Sidebar */}
+      <>
+        <div className={`category-sidebar ${showSidebar ? "show" : ""}`}>
+          <div className="sidebar-header">
+            <h5>{selectedCategory?.name}</h5>
+            <button className="close-btn" onClick={closeSidebar}>
+              <i className="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <div className="sidebar-body">
+            <div className="detail-section">
+              <h6>Logo</h6>
+              <div className="logo-box">
+                {selectedCategory?.icon ? (
+                  <img src={getImageUrl(selectedCategory.icon)} alt="icon" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                ) : (
+                  <i className="bi bi-box-seam"></i>
+                )}
               </div>
-              <div className="sidebar-body">
-                <ul className="list-group">
-                  <li><strong>Parent Category</strong> <span>{getParentName(selectedCategory)}</span></li>
-                  <li><strong>Order Priority</strong> <span>{selectedCategory.order}</span></li>
-                  <li><strong>Meta Title</strong> <span>{selectedCategory.metaTitle || "—"}</span></li>
-                  <li><strong>Meta Description</strong> <span>{selectedCategory.metaDescription || "—"}</span></li>
-                </ul>
-                <div className="image-section">
-                  <div className="image-card">
-                    <div className="image-label">🏞️ Banner</div>
-                    {selectedCategory.banner ? (
-                      <img src={getImageUrl(selectedCategory.banner)} alt="banner" />
-                    ) : <div className="placeholder-icon">No banner</div>}
-                  </div>
-                  <div className="image-card">
-                    <div className="image-label">🔘 Icon</div>
-                    {selectedCategory.icon ? (
-                      <img src={getImageUrl(selectedCategory.icon)} alt="icon" style={{ width: "80px", margin: "0 auto" }} />
-                    ) : <div className="placeholder-icon">No icon</div>}
-                  </div>
-                  <div className="image-card">
-                    <div className="image-label">📷 Cover</div>
-                    {selectedCategory.coverImage ? (
-                      <img src={getImageUrl(selectedCategory.coverImage)} alt="cover" />
-                    ) : <div className="placeholder-icon">No cover</div>}
-                  </div>
-                </div>
+            </div>
+            <div className="detail-section">
+              <h6>Banner - Cover Image</h6>
+              <div className="banner-images">
+                {selectedCategory?.banner ? (
+                  <img src={getImageUrl(selectedCategory.banner)} alt="banner" />
+                ) : (
+                  <div className="text-muted">No banner</div>
+                )}
+                {selectedCategory?.coverImage ? (
+                  <img src={getImageUrl(selectedCategory.coverImage)} alt="cover" />
+                ) : (
+                  <div className="text-muted">No cover</div>
+                )}
               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+            </div>
+            <div className="detail-section">
+              <h6>Products in the Category</h6>
+              <div className="d-flex align-items-center gap-3">
+                <span>—</span>
+                <button className="view-products-btn">View Products</button>
+              </div>
+            </div>
+            <div className="detail-section">
+              <h6>Parent Category</h6>
+              <p>{selectedCategory ? getParentName(selectedCategory) : "—"}</p>
+            </div>
+            <div className="detail-section">
+              <h6>Order Level</h6>
+              <p>{selectedCategory?.order ?? "—"}</p>
+            </div>
+            <div className="detail-section">
+              <h6>Level</h6>
+              <p>{selectedCategory ? getCategoryLevel(selectedCategory) : "—"}</p>
+            </div>
+            <div className="detail-section">
+              <h6>Category Based Discount</h6>
+              <button className="discount-btn">Not Applied</button>
+            </div>
+          </div>
+        </div>
+        <div className={`sidebar-overlay ${showSidebar ? "show" : ""}`} onClick={closeSidebar} />
+      </>
+
+      {/* Pagination */}
+      <div className="pagination-wrapper">
+        <button
+          className="page-arrow"
+          onClick={handlePrev}
+          disabled={currentPage === 1}
+          style={{ opacity: currentPage === 1 ? 0.5 : 1 }}
+        >
+          <i className="bi bi-chevron-left"></i>
+        </button>
+
+        {Array.from({ length: totalPages }, (_, index) => {
+          const pageNum = index + 1;
+          if (
+            pageNum === 1 ||
+            pageNum === totalPages ||
+            Math.abs(pageNum - currentPage) <= 2
+          ) {
+            return (
+              <button
+                key={pageNum}
+                className={`page-number ${currentPage === pageNum ? "active" : ""}`}
+                onClick={() => goToPage(pageNum)}
+              >
+                {pageNum}
+              </button>
+            );
+          } else if (pageNum === 2 && currentPage > 4) {
+            return <span key="dots-left" className="page-dots">…</span>;
+          } else if (pageNum === totalPages - 1 && currentPage < totalPages - 3) {
+            return <span key="dots-right" className="page-dots">…</span>;
+          }
+          return null;
+        })}
+
+        <button
+          className="page-arrow"
+          onClick={handleNext}
+          disabled={currentPage === totalPages}
+          style={{ opacity: currentPage === totalPages ? 0.5 : 1 }}
+        >
+          <i className="bi bi-chevron-right"></i>
+        </button>
+      </div>
     </div>
   );
 }
