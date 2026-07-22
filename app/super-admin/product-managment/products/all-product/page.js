@@ -4,8 +4,6 @@ import { useState, useMemo, useCallback, useRef, useTransition, useEffect } from
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
-import 'bootstrap/dist/css/bootstrap.min.css';
-import 'bootstrap-icons/font/bootstrap-icons.css';
 import './all-products.css';
 import { useDebounce } from '../components/hooks/useDebounce';
 import { usePagination } from '../components/hooks/usePagination';
@@ -22,7 +20,6 @@ export default function AllProductsPage() {
   const dropdownRef = useRef(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // State
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOption, setFilterOption] = useState('');
   const [sortOption, setSortOption] = useState('');
@@ -30,11 +27,8 @@ export default function AllProductsPage() {
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [isPending, startTransition] = useTransition();
-
-  // Data fetching
   const { products, loading, fetchProducts } = useProducts();
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -45,10 +39,8 @@ export default function AllProductsPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Image URL helper
   const getImageUrl = useCallback((filename) => filename ? `${SERVERURL}/imgUploads/${filename}` : null, []);
 
-  // Filter & Sort
   const filteredAndSortedProducts = useMemo(() => {
     let result = [...products];
     if (debouncedSearchTerm) {
@@ -73,7 +65,6 @@ export default function AllProductsPage() {
     return result;
   }, [products, debouncedSearchTerm, filterOption, sortOption]);
 
-  // Pagination
   const { currentPage, totalPages, goToPage, nextPage, prevPage, setCurrentPage } =
     usePagination(filteredAndSortedProducts.length, itemsPerPage);
 
@@ -92,7 +83,6 @@ export default function AllProductsPage() {
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   }, [currentPage, totalPages]);
 
-  // Toggle handlers
   const togglePublished = useCallback(async (id, current) => {
     const res = await updateProductAPI(id, { published: !current });
     if (res.success) { toast.success(`Product ${!current ? 'published' : 'unpublished'}`); fetchProducts(); }
@@ -121,18 +111,14 @@ export default function AllProductsPage() {
   const handleEdit = useCallback((id) => router.push(`/super-admin/product-managment/products/edit-product/${id}`), [router]);
   const handleInfoClick = useCallback((id) => router.push(`/super-admin/product-managment/products/product-details/${id}`), [router]);
 
-  // UI helpers
-  const toggleDropdown = () => setDropdownOpen(prev => !prev);
+const toggleDropdown = (e) => {
+  e.stopPropagation();
+  console.log('Toggling dropdown, current:', dropdownOpen);
+  setDropdownOpen(prev => !prev);
+};
   const closeDropdown = () => setDropdownOpen(false);
-  const resetFilters = () => {
-    setSearchTerm('');
-    setFilterOption('');
-    setSortOption('');
-    setCurrentPage(1);
-  };
   const handleItemsPerPageChange = (e) => {
-    setItemsPerPage(parseInt(e.target.value, 10));
-    setCurrentPage(1);
+    setItemsPerPage(parseInt(e.target.value, 10)); setCurrentPage(1);
   };
   const handleSearchChange = (e) => startTransition(() => setSearchTerm(e.target.value));
 
@@ -142,121 +128,168 @@ export default function AllProductsPage() {
   return (
     <div className="all-products-container" suppressHydrationWarning>
       <Toaster position="top-right" />
-
-      {/* Header */}
+      
       <div className="header-actions">
-        <div className="header-left">
-          <h4 className="page-title">📦 All Products</h4>
-          <p className="page-subtitle">Manage your product inventory and listings</p>
-        </div>
-        <div className="header-right">
-          <div className="transparent-dropdown" ref={dropdownRef}>
-            <button className="transparent-add-btn" onClick={toggleDropdown}>
-              <i className="bi bi-plus-circle"></i> Add New
-            </button>
-            {dropdownOpen && (
-              <ul className="transparent-dropdown-menu">
-                <li><Link href="/super-admin/product-managment/products/add-product" className="dropdown-item" onClick={closeDropdown}><i className="bi bi-box-seam me-2"></i> New Product</Link></li>
-                <li><Link href="/super-admin/product-managment/product-setup/category" className="dropdown-item" onClick={closeDropdown}><i className="bi bi-tags me-2"></i> New Category</Link></li>
-                <li><Link href="/super-admin/product-managment/draft-products" className="dropdown-item" onClick={closeDropdown}><i className="bi bi-file-earmark-text me-2"></i> Draft</Link></li>
-                <li><Link href="/super-admin/product-managment/product-setup/Brand" className="dropdown-item" onClick={closeDropdown}><i className="bi bi-building me-2"></i> New Brand</Link></li>
-              </ul>
-            )}
-          </div>
-        </div>
+        <h3 className="page-title">All products</h3>
+       <div className="dropdown-wrapper" ref={dropdownRef}>
+  <button type="button" onClick={toggleDropdown} className="add-new-btn">
+    Add New Product
+    <span className="icon-plus">➕</span>
+  </button>
+  <ul className={`dropdown-menu ${dropdownOpen ? 'open' : ''}`}>
+    <li>
+      <Link href="/super-admin/product-managment/products/add-product" onClick={closeDropdown} className="dropdown-item">
+        <i className="bi bi-box me-2"></i> Product
+      </Link>
+    </li>
+    <li>
+      <Link href="/super-admin/product-managment/product-setup/category" onClick={closeDropdown} className="dropdown-item">
+        <i className="bi bi-tags me-2"></i> Category
+      </Link>
+    </li>
+    <li>
+      <Link href="/super-admin/product-managment/product-setup/Brand" onClick={closeDropdown} className="dropdown-item">
+        <i className="bi bi-building me-2"></i> Brand
+      </Link>
+    </li>
+  </ul>
+</div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="filter-bar">
-        <div className="row g-2 align-items-end">
-          <div className="col-md-4">
-            <input type="text" className="form-control" placeholder="Search products..." value={searchTerm} onChange={handleSearchChange} />
+      <div className="main-table-wrapper">
+        
+        {/* TABS */}
+        <ul className="product-tabs">
+          <li className="tab-item active">All products</li>
+        </ul>
+
+        {/* FILTER BAR */}
+        <div className="filter-top">
+          <div className="search-box">
+            <i className="bi bi-search search-icon"></i>
+            <input type="text" placeholder="Search products..." value={searchTerm} onChange={handleSearchChange} />
           </div>
-          <div className="col-md-3">
-            <select className="form-select" value={filterOption} onChange={(e) => setFilterOption(e.target.value)}>
+          <div className="select-wrapper">
+            <select className="filter-select" defaultValue="">
+              <option value="" disabled>Bulk Action</option>
+            </select>
+          </div>
+          <div className="select-wrapper">
+            <select className="filter-select" value={filterOption} onChange={(e) => setFilterOption(e.target.value)}>
               <option value="">Filter</option>
               <option value="published">Published</option>
               <option value="featured">Featured</option>
               <option value="todayDeal">Today's Deal</option>
-              <option value="discount">Has Discount</option>
+              <option value="discount">Discount</option>
             </select>
           </div>
-          <div className="col-md-3">
-            <select className="form-select" value={sortOption} onChange={(e) => setSortOption(e.target.value)}>
+          <div className="select-wrapper">
+            <select className="filter-select" value={sortOption} onChange={(e) => setSortOption(e.target.value)}>
               <option value="">Sort</option>
-              <option value="price-asc">Price (Low to High)</option>
-              <option value="price-desc">Price (High to Low)</option>
-              <option value="rating-desc">Highest Rated</option>
-              <option value="name-asc">Name (A-Z)</option>
+              <option value="price-asc">Price ↑</option>
+              <option value="price-desc">Price ↓</option>
+              <option value="rating-desc">Rating</option>
+              <option value="name-asc">Name</option>
             </select>
-          </div>
-          <div className="col-md-2">
-            <button className="btn btn-outline-secondary w-100" onClick={resetFilters}>Reset</button>
           </div>
         </div>
-      </div>
 
-      {/* Table */}
-      <div className="table-responsive">
-        {loading ? (
-          <table className="med-table">
-            <thead><tr>{['Product','Brand','Category','Rating','Price (₹)','Discount','Info','Published','Featured',"Today's Deal",'Actions'].map(h => <th key={h}>{h}</th>)}</tr></thead>
-            <tbody>{Array(itemsPerPage).fill(null).map((_, i) => <SkeletonRow key={i} />)}</tbody>
-          </table>
-        ) : (
-          <>
+        {/* TABLE */}
+        <div className="table-responsive">
+          {loading ? (
             <table className="med-table">
-              <thead><tr>{['Product','Brand','Category','Rating','Price (₹)','Discount','Info','Published','Featured',"Today's Deal",'Actions'].map(h => <th key={h}>{h}</th>)}</tr></thead>
-              <tbody>
-                {paginatedProducts.map(product => (
-                  <ProductRow
-                    key={product._id}
-                    product={product}
-                    onTogglePublished={togglePublished}
-                    onToggleFeatured={toggleFeatured}
-                    onToggleTodayDeal={toggleTodayDeal}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                    onInfo={handleInfoClick}
-                    getImageUrl={getImageUrl}
-                  />
-                ))}
-                {paginatedProducts.length === 0 && (
-                  <tr><td colSpan={11} className="text-center py-4">No products found.</td></tr>
-                )}
-              </tbody>
+              <thead>
+                <tr>
+                  <th className="checkbox-col"><input type="checkbox" disabled /></th>
+                  <th>THUMB</th>
+                  <th>NAME / BRAND</th>
+                  <th>OWNER / CATEGORY</th>
+                  <th>RATINGS</th>
+                  <th>PRICE DETAILS</th>
+                  <th>INFO</th>
+                  <th>PUBLISHED</th>
+                  <th>FEATURED</th>
+                  <th>TODAY'S DEAL</th>
+                  <th>OPTIONS</th>
+                </tr>
+              </thead>
+              <tbody>{Array(itemsPerPage).fill(null).map((_, i) => <SkeletonRow key={i} />)}</tbody>
             </table>
+          ) : (
+            <>
+              <table className="med-table">
+                <thead>
+                  <tr>
+                    <th className="checkbox-col"><input type="checkbox" /></th>
+                    <th>THUMB</th>
+                    <th>NAME / BRAND</th>
+                    <th>OWNER / CATEGORY</th>
+                    <th>RATINGS</th>
+                    <th>PRICE DETAILS</th>
+                    <th>INFO</th>
+                    <th>PUBLISHED</th>
+                    <th>FEATURED</th>
+                    <th>TODAY'S DEAL</th>
+                    <th>OPTIONS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedProducts.map(product => (
+                    <ProductRow
+                      key={product._id}
+                      product={product}
+                      onTogglePublished={togglePublished}
+                      onToggleFeatured={toggleFeatured}
+                      onToggleTodayDeal={toggleTodayDeal}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onInfo={handleInfoClick}
+                      getImageUrl={getImageUrl}
+                    />
+                  ))}
+                  {paginatedProducts.length === 0 && (
+                    <tr><td colSpan={11} className="no-products">No products found.</td></tr>
+                  )}
+                </tbody>
+              </table>
 
-            {/* Pagination */}
-            {filteredAndSortedProducts.length > 0 && (
-              <div className="pagination-controls">
-                <div className="pagination-info">
-                  Showing {startItem} to {endItem} of {filteredAndSortedProducts.length} products
-                </div>
-                <div className="pagination-actions">
-                  <select className="form-select per-page-select" value={itemsPerPage} onChange={handleItemsPerPageChange}>
-                    {[10,25,50,100].map(n => <option key={n} value={n}>{n} per page</option>)}
-                  </select>
-                  <nav aria-label="Page navigation">
-                    <ul className="pagination mb-0">
-                      <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                        <button className="page-link" onClick={prevPage} disabled={currentPage === 1}><i className="bi bi-chevron-left"></i></button>
-                      </li>
-                      {pageNumbers.map(p => (
-                        <li key={p} className={`page-item ${currentPage === p ? 'active' : ''}`}>
-                          <button className="page-link" onClick={() => goToPage(p)}>{p}</button>
+              {/* PAGINATION */}
+              {filteredAndSortedProducts.length > 0 && (
+                <div className="pagination-wrapper">
+                  <div className="pagination-info">
+                    Showing {startItem} to {endItem} of {filteredAndSortedProducts.length} products
+                  </div>
+                  <div className="pagination-controls">
+                    <select className="pagination-select" value={itemsPerPage} onChange={handleItemsPerPageChange}>
+                      {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n} per page</option>)}
+                    </select>
+                    <nav>
+                      <ul className="pagination-list">
+                        <li className={currentPage === 1 ? 'hidden' : ''}>
+                          <button onClick={prevPage} disabled={currentPage === 1} className="pagination-btn">
+                            <span className="pagination-arrow">◀</span>
+                          </button>
                         </li>
-                      ))}
-                      <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-                        <button className="page-link" onClick={nextPage} disabled={currentPage === totalPages}><i className="bi bi-chevron-right"></i></button>
-                      </li>
-                    </ul>
-                  </nav>
+                        {pageNumbers.map(p => (
+                          <li key={p}>
+                            <button onClick={() => goToPage(p)} className={`pagination-btn ${currentPage === p ? 'active' : ''}`}>
+                              {p}
+                            </button>
+                          </li>
+                        ))}
+                        <li className={currentPage === totalPages ? 'hidden' : ''}>
+                          <button onClick={nextPage} disabled={currentPage === totalPages} className="pagination-btn">
+                            <span className="pagination-arrow">▶</span>
+                          </button>
+                        </li>
+                      </ul>
+                    </nav>
+                  </div>
                 </div>
-              </div>
-            )}
-          </>
-        )}
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
